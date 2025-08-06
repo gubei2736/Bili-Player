@@ -31,6 +31,7 @@ export const PlaylistHeader = memo(function PlaylistHeader({
 			<View style={{ flexDirection: 'row', padding: 16 }}>
 				<Image
 					source={{ uri: coverUri }}
+					contentFit='contain'
 					style={{ width: 120, height: 120, borderRadius: 8 }}
 				/>
 				<View style={{ marginLeft: 16, flex: 1, justifyContent: 'center' }}>
