@@ -127,9 +127,10 @@ export default function FavoritePage() {
 			return
 		}
 		openModal(
-			'FavoriteSyncProgress',
+			'PlaylistSyncProgress',
 			{
-				favoriteId: Number(id),
+				remoteId: Number(id),
+				type: 'favorite',
 				shouldRedirectToLocalPlaylist: true,
 				expandMultiPage: expandMultiPageOnSync,
 			},
