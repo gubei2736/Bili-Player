@@ -145,9 +145,20 @@ export class QQMusicApi {
 
 	getPlaylist(id: string): ResultAsync<QQMusicPlaylistResponse, Error> {
 		const params = new URLSearchParams({
-			id,
+			type: '1',
+			json: '1',
+			utf8: '1',
+			onlysong: '0',
+			disstid: id,
 			format: 'json',
-			news心情: '1',
+			g_tk: '5381',
+			loginUin: '0',
+			hostUin: '0',
+			inCharset: 'utf8',
+			outCharset: 'utf-8',
+			notice: '0',
+			platform: 'yqq.json',
+			needNewCode: '0',
 		})
 		const url = `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?${params.toString()}`
 

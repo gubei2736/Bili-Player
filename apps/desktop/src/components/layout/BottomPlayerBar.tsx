@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
 	Play,
 	Pause,
@@ -11,12 +11,19 @@ import {
 	VolumeX,
 	Maximize2,
 	Sliders,
+	FileText,
 } from 'lucide-react'
 import { useQueueStore, useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
 import { getQualityBadgeInfo } from '../../audio/audioSettings'
 import { WavySlider } from '../player/WavySlider'
+import { parseSpl, type SplLyricData } from '@bbplayer/splash'
+import {
+	lyricService,
+	getStoredLyricOffset,
+} from '../../services/lyricService'
+import { LyricsSettingsModal } from '../modals/LyricsSettingsModal'
 
 export interface BottomPlayerBarProps {
 	onToggleFullscreenLyrics?: () => void
@@ -49,6 +56,54 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		currentTrack?.source === 'bilibili' ? (currentTrack as BilibiliTrack) : null
 	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
 	const badgeInfo = currentTrack ? getQualityBadgeInfo(currentQualityId) : null
+
+	const [splContent, setSplContent] = useState<string>('')
+	const [lyricModalOpen, setLyricModalOpen] = useState(false)
+
+	// Auto fetch lyrics on currentTrack change
+	useEffect(() => {
+		if (currentTrack) {
+			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
+				setSplContent(res?.splContent || '')
+			})
+		} else {
+			setSplContent('')
+		}
+	}, [currentTrack?.uniqueKey])
+
+	// Listen for custom lyric changes
+	useEffect(() => {
+		const handleCustomLyric = (e: any) => {
+			if (e.detail?.trackKey === currentTrack?.uniqueKey) {
+				setSplContent(e.detail.splContent)
+			}
+		}
+		window.addEventListener('bbplayer:custom-lyric-change', handleCustomLyric)
+		return () => {
+			window.removeEventListener('bbplayer:custom-lyric-change', handleCustomLyric)
+		}
+	}, [currentTrack?.uniqueKey])
+
+	const splData = useMemo(() => {
+		if (!splContent) return null
+		try {
+			return parseSpl(splContent)
+		} catch {
+			return null
+		}
+	}, [splContent])
+
+	const currentLine = useMemo(() => {
+		if (!splData || splData.lines.length === 0) return null
+		const offset = currentTrack ? getStoredLyricOffset(currentTrack.uniqueKey) : 0
+		const ms = (currentTime + offset) * 1000
+		for (let i = splData.lines.length - 1; i >= 0; i--) {
+			if (ms >= splData.lines[i]!.startTime) {
+				return splData.lines[i]!
+			}
+		}
+		return splData.lines[0] || null
+	}, [splData, currentTime, currentTrack])
 
 	useEffect(() => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
@@ -220,62 +275,89 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					)}
 				</div>
 
-				{/* Center: Playback Controls */}
-				<div className="flex items-center gap-4">
-					<button
-						onClick={togglePlayMode}
-						title={`播放模式: ${playMode}`}
-						className="p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+				{/* Center: Status Bar Lyrics & Playback Controls */}
+				<div className="flex flex-col items-center justify-center flex-1 max-w-lg px-2">
+					{/* Status Bar Lyric */}
+					<div
+						onClick={onToggleFullscreenLyrics}
+						className="h-4 flex items-center justify-center gap-2 cursor-pointer text-center overflow-hidden max-w-md group mb-1"
+						title="状态栏歌词 (点击展开沉浸式全屏歌词)"
 					>
-						{playMode === 'shuffle' && <Shuffle className="w-4 h-4 text-primary" />}
-						{playMode === 'repeat_one' && <Repeat1 className="w-4 h-4 text-primary" />}
-						{playMode === 'repeat_all' && <Repeat className="w-4 h-4 text-primary" />}
-						{playMode === 'sequential' && <Repeat className="w-4 h-4" />}
-					</button>
-
-					<button
-						onClick={prev}
-						title="上一曲"
-						className="p-2 rounded-full hover:bg-white/10 text-foreground transition-colors"
-					>
-						<SkipBack className="w-5 h-5 fill-current" />
-					</button>
-
-					<button
-						onClick={togglePlayPause}
-						title={isPlaying ? '暂停' : '播放'}
-						className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
-						style={{ backgroundColor: primaryColor }}
-					>
-						{isPlaying ? (
-							<Pause className="w-5 h-5 fill-current" />
+						{currentLine ? (
+							<div className="flex items-center gap-2 text-xs truncate">
+								<span className="font-semibold text-foreground/90 group-hover:text-primary transition-colors truncate">
+									{currentLine.content}
+								</span>
+								{currentLine.translation && (
+									<span className="text-[11px] text-muted-foreground/80 hidden sm:inline group-hover:text-sky-300 transition-colors truncate">
+										{currentLine.translation}
+									</span>
+								)}
+							</div>
 						) : (
-							<Play className="w-5 h-5 fill-current ml-0.5" />
+							<span className="text-[10px] text-muted-foreground/50 tracking-wider">
+								{currentTrack ? '♪ 沉浸聆听中 · 点击右侧调整歌词' : 'BBPlayer 全能音乐播放器'}
+							</span>
 						)}
-					</button>
+					</div>
 
-					<button
-						onClick={next}
-						title="下一曲"
-						className="p-2 rounded-full hover:bg-white/10 text-foreground transition-colors"
-					>
-						<SkipForward className="w-5 h-5 fill-current" />
-					</button>
+					{/* Playback Controls */}
+					<div className="flex items-center gap-4">
+						<button
+							onClick={togglePlayMode}
+							title={`播放模式: ${playMode}`}
+							className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+						>
+							{playMode === 'shuffle' && <Shuffle className="w-4 h-4 text-primary" />}
+							{playMode === 'repeat_one' && <Repeat1 className="w-4 h-4 text-primary" />}
+							{playMode === 'repeat_all' && <Repeat className="w-4 h-4 text-primary" />}
+							{playMode === 'sequential' && <Repeat className="w-4 h-4" />}
+						</button>
 
-					<button
-						onClick={toggleLoudnessNormalization}
-						title={loudnessEnabled ? '已开启响度均衡' : '已关闭响度均衡'}
-						className={`p-2 rounded-full hover:bg-white/10 transition-colors ${
-							loudnessEnabled ? 'text-primary' : 'text-muted-foreground'
-						}`}
-					>
-						<Sliders className="w-4 h-4" />
-					</button>
+						<button
+							onClick={prev}
+							title="上一曲"
+							className="p-1.5 rounded-full hover:bg-white/10 text-foreground transition-colors"
+						>
+							<SkipBack className="w-5 h-5 fill-current" />
+						</button>
+
+						<button
+							onClick={togglePlayPause}
+							title={isPlaying ? '暂停' : '播放'}
+							className="w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform active:scale-95 shadow-md"
+							style={{ backgroundColor: primaryColor }}
+						>
+							{isPlaying ? (
+								<Pause className="w-4 h-4 fill-current" />
+							) : (
+								<Play className="w-4 h-4 fill-current ml-0.5" />
+							)}
+						</button>
+
+						<button
+							onClick={next}
+							title="下一曲"
+							className="p-1.5 rounded-full hover:bg-white/10 text-foreground transition-colors"
+						>
+							<SkipForward className="w-5 h-5 fill-current" />
+						</button>
+
+						<button
+							onClick={toggleLoudnessNormalization}
+							title={loudnessEnabled ? '已开启响度均衡' : '已关闭响度均衡'}
+							className={`p-1.5 rounded-full hover:bg-white/10 transition-colors ${
+								loudnessEnabled ? 'text-primary' : 'text-muted-foreground'
+							}`}
+						>
+							<Sliders className="w-4 h-4" />
+						</button>
+					</div>
 				</div>
 
 				{/* Right: Volume & Lyric Trigger */}
-				<div className="flex items-center justify-end gap-3 w-1/4 min-w-[200px]">
-					<div className="flex items-center gap-2">
+				<div className="flex items-center justify-end gap-2.5 w-1/4 min-w-[200px]">
+					<div className="flex items-center gap-1.5">
 						<button
 							onClick={toggleMute}
 							className="p-1.5 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
@@ -293,19 +375,34 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							step="0.01"
 							value={isMuted ? 0 : volume}
 							onChange={handleVolumeChange}
-							className="w-20 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary"
+							className="w-16 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary"
 						/>
 					</div>
 
 					<button
+						onClick={() => setLyricModalOpen(true)}
+						title="歌词微调与智能搜索匹配"
+						className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-primary transition-colors"
+					>
+						<FileText className="w-4 h-4" />
+					</button>
+
+					<button
 						onClick={onToggleFullscreenLyrics}
-						title="全屏歌词模式"
-						className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+						title="全屏沉浸歌词模式"
+						className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
 					>
 						<Maximize2 className="w-4 h-4" />
 					</button>
 				</div>
 			</div>
+
+			<LyricsSettingsModal
+				isOpen={lyricModalOpen}
+				onClose={() => setLyricModalOpen(false)}
+				track={currentTrack}
+				onLyricsUpdated={(spl) => setSplContent(spl)}
+			/>
 		</footer>
 	)
 }

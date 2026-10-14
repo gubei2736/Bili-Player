@@ -38,17 +38,49 @@ export const PlaylistImportModal: React.FC<PlaylistImportModalProps> = ({
 
 	if (!isOpen) return null
 
-	const parseInput = (raw: string): { id: string; source: 'netease' | 'qq' } => {
+	const parseInput = (
+		raw: string,
+	): { id: string; source: 'netease' | 'qq' } | null => {
 		const str = raw.trim()
+		if (!str) return null
+
+		// 1. QQ 音乐识别
 		if (str.includes('qq.com')) {
-			// e.g. https://y.qq.com/n/ryqq/playlist/7123456
-			const m = str.match(/playlist\/(\d+)/) || str.match(/id=(\d+)/)
-			return { id: m ? m[1]! : str, source: 'qq' }
+			const m =
+				str.match(/playlist\/(\d+)/) ||
+				str.match(/taoge\.html\?id=(\d+)/) ||
+				str.match(/[?&]id=(\d+)/) ||
+				str.match(/[?&]dissid=(\d+)/) ||
+				str.match(/[?&]disstid=(\d+)/)
+			if (m && m[1]) return { id: m[1], source: 'qq' }
 		}
 
-		// Default netease: https://music.163.com/playlist?id=123456
-		const m = str.match(/id=(\d+)/)
-		return { id: m ? m[1]! : str, source: 'netease' }
+		// 2. 网易云音乐识别
+		if (str.includes('163.com') || str.includes('163cn.tv')) {
+			const m =
+				str.match(/playlist\/(\d+)/) ||
+				str.match(/[?&]id=(\d+)/) ||
+				str.match(/playlist\?id=(\d+)/)
+			if (m && m[1]) return { id: m[1], source: 'netease' }
+		}
+
+		// 3. 通用参数匹配 (包含在整段分享文字中)
+		const generalIdMatch =
+			str.match(/[?&]id=(\d+)/) || str.match(/[?&]dissid=(\d+)/)
+		if (generalIdMatch && generalIdMatch[1]) {
+			return {
+				id: generalIdMatch[1],
+				source: str.includes('qq') ? 'qq' : 'netease',
+			}
+		}
+
+		// 4. 纯数字歌单 ID
+		const pureDigits = str.match(/\b\d{5,12}\b/)
+		if (pureDigits) {
+			return { id: pureDigits[0], source: 'netease' }
+		}
+
+		return null
 	}
 
 	const handleStartImport = async () => {
@@ -57,7 +89,15 @@ export const PlaylistImportModal: React.FC<PlaylistImportModalProps> = ({
 		setStep('fetching')
 		setProgressText('正在解析歌单元数据与歌曲列表...')
 
-		const { id, source } = parseInput(inputVal)
+		const parsed = parseInput(inputVal)
+		if (!parsed) {
+			setError(
+				'未能识别出有效的歌单 ID 或链接，请确认粘贴了包含 id=数字 的完整分享链接或纯数字歌单 ID',
+			)
+			setStep('input')
+			return
+		}
+		const { id, source } = parsed
 		const fetchRes = await externalPlaylistService.fetchExternalPlaylist(id, source)
 
 		if (fetchRes.isErr()) {

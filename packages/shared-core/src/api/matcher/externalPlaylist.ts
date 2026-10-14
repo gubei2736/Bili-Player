@@ -1,5 +1,5 @@
 import { decode } from 'he'
-import { errAsync, ResultAsync } from 'neverthrow'
+import { errAsync, okAsync, ResultAsync } from 'neverthrow'
 
 import { bilibiliApi, type BilibiliApi } from '../bilibili/api'
 import { neteaseApi, type NeteaseApi } from '../netease/api'
@@ -62,87 +62,73 @@ export class ExternalPlaylistService {
 		source: 'netease' | 'qq',
 	): ResultAsync<{ playlist: GenericPlaylist; tracks: GenericTrack[] }, Error> {
 		if (source === 'netease') {
-			return this.nApi.getPlaylist(playlistId).map((response) => {
-				if (!response.playlist) {
-					return {
+			return this.nApi
+				.getPlaylist(playlistId)
+				.mapErr((err) => new Error(err.message || '获取网易云歌单网络异常'))
+				.andThen((response) => {
+					if (!response.playlist || !response.playlist.tracks || response.playlist.tracks.length === 0) {
+						return errAsync(
+							new Error('未找到网易云歌单或歌单为空/暂无公开权限，请检查歌单链接有效性'),
+						)
+					}
+
+					const tracks = response.playlist.tracks.map((track) => ({
+						title: track.name,
+						artists: track.ar.map((a) => a.name),
+						album: track.al.name,
+						duration: track.dt,
+						coverUrl: (track.al.picUrl || '').replace('http://', 'https://'),
+						translatedTitle: track.tns?.[0],
+					}))
+
+					return okAsync({
 						playlist: {
-							id: playlistId,
-							title: 'Unknown Playlist',
-							coverUrl: '',
-							description: '',
-							trackCount: 0,
+							id: response.playlist.id.toString(),
+							title: response.playlist.name,
+							coverUrl: response.playlist.coverImgUrl,
+							description: response.playlist.description ?? '',
+							trackCount: response.playlist.trackCount || tracks.length,
 							author: {
-								name: 'Unknown',
-								id: 0,
+								name: response.playlist.creator?.nickname ?? '网易云音乐人',
+								id: response.playlist.creator?.userId ?? 0,
 							},
 						},
-						tracks: [],
-					}
-				}
-
-				const tracks = (response.playlist.tracks ?? []).map((track) => ({
-					title: track.name,
-					artists: track.ar.map((a) => a.name),
-					album: track.al.name,
-					duration: track.dt,
-					coverUrl: track.al.picUrl.replace('http://', 'https://'),
-					translatedTitle: track.tns?.[0],
-				}))
-
-				return {
-					playlist: {
-						id: response.playlist.id.toString(),
-						title: response.playlist.name,
-						coverUrl: response.playlist.coverImgUrl,
-						description: response.playlist.description ?? '',
-						trackCount: response.playlist.trackCount,
-						author: {
-							name: response.playlist.creator?.nickname ?? 'Unknown',
-							id: response.playlist.creator?.userId ?? 0,
-						},
-					},
-					tracks,
-				}
-			})
+						tracks,
+					})
+				})
 		} else if (source === 'qq') {
-			return this.qApi.getPlaylist(playlistId).map((response) => {
+			return this.qApi.getPlaylist(playlistId).andThen((response) => {
 				const playlist = response.data?.cdlist?.[0]
-				if (!playlist) {
-					return {
-						playlist: {
-							id: playlistId,
-							title: 'Unknown',
-							coverUrl: '',
-							description: '',
-							trackCount: 0,
-							author: { name: 'Unknown' },
-						},
-						tracks: [],
-					}
+				if (!playlist || !playlist.songlist || playlist.songlist.length === 0) {
+					return errAsync(
+						new Error('未找到 QQ 音乐歌单或歌单为空/暂无公开权限，请检查歌单链接有效性'),
+					)
 				}
 
 				const tracks = playlist.songlist.map((track) => ({
 					title: track.name,
 					artists: track.singer.map((s) => s.name),
-					album: track.album.name,
-					duration: track.interval * 1000,
-					coverUrl: `https://y.gtimg.cn/music/photo_new/T002R300x300M000${track.album.mid}.jpg`,
+					album: track.album?.name || '',
+					duration: (track.interval || 180) * 1000,
+					coverUrl: track.album?.mid
+						? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${track.album.mid}.jpg`
+						: '',
 					translatedTitle: track.subtitle,
 				}))
 
-				return {
+				return okAsync({
 					playlist: {
 						id: playlistId,
 						title: playlist.dissname,
 						coverUrl: playlist.logo,
 						description: playlist.desc || '',
-						trackCount: playlist.songnum,
+						trackCount: playlist.songnum || tracks.length,
 						author: {
-							name: playlist.nickname,
+							name: playlist.nickname || 'QQ音乐用户',
 						},
 					},
 					tracks,
-				}
+				})
 			})
 		}
 		return errAsync(new Error('Unsupported source: ' + String(source)))

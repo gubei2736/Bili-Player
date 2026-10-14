@@ -19,8 +19,10 @@ import { MainLayout } from './components/layout/MainLayout'
 import type { NavTab } from './components/layout/Sidebar'
 import { LoginModal } from './components/modals/LoginModal'
 import { PlaylistImportModal } from './components/modals/PlaylistImportModal'
+import { CreatePlaylistModal } from './components/modals/CreatePlaylistModal'
 import { ExportTrackModal } from './components/modals/ExportTrackModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
+import { lyricService } from './services/lyricService'
 import { SkinStoreView } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
@@ -54,6 +56,8 @@ const dummyArtist = (id: number, name: string): Artist => ({
 export const App: React.FC = () => {
 	const [loginModalOpen, setLoginModalOpen] = useState(false)
 	const [playlistImportOpen, setPlaylistImportOpen] = useState(false)
+	const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false)
+	const [activeSplContent, setActiveSplContent] = useState<string>('')
 	const [exportModalTrack, setExportModalTrack] = useState<Track | null>(null)
 	const [fullscreenLyricsOpen, setFullscreenLyricsOpen] = useState(false)
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
@@ -143,6 +147,29 @@ export const App: React.FC = () => {
 			})
 		}
 	}, [isLoggedIn, userInfo?.mid, syncRemotePlaylists])
+
+	// Auto fetch lyrics dynamically for current track
+	useEffect(() => {
+		if (currentTrack) {
+			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
+				setActiveSplContent(res?.splContent || '')
+			})
+		} else {
+			setActiveSplContent('')
+		}
+	}, [currentTrack?.uniqueKey])
+
+	useEffect(() => {
+		const handleCustom = (e: any) => {
+			if (e.detail?.trackKey === currentTrack?.uniqueKey) {
+				setActiveSplContent(e.detail.splContent)
+			}
+		}
+		window.addEventListener('bbplayer:custom-lyric-change', handleCustom)
+		return () => {
+			window.removeEventListener('bbplayer:custom-lyric-change', handleCustom)
+		}
+	}, [currentTrack?.uniqueKey])
 
 	// 1. Initialize DB
 	useEffect(() => {
@@ -536,26 +563,71 @@ export const App: React.FC = () => {
 						{tab === 'library' && (
 							<div className="space-y-4">
 								<div className="flex items-center justify-between">
-									<h2 className="text-base font-bold text-foreground">
-										我的音乐库
-									</h2>
+									<div>
+										<h2 className="text-base font-bold text-foreground">
+											我的音乐库
+										</h2>
+										<p className="text-xs text-muted-foreground mt-0.5">
+											管理你的本地曲库与自建歌单
+										</p>
+									</div>
 									<div className="flex items-center gap-2">
 										<button
 											onClick={() => setPlaylistImportOpen(true)}
-											className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
+											className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
 										>
 											<Import className="w-3.5 h-3.5" />
 											<span>导入网易云/QQ歌单</span>
 										</button>
-										<button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-medium transition-colors">
+										<button
+											onClick={() => setCreatePlaylistOpen(true)}
+											className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all"
+										>
 											<FolderPlus className="w-3.5 h-3.5" />
 											<span>新建歌单</span>
 										</button>
 									</div>
 								</div>
-								<div className="p-8 text-center rounded-xl border border-dashed border-white/10 text-muted-foreground text-xs">
-									暂无自定义歌单，可点击上方“导入网易云/QQ歌单”快速迁移
-								</div>
+
+								{/* Library Playlists List */}
+								{usePlaylistStore.getState().favoritePlaylists.length > 0 ? (
+									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+										{usePlaylistStore.getState().favoritePlaylists.map((pl) => (
+											<div
+												key={pl.id}
+												onClick={() => {
+													usePlaylistStore.getState().setSelectedPlaylistId(pl.id)
+													setActiveTab('favorites')
+												}}
+												className="p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+											>
+												<div className="flex items-center justify-between">
+													<div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+														<Music className="w-5 h-5" />
+													</div>
+													<span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground">
+														{pl.media_count} 首
+													</span>
+												</div>
+												<div>
+													<p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+														{pl.title}
+													</p>
+													<p className="text-[10px] text-muted-foreground mt-0.5">
+														云端收藏夹 · 点击浏览曲目
+													</p>
+												</div>
+											</div>
+										))}
+									</div>
+								) : (
+									<div className="p-12 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground space-y-3">
+										<FolderPlus className="w-10 h-10 mx-auto opacity-30" />
+										<p className="text-xs">
+											暂无自定义歌单，可点击上方“新建歌单”或“导入网易云/QQ歌单”
+										</p>
+									</div>
+								)}
 							</div>
 						)}
 
@@ -632,6 +704,16 @@ export const App: React.FC = () => {
 				onClose={() => setPlaylistImportOpen(false)}
 			/>
 
+			<CreatePlaylistModal
+				isOpen={createPlaylistOpen}
+				onClose={() => setCreatePlaylistOpen(false)}
+				onSuccess={() => {
+					if (userInfo?.mid) {
+						usePlaylistStore.getState().syncRemotePlaylists(userInfo.mid)
+					}
+				}}
+			/>
+
 			<ExportTrackModal
 				isOpen={exportModalTrack !== null}
 				onClose={() => setExportModalTrack(null)}
@@ -642,6 +724,7 @@ export const App: React.FC = () => {
 				isOpen={fullscreenLyricsOpen}
 				onClose={() => setFullscreenLyricsOpen(false)}
 				track={currentTrack}
+				splContent={activeSplContent}
 			/>
 		</>
 	)

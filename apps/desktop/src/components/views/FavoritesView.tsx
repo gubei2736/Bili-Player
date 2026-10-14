@@ -48,12 +48,19 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		selectedPlaylistId,
 		setSelectedPlaylistId,
 		syncRemotePlaylists,
+		playlistTracksCache,
+		setPlaylistTracksCache,
 		isLoading: isSyncingPlaylists,
 	} = usePlaylistStore()
 	const { setQueue, getCurrentTrack } = useQueueStore()
 	const currentTrack = getCurrentTrack()
 
-	const [tracks, setTracks] = useState<BilibiliTrack[]>([])
+	const [tracks, setTracks] = useState<BilibiliTrack[]>(() => {
+		if (selectedPlaylistId && playlistTracksCache[selectedPlaylistId]) {
+			return playlistTracksCache[selectedPlaylistId]!
+		}
+		return []
+	})
 	const [loadingTracks, setLoadingTracks] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [hiddenIds, setHiddenIds] = useState<number[]>(getHiddenFavoriteIds())
@@ -75,8 +82,15 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		(p) => !hiddenIds.includes(p.id),
 	)
 
-	// Fetch tracks when selectedPlaylistId changes
-	const fetchPlaylistTracks = async (favoriteId: number) => {
+	// Fetch tracks when selectedPlaylistId changes (cache-first)
+	const fetchPlaylistTracks = async (favoriteId: number, forceRefresh = false) => {
+		const cached = playlistTracksCache[favoriteId]
+		if (cached && cached.length > 0 && !forceRefresh) {
+			setTracks(cached)
+			setLoadingTracks(false)
+			return
+		}
+
 		setLoadingTracks(true)
 		setError(null)
 		try {
@@ -90,13 +104,14 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 					convertFavoriteItemToTrack(m, idx),
 				)
 				setTracks(converted)
+				setPlaylistTracksCache(favoriteId, converted)
 			} else {
 				setError(res.error.message || '获取收藏夹内容失败')
-				setTracks([])
+				if (!cached) setTracks([])
 			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : '网络请求异常')
-			setTracks([])
+			if (!cached) setTracks([])
 		} finally {
 			setLoadingTracks(false)
 		}
@@ -124,7 +139,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		if (!userInfo?.mid) return
 		await syncRemotePlaylists(userInfo.mid)
 		if (selectedPlaylistId) {
-			await fetchPlaylistTracks(selectedPlaylistId)
+			await fetchPlaylistTracks(selectedPlaylistId, true)
 		}
 	}
 
