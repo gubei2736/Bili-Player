@@ -98,29 +98,34 @@ export class ExternalPlaylistService {
 				})
 		} else if (source === 'qq') {
 			return this.qApi.getPlaylist(playlistId).andThen((response) => {
-				const playlist = response.data?.cdlist?.[0]
+				const resObj = response as any
+				const playlist = resObj.cdlist?.[0] || resObj.data?.cdlist?.[0]
 				if (!playlist || !playlist.songlist || playlist.songlist.length === 0) {
 					return errAsync(
 						new Error('未找到 QQ 音乐歌单或歌单为空/暂无公开权限，请检查歌单链接有效性'),
 					)
 				}
 
-				const tracks = playlist.songlist.map((track) => ({
-					title: track.name,
-					artists: track.singer.map((s) => s.name),
-					album: track.album?.name || '',
+				const tracks = playlist.songlist.map((track: any) => ({
+					title: track.songname || track.name || '未知曲目',
+					artists: Array.isArray(track.singer)
+						? track.singer.map((s: any) => s.name || '').filter(Boolean)
+						: ['未知歌手'],
+					album: track.albumname || track.album?.name || '',
 					duration: (track.interval || 180) * 1000,
-					coverUrl: track.album?.mid
-						? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${track.album.mid}.jpg`
-						: '',
-					translatedTitle: track.subtitle,
+					coverUrl: track.albummid
+						? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${track.albummid}.jpg`
+						: track.album?.mid
+							? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${track.album.mid}.jpg`
+							: '',
+					translatedTitle: track.songorig || track.subtitle,
 				}))
 
 				return okAsync({
 					playlist: {
 						id: playlistId,
-						title: playlist.dissname,
-						coverUrl: playlist.logo,
+						title: playlist.dissname || 'QQ音乐歌单',
+						coverUrl: playlist.logo || '',
 						description: playlist.desc || '',
 						trackCount: playlist.songnum || tracks.length,
 						author: {

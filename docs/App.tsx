@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
 	Search,
 	Music,
@@ -137,7 +137,7 @@ export const App: React.FC = () => {
 	const { setQueue, next, prev, getCurrentTrack } = useQueueStore()
 	const currentTrack = getCurrentTrack()
 	const { isLoggedIn, userInfo } = useAuthStore()
-	const { syncRemotePlaylists } = usePlaylistStore()
+	const { syncRemotePlaylists, favoritePlaylists } = usePlaylistStore()
 
 	// Auto sync remote playlists and collections when logged in
 	useEffect(() => {
@@ -147,6 +147,13 @@ export const App: React.FC = () => {
 			})
 		}
 	}, [isLoggedIn, userInfo?.mid, syncRemotePlaylists])
+
+	// Auto fetch favorite playlists when entering library tab if empty
+	useEffect(() => {
+		if (activeTab === 'library' && isLoggedIn && userInfo?.mid && (!favoritePlaylists || favoritePlaylists.length === 0)) {
+			syncRemotePlaylists(userInfo.mid).catch(() => {})
+		}
+	}, [activeTab, isLoggedIn, userInfo?.mid, favoritePlaylists, syncRemotePlaylists])
 
 	// Auto fetch lyrics dynamically for current track
 	useEffect(() => {
@@ -242,17 +249,26 @@ export const App: React.FC = () => {
 		} catch {}
 	}, [])
 
+	const handlePlayTrack = useCallback(
+		async (track: Track, index: number) => {
+			setQueue(featuredTracks, index)
+			try {
+				await playTrackWithProxy(track)
+			} catch (err) {
+				console.error('Failed to play track with proxy:', err)
+			}
+		},
+		[featuredTracks, setQueue, playTrackWithProxy],
+	)
+
 	const lastShortcutTriggerTimeRef = useRef<number>(0)
 
-	// 3. Global Shortcuts IPC Event Listener
-	useEffect(() => {
-		let unlistenFn: (() => void) | undefined
-		listen<string>('global-shortcut-event', async (event) => {
+	const handleGlobalShortcutAction = useCallback(
+		(action: string) => {
 			const now = Date.now()
-			if (now - lastShortcutTriggerTimeRef.current < 200) return
+			if (now - lastShortcutTriggerTimeRef.current < 150) return
 			lastShortcutTriggerTimeRef.current = now
 
-			const action = event.payload
 			if (action === 'play_pause') {
 				if (desktopAudioEngine.isPlaying()) {
 					desktopAudioEngine.pause()
@@ -274,6 +290,20 @@ export const App: React.FC = () => {
 					playTrackWithProxy(nextTrack).catch(() => {})
 				}
 			}
+		},
+		[next, prev, currentTrack, featuredTracks, playTrackWithProxy, handlePlayTrack],
+	)
+
+	// 3. Global Shortcuts IPC Event Listener & Eval Hook
+	useEffect(() => {
+		// 绑定全局 eval 触发钩子，确保即使应用失焦或 WebView2 IPC 事件被节流也能直接调用执行
+		;(window as any).__triggerGlobalShortcut = (action: string) => {
+			handleGlobalShortcutAction(action)
+		}
+
+		let unlistenFn: (() => void) | undefined
+		listen<string>('global-shortcut-event', async (event) => {
+			handleGlobalShortcutAction(event.payload)
 		})
 			.then((fn) => {
 				unlistenFn = fn
@@ -281,9 +311,10 @@ export const App: React.FC = () => {
 			.catch(() => {})
 
 		return () => {
+			delete (window as any).__triggerGlobalShortcut
 			if (unlistenFn) unlistenFn()
 		}
-	}, [next, prev, currentTrack, featuredTracks])
+	}, [handleGlobalShortcutAction])
 
 	// 4. In-App Single-Key & Global Shortcuts Handling
 	useEffect(() => {
@@ -441,15 +472,6 @@ export const App: React.FC = () => {
 		}
 	}
 
-	const handlePlayTrack = async (track: Track, index: number) => {
-		setQueue(featuredTracks, index)
-		try {
-			await playTrackWithProxy(track)
-		} catch (err) {
-			console.error('Failed to play track with proxy:', err)
-		}
-	}
-
 	return (
 		<>
 			<MainLayout
@@ -590,9 +612,9 @@ export const App: React.FC = () => {
 								</div>
 
 								{/* Library Playlists List */}
-								{usePlaylistStore.getState().favoritePlaylists.length > 0 ? (
+								{favoritePlaylists && favoritePlaylists.length > 0 ? (
 									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-										{usePlaylistStore.getState().favoritePlaylists.map((pl) => (
+										{favoritePlaylists.map((pl) => (
 											<div
 												key={pl.id}
 												onClick={() => {

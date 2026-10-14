@@ -112,30 +112,49 @@ pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: Shortc
         lock.clone().unwrap_or_else(get_default_shortcuts)
     };
 
-    for item in active_configs {
+    let mut matched_id = None;
+    for item in &active_configs {
         let normalized = normalize_shortcut_key(&item.key);
         if let Ok(s) = normalized.parse::<Shortcut>() {
             if shortcut == &s {
-                match item.id.as_str() {
-                    "toggle_penetration" => {
-                        let new_state = !LYRICS_IGNORE_CURSOR.load(Ordering::SeqCst);
-                        LYRICS_IGNORE_CURSOR.store(new_state, Ordering::SeqCst);
-                        if let Some(lyrics_win) = app.get_webview_window("lyrics") {
-                            let _ = lyrics_win.set_ignore_cursor_events(new_state);
-                        }
-                    }
-                    "toggle_lyrics" => {
-                        let _ = crate::window_ext::toggle_lyrics_window(app.clone());
-                    }
-                    _ => {}
-                }
-                let _ = app.emit("global-shortcut-event", item.id);
-                return;
+                matched_id = Some(item.id.clone());
+                break;
             }
         }
     }
 
-    let _ = app.emit("global-shortcut-event", current_str);
+    let action_id = match matched_id {
+        Some(ref id) => id.clone(),
+        None => current_str,
+    };
+
+    match action_id.as_str() {
+        "toggle_penetration" => {
+            let new_state = !LYRICS_IGNORE_CURSOR.load(Ordering::SeqCst);
+            LYRICS_IGNORE_CURSOR.store(new_state, Ordering::SeqCst);
+            if let Some(lyrics_win) = app.get_webview_window("lyrics") {
+                let _ = lyrics_win.set_ignore_cursor_events(new_state);
+            }
+        }
+        "toggle_lyrics" => {
+            let _ = crate::window_ext::toggle_lyrics_window(app.clone());
+        }
+        _ => {}
+    }
+
+    // 1. 标准 Tauri IPC 事件派发
+    let _ = app.emit("global-shortcut-event", &action_id);
+
+    // 2. 双保险：直接在主窗口执行 window.__triggerGlobalShortcut，防止失焦时 Webview 事件被系统队列节流延迟
+    if let Some(main_win) = app.get_webview_window("main") {
+        if let Ok(json_id) = serde_json::to_string(&action_id) {
+            let script = format!(
+                "if (window.__triggerGlobalShortcut) {{ window.__triggerGlobalShortcut({}); }}",
+                json_id
+            );
+            let _ = main_win.eval(&script);
+        }
+    }
 }
 
 #[tauri::command]
@@ -149,3 +168,28 @@ pub fn update_shortcuts(app: AppHandle, configs: Vec<ShortcutConfig>) -> Result<
     register_all_shortcuts(&app, &configs);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_shortcuts() {
+        let list = vec![
+            "Alt+Shift+Space",
+            "Alt+Shift+ArrowLeft",
+            "Alt+Shift+ArrowRight",
+            "Alt+Shift+D",
+            "Alt+Shift+L",
+            "Alt+Shift+Left",
+            "Alt+Shift+Right",
+        ];
+        for s in list {
+            let normalized = normalize_shortcut_key(s);
+            let parsed = normalized.parse::<Shortcut>();
+            println!("original: {}, normalized: {}, parsed: {:?}", s, normalized, parsed);
+            assert!(parsed.is_ok(), "Failed to parse: {} (normalized: {})", s, normalized);
+        }
+    }
+}
+

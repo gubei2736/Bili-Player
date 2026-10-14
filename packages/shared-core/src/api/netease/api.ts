@@ -1,5 +1,5 @@
 import { parseYrc } from '@bbplayer/splash'
-import { errAsync, okAsync, type ResultAsync } from 'neverthrow'
+import { errAsync, okAsync, ResultAsync } from 'neverthrow'
 
 import type {
 	NeteaseLyricResponse,
@@ -14,7 +14,7 @@ import { NeteaseApiError } from './errors'
 import type { RequestOptions } from './request'
 import { createRequest } from './request'
 import { createOption } from './utils'
-import type { IHttpClient } from '../http'
+import { getDefaultHttpClient, type IHttpClient } from '../http'
 
 export interface SearchParams {
 	keywords: string
@@ -25,6 +25,10 @@ export interface SearchParams {
 
 export class NeteaseApi {
 	constructor(private readonly client?: IHttpClient) {}
+
+	private get http(): IHttpClient {
+		return this.client ?? getDefaultHttpClient()
+	}
 
 	getLyrics(
 		id: number,
@@ -63,7 +67,41 @@ export class NeteaseApi {
 			'/api/song/lyric/v1',
 			data,
 			requestOptions,
-		).map((res) => res.body)
+		)
+			.map((res) => res.body)
+			.orElse(() => {
+				// Fallback 到标准明文歌词接口，避免 eapi 二进制加密被破坏导致解密失败
+				return ResultAsync.fromPromise(
+					this.http
+						.fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=1&kv=1&tv=-1`, {
+							headers: {
+								Referer: 'https://music.163.com/',
+								'User-Agent':
+									'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+							},
+							signal,
+						})
+						.then(async (res) => {
+							if (!res.ok) {
+								throw new Error(`Netease plaintext lyric error: ${res.statusText}`)
+							}
+							const json = await res.json()
+							return {
+								code: json.code || 200,
+								lrc: json.lrc,
+								klyric: json.klyric,
+								tlyric: json.tlyric,
+								romalrc: json.romalrc,
+							} as NeteaseLyricResponse
+						}),
+					(e) =>
+						new NeteaseApiError({
+							message: '获取网易云歌词失败',
+							type: 'RequestFailed',
+							cause: e,
+						}),
+				)
+			})
 	}
 
 	search(
@@ -158,22 +196,54 @@ export class NeteaseApi {
 	getPlaylist(
 		id: string,
 	): ResultAsync<NeteasePlaylistResponse, NeteaseApiError> {
-		const data = {
-			s: '0',
-			id,
-			n: '1000',
-			t: '0',
-		}
-		const requestOptions: RequestOptions = createOption({}, 'eapi')
-		if (this.client) {
-			requestOptions.client = this.client
-		}
+		// 1. 优先使用开放稳定的 v3 接口，避免 eapi 状态码不符合预期
+		return ResultAsync.fromPromise(
+			this.http
+				.fetch('https://music.163.com/api/v3/playlist/detail', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded',
+						Referer: 'https://music.163.com/',
+						'User-Agent':
+							'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+					},
+					body: `id=${id}&n=1000&s=0`,
+				})
+				.then(async (res) => {
+					if (!res.ok) {
+						throw new Error(`HTTP status ${res.status}`)
+					}
+					const json = await res.json()
+					if (!json || json.code !== 200 || !json.playlist) {
+						throw new Error(json?.message || '歌单返回异常')
+					}
+					return json as NeteasePlaylistResponse
+				}),
+			(e) =>
+				new NeteaseApiError({
+					message: '获取网易云歌单失败',
+					type: 'RequestFailed',
+					cause: e,
+				}),
+		).orElse(() => {
+			// 2. 降级走原有的 eapi 请求
+			const data = {
+				s: '0',
+				id,
+				n: '1000',
+				t: '0',
+			}
+			const requestOptions: RequestOptions = createOption({}, 'eapi')
+			if (this.client) {
+				requestOptions.client = this.client
+			}
 
-		return createRequest<object, NeteasePlaylistResponse>(
-			'/api/v6/playlist/detail',
-			data,
-			requestOptions,
-		).map((res) => res.body)
+			return createRequest<object, NeteasePlaylistResponse>(
+				'/api/v6/playlist/detail',
+				data,
+				requestOptions,
+			).map((res) => res.body)
+		})
 	}
 }
 

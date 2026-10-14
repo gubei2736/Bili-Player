@@ -46,11 +46,11 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 
 	useEffect(() => {
 		if (isOpen && track) {
-			const cleaned = cleanTrackTitle(track.title)
-			setSearchKeyword(`${cleaned} ${track.artist?.name || ''}`.trim())
+			const fullTitle = track.title.trim()
+			setSearchKeyword(fullTitle)
 			setOffsetMs(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
-			handleSearch(`${cleaned} ${track.artist?.name || ''}`.trim())
+			handleSearch(fullTitle)
 		}
 	}, [isOpen, track])
 
@@ -107,7 +107,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
-			<div className="w-full max-w-lg rounded-2xl bg-background/95 border border-white/10 shadow-2xl overflow-hidden flex flex-col p-6 space-y-4">
+			<div className="w-full max-w-3xl max-h-[85vh] rounded-2xl bg-background/95 border border-white/10 shadow-2xl overflow-hidden flex flex-col p-6 space-y-4">
 				{/* Header */}
 				<div className="flex items-center justify-between pb-3 border-b border-white/5">
 					<div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 							<h3 className="text-sm font-bold text-foreground">
 								歌词管理与智能匹配
 							</h3>
-							<p className="text-[10px] text-muted-foreground truncate max-w-[280px]">
+							<p className="text-[10px] text-muted-foreground truncate max-w-md">
 								当前歌曲: {track.title}
 							</p>
 						</div>
@@ -175,7 +175,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 
 				{/* Tab 1: Search */}
 				{activeTab === 'search' && (
-					<div className="space-y-3">
+					<div className="space-y-3 flex-1 overflow-hidden flex flex-col">
 						<div className="flex items-center gap-2">
 							<input
 								type="text"
@@ -188,7 +188,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 							<button
 								onClick={() => handleSearch(searchKeyword)}
 								disabled={isSearching}
-								className="h-9 px-3.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+								className="h-9 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
 							>
 								{isSearching ? (
 									<Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -199,29 +199,29 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 							</button>
 						</div>
 
-						<div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+						<div className="max-h-[440px] overflow-y-auto space-y-2 pr-1 flex-1">
 							{isSearching ? (
-								<div className="py-8 text-center space-y-2 text-xs text-muted-foreground">
+								<div className="py-12 text-center space-y-2 text-xs text-muted-foreground">
 									<Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
 									<p>正在检索网易云与 QQ 音乐歌词库...</p>
 								</div>
 							) : candidates.length === 0 ? (
-								<div className="py-8 text-center text-xs text-muted-foreground">
+								<div className="py-12 text-center text-xs text-muted-foreground">
 									未找到匹配歌词，可尝试精简歌曲标题或点击上方“粘贴 LRC/SPL”自定义
 								</div>
 							) : (
 								candidates.map((item) => (
 									<div
 										key={`${item.source}_${item.id}`}
-										className="p-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 flex items-center justify-between gap-3 text-xs"
+										className="p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 flex items-center justify-between gap-4 text-xs transition-colors"
 									>
-										<div className="overflow-hidden space-y-0.5">
+										<div className="overflow-hidden space-y-1 flex-1">
 											<div className="flex items-center gap-2">
-												<span className="font-semibold text-foreground truncate max-w-[200px]">
+												<span className="font-semibold text-foreground truncate max-w-md">
 													{item.title}
 												</span>
 												<span
-													className={`text-[9px] px-1.5 py-0.2 rounded font-medium ${
+													className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
 														item.source === 'netease'
 															? 'bg-red-500/20 text-red-300'
 															: 'bg-emerald-500/20 text-emerald-300'
@@ -238,7 +238,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 										<button
 											onClick={() => handleApplyCandidate(item)}
 											disabled={loadingCandidateId === item.id}
-											className="px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-medium transition-colors flex items-center gap-1"
+											className="px-3.5 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0"
 										>
 											{loadingCandidateId === item.id && (
 												<Loader2 className="w-3 h-3 animate-spin" />

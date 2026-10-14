@@ -215,17 +215,33 @@ export class LyricService {
 	// 3. Fetch candidate's lyrics
 	async fetchCandidateLyrics(candidate: LyricSearchCandidate): Promise<string | null> {
 		if (candidate.source === 'netease') {
-			const res = await neteaseApi.getLyrics(Number(candidate.id))
-			if (res.isOk()) {
-				if (res.value.yrc?.lyric) {
-					return parseYrc(res.value.yrc.lyric)
+			try {
+				const res = await neteaseApi.getLyrics(Number(candidate.id))
+				if (res.isOk()) {
+					const data = res.value
+					if (data.yrc?.lyric) {
+						try {
+							const parsed = parseYrc(data.yrc.lyric)
+							if (parsed && parsed.trim().length > 0) {
+								return parsed
+							}
+						} catch (parseErr) {
+							console.warn('parseYrc failed, falling back to standard lrc:', parseErr)
+						}
+					}
+					return data.lrc?.lyric || data.yrc?.lyric || null
 				}
-				return res.value.lrc?.lyric || null
+			} catch (e) {
+				console.error('Fetch netease lyrics error:', e)
 			}
 		} else if (candidate.source === 'qqmusic') {
-			const res = await qqMusicApi.getLyrics(String(candidate.id))
-			if (res.isOk()) {
-				return res.value.lyric || null
+			try {
+				const res = await qqMusicApi.getLyrics(String(candidate.id))
+				if (res.isOk()) {
+					return res.value.lyric || null
+				}
+			} catch (e) {
+				console.error('Fetch qqmusic lyrics error:', e)
 			}
 		}
 		return null
