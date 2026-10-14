@@ -72,6 +72,9 @@ export const App: React.FC = () => {
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 	const [searchQuery, setSearchQuery] = useState('')
 	const [dbReady, setDbReady] = useState(false)
+	const [closeAction, setCloseAction] = useState<'tray' | 'exit'>(() => {
+		return (localStorage.getItem('bbplayer_close_action') as 'tray' | 'exit') || 'tray'
+	})
 	const [featuredTracks, setFeaturedTracks] = useState<Track[]>([
 		{
 			id: 1,
@@ -638,6 +641,91 @@ export const App: React.FC = () => {
 
 								{/* Audio Quality Preferences */}
 								<AudioQualitySettingsCard />
+
+								{/* Window Close Behavior Card */}
+								<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs space-y-3">
+									<div>
+										<p className="font-semibold text-foreground">
+											窗口关闭行为
+										</p>
+										<p className="text-[11px] text-muted-foreground mt-0.5">
+											选择点击标题栏关闭按钮 (X) 时执行的操作
+										</p>
+									</div>
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+										<button
+											onClick={() => {
+												setCloseAction('tray')
+												localStorage.setItem('bbplayer_close_action', 'tray')
+											}}
+											className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
+												closeAction === 'tray'
+													? 'bg-[#00AEEC]/15 border-[#00AEEC]/40 text-foreground shadow-sm'
+													: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/5'
+											}`}
+										>
+											<div
+												className={`w-3.5 h-3.5 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
+													closeAction === 'tray'
+														? 'border-[#00AEEC]'
+														: 'border-white/30'
+												}`}
+											>
+												{closeAction === 'tray' && (
+													<div className="w-1.5 h-1.5 rounded-full bg-[#00AEEC]" />
+												)}
+											</div>
+											<div>
+												<p
+													className={`font-semibold ${
+														closeAction === 'tray' ? 'text-[#00AEEC]' : ''
+													}`}
+												>
+													隐藏到系统托盘
+												</p>
+												<p className="text-[10px] text-muted-foreground mt-0.5">
+													后台继续播放音乐，点击托盘图标随时唤起
+												</p>
+											</div>
+										</button>
+
+										<button
+											onClick={() => {
+												setCloseAction('exit')
+												localStorage.setItem('bbplayer_close_action', 'exit')
+											}}
+											className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
+												closeAction === 'exit'
+													? 'bg-[#00AEEC]/15 border-[#00AEEC]/40 text-foreground shadow-sm'
+													: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/5'
+											}`}
+										>
+											<div
+												className={`w-3.5 h-3.5 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
+													closeAction === 'exit'
+														? 'border-[#00AEEC]'
+														: 'border-white/30'
+												}`}
+											>
+												{closeAction === 'exit' && (
+													<div className="w-1.5 h-1.5 rounded-full bg-[#00AEEC]" />
+												)}
+											</div>
+											<div>
+												<p
+													className={`font-semibold ${
+														closeAction === 'exit' ? 'text-[#00AEEC]' : ''
+													}`}
+												>
+													直接关闭应用
+												</p>
+												<p className="text-[10px] text-muted-foreground mt-0.5">
+													立即停止播放并彻底退出桌面程序
+												</p>
+											</div>
+										</button>
+									</div>
+								</div>
 
 								<div className="space-y-3 rounded-xl bg-white/5 p-4 border border-white/5 text-xs">
 									<div className="flex items-center justify-between">

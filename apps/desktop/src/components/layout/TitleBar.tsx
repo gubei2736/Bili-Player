@@ -1,11 +1,10 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import {
 	Minus,
 	Square,
 	X,
 	Search,
 	Pin,
-	Sparkles,
 	Disc3,
 } from 'lucide-react'
 
@@ -16,7 +15,6 @@ export interface TitleBarProps {
 
 export const TitleBar: React.FC<TitleBarProps> = ({
 	onSearch,
-	onToggleLyricsWindow,
 }) => {
 	const [query, setQuery] = useState('')
 	const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false)
@@ -42,9 +40,17 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
 	const handleClose = async () => {
 		try {
+			const action = localStorage.getItem('bbplayer_close_action') || 'tray'
 			const { getCurrentWindow } = await import('@tauri-apps/api/window')
-			await getCurrentWindow().close()
-		} catch {}
+			const win = getCurrentWindow()
+			if (action === 'tray') {
+				await win.hide()
+			} else {
+				await win.close()
+			}
+		} catch {
+			window.close()
+		}
 	}
 
 	const handleTogglePin = async () => {
@@ -113,17 +119,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
 			{/* Right actions & Window controls */}
 			<div className="flex items-center justify-end gap-1 min-w-[190px]">
-				{onToggleLyricsWindow && (
-					<button
-						onClick={onToggleLyricsWindow}
-						title="切换桌面悬浮歌词 (Ctrl+Alt+D)"
-						className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.04] hover:bg-primary/15 border border-white/[0.06] hover:border-primary/30 text-muted-foreground hover:text-primary transition-all duration-150 mr-1"
-					>
-						<Sparkles className="w-3 h-3" />
-						<span className="text-[11px] font-medium">词</span>
-					</button>
-				)}
-
 				<button
 					onClick={handleTogglePin}
 					title={isAlwaysOnTop ? '取消窗口置顶' : '置顶窗口'}

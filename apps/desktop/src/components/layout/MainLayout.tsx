@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { TitleBar } from './TitleBar'
 import { Sidebar, type NavTab } from './Sidebar'
 import { BottomPlayerBar } from './BottomPlayerBar'
-import { useQueueStore } from '@bbplayer/shared-core'
+import { useQueueStore, useSkinStore } from '@bbplayer/shared-core'
 
 export interface MainLayoutProps {
 	children: (activeTab: NavTab) => React.ReactNode
@@ -29,12 +29,27 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 	const setActiveTab = onSelectTab || setInternalActiveTab
 
 	const currentTrack = useQueueStore((s) => s.getCurrentTrack())
+	const customBgUrl = useSkinStore((s) => s.customBgUrl)
+	const customBgOpacity = useSkinStore((s) => s.customBgOpacity)
+	const customBgBlur = useSkinStore((s) => s.customBgBlur)
 
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07090e] text-foreground border border-white/10 shadow-2xl relative select-none">
+			{/* 0. Custom Wallpaper Background Layer */}
+			{customBgUrl && (
+				<div
+					className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
+					style={{
+						backgroundImage: `url(${customBgUrl})`,
+						opacity: customBgOpacity ?? 0.35,
+						filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
+					}}
+				/>
+			)}
+
 			{/* 1. Ambient Dynamic Cover Glow (随当前播放歌曲封面实时晕染底层环境光) */}
 			<div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-				{currentTrack?.coverUrl && (
+				{currentTrack?.coverUrl && !customBgUrl && (
 					<img
 						src={currentTrack.coverUrl}
 						alt=""
@@ -48,10 +63,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 			</div>
 
 			{/* 2. Top frameless title bar */}
-			<TitleBar
-				onSearch={onSearch}
-				onToggleLyricsWindow={onToggleLyricsWindow}
-			/>
+			<TitleBar onSearch={onSearch} />
 
 			{/* 3. Middle area: Sidebar + Inset Glass Main Viewport */}
 			<div className="flex flex-1 overflow-hidden relative z-10 px-2 pb-1.5 gap-2">
@@ -60,7 +72,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					onSelectTab={setActiveTab}
 					onOpenLoginModal={onOpenLoginModal}
 				/>
-				<main className="flex-1 h-full overflow-y-auto relative rounded-2xl bg-white/[0.02] border border-white/[0.06] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-xl">
+				<main className="flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl bg-white/[0.02] border border-white/[0.06] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-xl">
 					{children(activeTab)}
 				</main>
 			</div>

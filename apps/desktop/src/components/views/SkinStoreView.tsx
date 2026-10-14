@@ -1,5 +1,14 @@
-import React from 'react'
-import { Palette, Check, Sparkles, RefreshCw } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import {
+	Palette,
+	Check,
+	Sparkles,
+	RefreshCw,
+	Image as ImageIcon,
+	Upload,
+	Trash2,
+	Eye,
+} from 'lucide-react'
 import { useSkinStore, type BilibiliGarbSuitDetailResponse } from '@bbplayer/shared-core'
 
 interface PresetSkin {
@@ -59,7 +68,19 @@ function hexToRgbTriple(hex: string): string {
 }
 
 export const SkinStoreView: React.FC = () => {
-	const { activeSkinId, setSkin, clearSkin } = useSkinStore()
+	const {
+		activeSkinId,
+		setSkin,
+		clearSkin,
+		customBgUrl,
+		customBgOpacity,
+		customBgBlur,
+		setCustomBg,
+		clearCustomBg,
+	} = useSkinStore()
+
+	const [urlInput, setUrlInput] = useState('')
+	const fileInputRef = useRef<HTMLInputElement | null>(null)
 
 	const handleApplyPreset = (preset: PresetSkin) => {
 		const mockSuit: BilibiliGarbSuitDetailResponse = {
@@ -98,16 +119,36 @@ export const SkinStoreView: React.FC = () => {
 		document.documentElement.style.setProperty('--ring', '#00AEEC')
 	}
 
+	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0]
+		if (!file) return
+		const reader = new FileReader()
+		reader.onload = (event) => {
+			const res = event.target?.result as string
+			if (res) {
+				setCustomBg(res, customBgOpacity, customBgBlur)
+			}
+		}
+		reader.readAsDataURL(file)
+	}
+
+	const handleApplyUrl = () => {
+		if (!urlInput.trim()) return
+		setCustomBg(urlInput.trim(), customBgOpacity, customBgBlur)
+		setUrlInput('')
+	}
+
 	return (
-		<div className="space-y-6 max-w-4xl">
+		<div className="space-y-6 max-w-4xl pb-10">
+			{/* Top Header */}
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-base font-bold text-foreground flex items-center gap-2">
 						<Palette className="w-5 h-5 text-primary" />
-						<span>B 站装扮主题引擎</span>
+						<span>个性装扮与主题</span>
 					</h2>
 					<p className="text-xs text-muted-foreground mt-0.5">
-						一键换肤：动态注入 CSS 主题色彩、波浪进度条动态游标挂件与背景
+						自定义背景壁纸、动态主题色彩与播放界面个性化装扮
 					</p>
 				</div>
 				<button
@@ -115,65 +156,204 @@ export const SkinStoreView: React.FC = () => {
 					className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-foreground transition-colors"
 				>
 					<RefreshCw className="w-3.5 h-3.5" />
-					<span>恢复默认主题</span>
+					<span>恢复默认配色</span>
 				</button>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{PRESET_SKINS.map((skin) => {
-					const isActive = activeSkinId === skin.id
-					return (
-						<div
-							key={skin.id}
-							className={`p-4 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
-								isActive
-									? 'bg-primary/10 border-primary/50 shadow-lg'
-									: 'bg-white/5 border-white/5 hover:border-white/15'
-							}`}
+			{/* Section 1: Custom Background Wallpaper Card */}
+			<div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 shadow-lg space-y-4">
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-2">
+						<ImageIcon className="w-4 h-4 text-[#00AEEC]" />
+						<span className="text-xs font-bold text-foreground">
+							全景自定义背景壁纸
+						</span>
+					</div>
+					{customBgUrl && (
+						<button
+							onClick={clearCustomBg}
+							className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 transition-colors"
 						>
-							<div className="flex items-center gap-3.5 overflow-hidden">
-								<div
-									className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0"
-									style={{ backgroundColor: skin.color }}
+							<Trash2 className="w-3.5 h-3.5" />
+							<span>清除壁纸</span>
+						</button>
+					)}
+				</div>
+
+				<div className="flex flex-col md:flex-row gap-5 items-start">
+					{/* Wallpaper Preview Area */}
+					<div className="w-full md:w-56 h-32 rounded-xl bg-black/40 border border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center">
+						{customBgUrl ? (
+							<img
+								src={customBgUrl}
+								alt="Custom Background"
+								className="w-full h-full object-cover transition-all"
+								style={{
+									opacity: customBgOpacity,
+									filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
+								}}
+							/>
+						) : (
+							<div className="text-center text-muted-foreground/60 space-y-1">
+								<ImageIcon className="w-6 h-6 mx-auto opacity-50" />
+								<p className="text-[10px]">当前未设置背景壁纸</p>
+							</div>
+						)}
+					</div>
+
+					{/* Controls: Upload & Sliders */}
+					<div className="flex-1 w-full space-y-3.5 text-xs">
+						<div className="flex flex-wrap items-center gap-2.5">
+							<input
+								ref={fileInputRef}
+								type="file"
+								accept="image/*"
+								onChange={handleFileUpload}
+								className="hidden"
+							/>
+							<button
+								onClick={() => fileInputRef.current?.click()}
+								className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#00AEEC] hover:bg-[#1dbefa] text-white font-semibold transition-all shadow-md shadow-[#00AEEC]/20 active:scale-95"
+							>
+								<Upload className="w-3.5 h-3.5" />
+								<span>上传本地图片</span>
+							</button>
+
+							<div className="flex-1 flex items-center gap-1.5 min-w-[200px]">
+								<input
+									type="text"
+									placeholder="或粘贴网络图片直链 URL..."
+									value={urlInput}
+									onChange={(e) => setUrlInput(e.target.value)}
+									className="flex-1 h-8 px-3 rounded-xl bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground/60 text-xs outline-none focus:border-[#00AEEC]/50"
+								/>
+								<button
+									onClick={handleApplyUrl}
+									disabled={!urlInput.trim()}
+									className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-foreground disabled:opacity-40 transition-colors font-medium"
 								>
-									<Sparkles className="w-6 h-6" />
+									应用
+								</button>
+							</div>
+						</div>
+
+						{/* Sliders for Opacity & Blur */}
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+							{/* Opacity Slider */}
+							<div className="space-y-1.5">
+								<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+									<span>背景不透明度</span>
+									<span className="font-mono text-foreground font-semibold">
+										{Math.round((customBgOpacity ?? 0.35) * 100)}%
+									</span>
 								</div>
-								<div className="overflow-hidden">
-									<div className="flex items-center gap-2">
-										<p className="text-xs font-bold text-foreground">
-											{skin.name}
-										</p>
-										<span
-											className="w-2.5 h-2.5 rounded-full inline-block shadow-sm"
-											style={{ backgroundColor: skin.color }}
-										/>
-									</div>
-									<p className="text-[11px] text-muted-foreground truncate mt-0.5">
-										{skin.description}
-									</p>
-								</div>
+								<input
+									type="range"
+									min="0.1"
+									max="1"
+									step="0.05"
+									value={customBgOpacity ?? 0.35}
+									onChange={(e) =>
+										setCustomBg(
+											customBgUrl,
+											parseFloat(e.target.value),
+											customBgBlur,
+										)
+									}
+									className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
+								/>
 							</div>
 
-							<button
-								onClick={() => handleApplyPreset(skin)}
-								className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+							{/* Blur Slider */}
+							<div className="space-y-1.5">
+								<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+									<span>毛玻璃模糊度</span>
+									<span className="font-mono text-foreground font-semibold">
+										{customBgBlur ?? 0}px
+									</span>
+								</div>
+								<input
+									type="range"
+									min="0"
+									max="30"
+									step="1"
+									value={customBgBlur ?? 0}
+									onChange={(e) =>
+										setCustomBg(
+											customBgUrl,
+											customBgOpacity,
+											parseInt(e.target.value, 10),
+										)
+									}
+									className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
+								/>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* Section 2: Preset Theme Garb Suits */}
+			<div className="space-y-3">
+				<h3 className="text-xs font-bold text-foreground">
+					预设主题装扮
+				</h3>
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{PRESET_SKINS.map((skin) => {
+						const isActive = activeSkinId === skin.id
+						return (
+							<div
+								key={skin.id}
+								className={`p-4 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
 									isActive
-										? 'bg-primary text-white shadow-md'
-										: 'bg-white/10 hover:bg-white/15 text-foreground'
+										? 'bg-primary/10 border-primary/50 shadow-lg'
+										: 'bg-white/5 border-white/5 hover:border-white/15'
 								}`}
 							>
-								{isActive ? (
-									<>
-										<Check className="w-3.5 h-3.5" />
-										<span>使用中</span>
-									</>
-								) : (
-									<span>应用</span>
-								)}
-							</button>
-						</div>
-					)
-				})}
+								<div className="flex items-center gap-3.5 overflow-hidden">
+									<div
+										className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0"
+										style={{ backgroundColor: skin.color }}
+									>
+										<Sparkles className="w-6 h-6" />
+									</div>
+									<div className="overflow-hidden">
+										<div className="flex items-center gap-2">
+											<p className="text-xs font-bold text-foreground">
+												{skin.name}
+											</p>
+											<span
+												className="w-2.5 h-2.5 rounded-full inline-block shadow-sm"
+												style={{ backgroundColor: skin.color }}
+											/>
+										</div>
+										<p className="text-[11px] text-muted-foreground truncate mt-0.5">
+											{skin.description}
+										</p>
+									</div>
+								</div>
+
+								<button
+									onClick={() => handleApplyPreset(skin)}
+									className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+										isActive
+											? 'bg-primary text-white shadow-md'
+											: 'bg-white/10 hover:bg-white/15 text-foreground'
+									}`}
+								>
+									{isActive ? (
+										<>
+											<Check className="w-3.5 h-3.5" />
+											<span>使用中</span>
+										</>
+									) : (
+										<span>应用</span>
+									)}
+								</button>
+							</div>
+						)
+					})}
+				</div>
 			</div>
 		</div>
 	)

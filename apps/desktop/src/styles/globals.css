@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -55,6 +55,7 @@
 	}
 }
 
+html,
 body {
 	color: hsl(var(--foreground));
 	background-color: transparent;
@@ -62,6 +63,8 @@ body {
 		'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+	font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 	user-select: none;
 	-webkit-user-select: none;
 	overflow: hidden;

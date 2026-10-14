@@ -11,9 +11,14 @@ export interface SkinState {
 	activeSkinId: number | null
 	activeSkinSuit: BilibiliGarbSuitDetailResponse | null
 	themeColors: BilibiliGarbColor | null
+	customBgUrl: string | null
+	customBgOpacity: number // 0.1 to 1.0 (default 0.35)
+	customBgBlur: number // 0 to 40 px (default 0)
 
 	setSkin: (suit: BilibiliGarbSuitDetailResponse | null) => void
 	clearSkin: () => void
+	setCustomBg: (url: string | null, opacity?: number, blur?: number) => void
+	clearCustomBg: () => void
 }
 
 export const useSkinStore = create<SkinState>()(
@@ -22,6 +27,9 @@ export const useSkinStore = create<SkinState>()(
 			activeSkinId: null,
 			activeSkinSuit: null,
 			themeColors: null,
+			customBgUrl: null,
+			customBgOpacity: 0.35,
+			customBgBlur: 0,
 
 			setSkin: (suit) => {
 				if (!suit) {
@@ -63,6 +71,22 @@ export const useSkinStore = create<SkinState>()(
 					themeColors: null,
 				})
 			},
+
+			setCustomBg: (url, opacity = 0.35, blur = 0) => {
+				set({
+					customBgUrl: url,
+					customBgOpacity: opacity,
+					customBgBlur: blur,
+				})
+			},
+
+			clearCustomBg: () => {
+				set({
+					customBgUrl: null,
+					customBgOpacity: 0.35,
+					customBgBlur: 0,
+				})
+			},
 		}),
 		{
 			name: 'bbplayer_skin_store',
@@ -71,6 +95,9 @@ export const useSkinStore = create<SkinState>()(
 				activeSkinId: state.activeSkinId,
 				activeSkinSuit: state.activeSkinSuit,
 				themeColors: state.themeColors,
+				customBgUrl: state.customBgUrl,
+				customBgOpacity: state.customBgOpacity,
+				customBgBlur: state.customBgBlur,
 			}),
 		},
 	),

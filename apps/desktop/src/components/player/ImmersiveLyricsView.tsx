@@ -239,8 +239,9 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							{lyricsData.lines.map((line, idx) => {
 								const isActive = idx === activeIndex
 								const distance = Math.abs(idx - activeIndex)
-								const blurAmount = distance === 0 ? 0 : distance === 1 ? 1.5 : 3
-								const opacity = distance === 0 ? 1 : distance === 1 ? 0.6 : 0.25
+								// 彻底去除高斯模糊 (blur)，仅使用清晰的明度与透明度阶梯保持主次分明与清晰易读
+								const opacity =
+									distance === 0 ? 1 : distance === 1 ? 0.75 : distance === 2 ? 0.55 : 0.35
 
 								return (
 									<div
@@ -254,11 +255,11 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											if (el) lineRefs.current.set(idx, el)
 											else lineRefs.current.delete(idx)
 										}}
-										className="transition-all duration-300 transform origin-left cursor-pointer hover:opacity-90"
+										className="transition-all duration-300 transform origin-left cursor-pointer hover:opacity-100"
 										style={{
-											filter: `blur(${blurAmount}px)`,
+											filter: 'none',
 											opacity,
-											scale: isActive ? 1.04 : 1.0,
+											scale: isActive ? 1.05 : 1.0,
 										}}
 									>
 										{/* Main line with syllable highlight */}
