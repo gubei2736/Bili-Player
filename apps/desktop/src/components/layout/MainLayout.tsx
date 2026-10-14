@@ -41,7 +41,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
 					style={{
 						backgroundImage: `url(${customBgUrl})`,
-						opacity: customBgOpacity ?? 1.0,
+						opacity: customBgOpacity ?? 0.5,
 						filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
 					}}
 				/>

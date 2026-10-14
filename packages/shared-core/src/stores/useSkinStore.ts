@@ -12,13 +12,15 @@ export interface SkinState {
 	activeSkinSuit: BilibiliGarbSuitDetailResponse | null
 	themeColors: BilibiliGarbColor | null
 	customBgUrl: string | null
-	customBgOpacity: number // 0.1 to 1.0 (default 1.0)
+	customBgOpacity: number // 0.1 to 1.0 (default 0.5)
 	customBgBlur: number // 0 to 40 px (default 0)
+	customTextColor: string | null // e.g. '#FFFFFF', '#FDE047', or null for default
 
 	setSkin: (suit: BilibiliGarbSuitDetailResponse | null) => void
 	clearSkin: () => void
 	setCustomBg: (url: string | null, opacity?: number, blur?: number) => void
 	clearCustomBg: () => void
+	setTextColor: (color: string | null) => void
 }
 
 export const useSkinStore = create<SkinState>()(
@@ -28,8 +30,9 @@ export const useSkinStore = create<SkinState>()(
 			activeSkinSuit: null,
 			themeColors: null,
 			customBgUrl: null,
-			customBgOpacity: 1.0,
+			customBgOpacity: 0.5,
 			customBgBlur: 0,
+			customTextColor: null,
 
 			setSkin: (suit) => {
 				if (!suit) {
@@ -72,7 +75,7 @@ export const useSkinStore = create<SkinState>()(
 				})
 			},
 
-			setCustomBg: (url, opacity = 1.0, blur = 0) => {
+			setCustomBg: (url, opacity = 0.5, blur = 0) => {
 				set({
 					customBgUrl: url,
 					customBgOpacity: opacity,
@@ -83,19 +86,33 @@ export const useSkinStore = create<SkinState>()(
 			clearCustomBg: () => {
 				set({
 					customBgUrl: null,
-					customBgOpacity: 1.0,
+					customBgOpacity: 0.5,
 					customBgBlur: 0,
 				})
+			},
+
+			setTextColor: (color) => {
+				set({ customTextColor: color })
 			},
 		}),
 		{
 			name: 'bbplayer_skin_store',
 			storage: createJSONStorage(() => getDefaultStateStorage()),
-			version: 2,
+			version: 3,
 			migrate: (persistedState: any, version: number) => {
-				if (version < 2 && persistedState) {
-					if (persistedState.customBgOpacity === 0.35 || persistedState.customBgOpacity === undefined) {
-						persistedState.customBgOpacity = 1.0
+				if (version < 3 && persistedState) {
+					if (
+						persistedState.customBgOpacity === 0.35 ||
+						persistedState.customBgOpacity === 1.0 ||
+						persistedState.customBgOpacity === undefined
+					) {
+						persistedState.customBgOpacity = 0.5
+					}
+					if (persistedState.customBgBlur === undefined) {
+						persistedState.customBgBlur = 0
+					}
+					if (persistedState.customTextColor === undefined) {
+						persistedState.customTextColor = null
 					}
 				}
 				return persistedState as SkinState
@@ -107,6 +124,7 @@ export const useSkinStore = create<SkinState>()(
 				customBgUrl: state.customBgUrl,
 				customBgOpacity: state.customBgOpacity,
 				customBgBlur: state.customBgBlur,
+				customTextColor: state.customTextColor,
 			}),
 		},
 	),

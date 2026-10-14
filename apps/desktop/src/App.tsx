@@ -15,7 +15,7 @@ import { CreatePlaylistModal } from './components/modals/CreatePlaylistModal'
 import { ExportTrackModal } from './components/modals/ExportTrackModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
 import { lyricService, getStoredLyricOffset } from './services/lyricService'
-import { SkinStoreView } from './components/views/SkinStoreView'
+import { SkinStoreView, applyFontColorToDom } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
 import { ShortcutsSettingsView } from './components/views/ShortcutsSettingsView'
@@ -196,7 +196,12 @@ export const App: React.FC = () => {
 			.catch((e) => console.warn('Database initialization note:', e))
 	}, [])
 
-	// 2. Initialize active theme skin colors (including --primary-rgb for Tailwind alpha support)
+	// 2. Initialize active theme skin colors & font colors
+	const customTextColor = useSkinStore((s) => s.customTextColor)
+	useEffect(() => {
+		applyFontColorToDom(customTextColor)
+	}, [customTextColor])
+
 	useEffect(() => {
 		const skin = useSkinStore.getState().activeSkinSuit
 		const color = skin?.suit_items?.skin?.[0]?.properties?.color

@@ -297,11 +297,13 @@ export class BilibiliApi {
 		Exclude<BilibiliTrack['bilibiliMetadata']['bilibiliStreamUrl'], undefined>,
 		BilibiliApiError
 	> {
-		const { bvid, cid, audioQuality, enableDolby, enableHiRes } = params
+		const { bvid, cid, audioQuality, enableDolby, enableHiRes, preferDolbyFirst } = params
+		// 8144 = 16 (DASH) + 64 (HDR) + 128 (4K) + 256 (Dolby) + 512 (8K) + 1024 (AV1) + 2048 (Dolby Vision) + 4096 (Hi-Res FLAC)
+		const fnval = enableHiRes || enableDolby ? '8144' : '4048'
 		const wbiParams = getWbiEncodedParams({
 			bvid,
 			cid: String(cid),
-			fnval: '4048',
+			fnval,
 			fnver: '0',
 			fourk: '1',
 			qlt: String(audioQuality),
@@ -336,26 +338,50 @@ export class BilibiliApi {
 					})
 				}
 
-				if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
-					return okAsync({
-						url: dash.dolby.audio[0].baseUrl,
-						quality: dash.dolby.audio[0].id,
-						getTime: Date.now() + 60 * 1000,
-						type: 'dash' as const,
-						volume,
-					})
+				// 1. 如果用户优先选择杜比全景声，先尝试杜比，再降级 Hi-Res
+				if (preferDolbyFirst) {
+					if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
+						return okAsync({
+							url: dash.dolby.audio[0].baseUrl,
+							quality: dash.dolby.audio[0].id || 30250,
+							getTime: Date.now() + 60 * 1000,
+							type: 'dash' as const,
+							volume,
+						})
+					}
+					if (enableHiRes && dash?.flac?.audio) {
+						return okAsync({
+							url: dash.flac.audio.baseUrl,
+							quality: dash.flac.audio.id || 30251,
+							getTime: Date.now() + 60 * 1000,
+							type: 'dash' as const,
+							volume,
+						})
+					}
+				} else {
+					// 默认高保真音质金字塔：Hi-Res 无损 (FLAC) > 杜比全景声 (EC-3) > 常规最高档 AAC
+					if (enableHiRes && dash?.flac?.audio) {
+						return okAsync({
+							url: dash.flac.audio.baseUrl,
+							quality: dash.flac.audio.id || 30251,
+							getTime: Date.now() + 60 * 1000,
+							type: 'dash' as const,
+							volume,
+						})
+					}
+
+					if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
+						return okAsync({
+							url: dash.dolby.audio[0].baseUrl,
+							quality: dash.dolby.audio[0].id || 30250,
+							getTime: Date.now() + 60 * 1000,
+							type: 'dash' as const,
+							volume,
+						})
+					}
 				}
 
-				if (enableHiRes && dash?.flac?.audio) {
-					return okAsync({
-						url: dash.flac.audio.baseUrl,
-						quality: dash.flac.audio.id,
-						getTime: Date.now() + 60 * 1000,
-						type: 'dash' as const,
-						volume,
-					})
-				}
-
+				// 2. 常规 AAC 音频流降级（按质量从高到低排序，优先选择权限内最高档位）
 				if (!dash?.audio || dash.audio.length === 0) {
 					return errAsync(
 						new BilibiliApiError({
@@ -366,25 +392,14 @@ export class BilibiliApi {
 				}
 
 				const getTime = Date.now() + 60 * 1000
-				const targetAudio = dash.audio.find(
-					(audio) => audio.id === audioQuality,
-				)
+				const sortedAudios = [...dash.audio].sort((a, b) => b.id - a.id)
+				const targetAudio =
+					dash.audio.find((audio) => audio.id === audioQuality) || sortedAudios[0]
 
 				if (targetAudio) {
 					return okAsync({
 						url: targetAudio.baseUrl,
 						quality: targetAudio.id,
-						getTime,
-						type: 'dash' as const,
-						volume,
-					})
-				}
-
-				const highestQualityAudio = dash.audio[0]
-				if (highestQualityAudio) {
-					return okAsync({
-						url: highestQualityAudio.baseUrl,
-						quality: highestQualityAudio.id,
 						getTime,
 						type: 'dash' as const,
 						volume,

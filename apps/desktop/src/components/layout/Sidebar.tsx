@@ -162,16 +162,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 						<span>扫码连接 B 站账号</span>
 					</button>
 				) : (
-					/* 默认背景下：保持截图所示的经典渐变边框和配色 */
+					/* 默认背景下：柔和素雅的科技微光边框，去除刺眼的霓虹彩虹色 */
 					<button
 						onClick={onOpenLoginModal}
-						className="group relative w-full overflow-hidden rounded-xl p-[1px] transition-all duration-300 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98]"
+						className="group relative w-full overflow-hidden rounded-xl p-[1px] transition-all duration-300 hover:shadow-md hover:shadow-primary/15 active:scale-[0.98]"
 					>
-						<div className="absolute inset-0 bg-gradient-to-r from-primary via-pink-500 to-sky-400 opacity-60 group-hover:opacity-100 transition-opacity" />
-						<div className="relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-[11px] bg-black/45 group-hover:bg-black/30 backdrop-blur-sm text-xs font-semibold text-white transition-all">
-							<LogIn className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
+						<div className="absolute inset-0 bg-gradient-to-r from-primary/35 via-sky-400/25 to-primary/35 opacity-70 group-hover:opacity-100 transition-opacity" />
+						<div className="relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-[11px] bg-black/40 group-hover:bg-black/25 backdrop-blur-sm text-xs font-medium text-white transition-all">
+							<LogIn className="w-3.5 h-3.5 text-primary/90 group-hover:scale-105 transition-transform" />
 							<span>扫码连接 B 站账号</span>
-							<Sparkles className="w-3 h-3 text-pink-300 opacity-90" />
+							<Sparkles className="w-3 h-3 text-sky-300/70 opacity-80" />
 						</div>
 					</button>
 				)}

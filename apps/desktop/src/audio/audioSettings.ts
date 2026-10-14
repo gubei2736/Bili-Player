@@ -1,14 +1,29 @@
-export type AudioQualityPreference = 'auto_hires' | 'high_192k' | 'standard_132k'
+export type AudioQualityPreference =
+	| 'auto_highest'
+	| 'hires_lossless'
+	| 'dolby_atmos'
+	| 'standard_aac'
+	| 'auto_hires'
+	| 'high_192k'
+	| 'standard_132k'
 
 const STORAGE_KEY = 'bbplayer_audio_quality_pref'
 
-export function getAudioQualityPreference(): AudioQualityPreference {
-	if (typeof window === 'undefined') return 'auto_hires'
+export function getAudioQualityPreference(): 'auto_highest' | 'hires_lossless' | 'dolby_atmos' | 'standard_aac' {
+	if (typeof window === 'undefined') return 'auto_highest'
 	const stored = localStorage.getItem(STORAGE_KEY)
-	if (stored === 'high_192k' || stored === 'standard_132k' || stored === 'auto_hires') {
+	if (
+		stored === 'auto_highest' ||
+		stored === 'hires_lossless' ||
+		stored === 'dolby_atmos' ||
+		stored === 'standard_aac'
+	) {
 		return stored
 	}
-	return 'auto_hires'
+	// 兼容旧版配置迁移
+	if (stored === 'auto_hires') return 'auto_highest'
+	if (stored === 'high_192k' || stored === 'standard_132k') return 'standard_aac'
+	return 'auto_highest'
 }
 
 export function setAudioQualityPreference(pref: AudioQualityPreference): void {
@@ -33,35 +48,35 @@ export function getQualityBadgeInfo(qualityId?: number): {
 			}
 		case 30250:
 			return {
-				text: 'Dolby 全景声',
+				text: '杜比全景声',
 				bg: 'bg-purple-500/20',
 				border: 'border-purple-400/30',
 				color: 'text-purple-300',
 			}
 		case 30280:
 			return {
-				text: '192K 高保真',
+				text: '常规 AAC · 320K',
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',
 			}
 		case 30232:
 			return {
-				text: '132K 标准',
+				text: '常规 AAC · 132K',
 				bg: 'bg-emerald-500/20',
 				border: 'border-emerald-400/30',
 				color: 'text-emerald-300',
 			}
 		case 30216:
 			return {
-				text: '64K 省流',
+				text: '常规 AAC · 64K',
 				bg: 'bg-zinc-500/20',
 				border: 'border-zinc-400/30',
 				color: 'text-zinc-300',
 			}
 		default:
 			return {
-				text: '192K 高保真',
+				text: '常规 AAC',
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',

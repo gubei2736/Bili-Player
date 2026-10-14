@@ -46,19 +46,28 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			let audioQuality = 30280
 			let enableHiRes = false
 			let enableDolby = false
+			let preferDolbyFirst = false
 
-			if (qualityPref === 'auto_hires') {
+			if (qualityPref === 'auto_highest' || (qualityPref as any) === 'auto_hires') {
 				audioQuality = 30280
 				enableHiRes = true
 				enableDolby = true
-			} else if (qualityPref === 'high_192k') {
+				preferDolbyFirst = false // 智能优先选择账号权限下最高档位清晰度：Hi-Res > 杜比 > 常规 AAC
+			} else if (qualityPref === 'hires_lossless') {
+				audioQuality = 30280
+				enableHiRes = true
+				enableDolby = false
+				preferDolbyFirst = false
+			} else if (qualityPref === 'dolby_atmos') {
+				audioQuality = 30280
+				enableHiRes = false
+				enableDolby = true
+				preferDolbyFirst = true
+			} else if (qualityPref === 'standard_aac') {
 				audioQuality = 30280
 				enableHiRes = false
 				enableDolby = false
-			} else if (qualityPref === 'standard_132k') {
-				audioQuality = 30232
-				enableHiRes = false
-				enableDolby = false
+				preferDolbyFirst = false
 			}
 
 			const streamRes = await bilibiliApi.getAudioStream({
@@ -67,6 +76,7 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 				audioQuality,
 				enableDolby,
 				enableHiRes,
+				preferDolbyFirst,
 			})
 
 			// 如果在等待网络响应期间用户切换到了另一首歌，直接放弃旧请求

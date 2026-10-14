@@ -8,6 +8,8 @@ import {
 	Upload,
 	Trash2,
 	Eye,
+	Type,
+	Pipette,
 } from 'lucide-react'
 import { useSkinStore, type BilibiliGarbSuitDetailResponse } from '@bbplayer/shared-core'
 
@@ -51,6 +53,16 @@ const PRESET_SKINS: PresetSkin[] = [
 	},
 ]
 
+export const FONT_COLOR_PRESETS = [
+	{ color: '#FFFFFF', name: '纯白 (默认)' },
+	{ color: '#FDE047', name: '暖金' },
+	{ color: '#38BDF8', name: '冰蓝' },
+	{ color: '#F472B6', name: '柔粉' },
+	{ color: '#34D399', name: '薄荷绿' },
+	{ color: '#C084FC', name: '淡紫' },
+	{ color: '#E2E8F0', name: '冷灰白' },
+]
+
 function hexToRgbTriple(hex: string): string {
 	let c = hex.replace('#', '')
 	if (c.length === 3) {
@@ -67,6 +79,55 @@ function hexToRgbTriple(hex: string): string {
 	return `${r} ${g} ${b}`
 }
 
+export function hexToHslTriple(hex: string): string {
+	let c = hex.replace('#', '')
+	if (c.length === 3) {
+		c = c
+			.split('')
+			.map((x) => x + x)
+			.join('')
+	}
+	const num = parseInt(c, 16)
+	if (Number.isNaN(num)) return '210 25% 98%'
+	const r = ((num >> 16) & 255) / 255
+	const g = ((num >> 8) & 255) / 255
+	const b = (num & 255) / 255
+	const max = Math.max(r, g, b)
+	const min = Math.min(r, g, b)
+	let h = 0
+	let s = 0
+	const l = (max + min) / 2
+	if (max !== min) {
+		const d = max - min
+		s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+		switch (max) {
+			case r:
+				h = (g - b) / d + (g < b ? 6 : 0)
+				break
+			case g:
+				h = (b - r) / d + 2
+				break
+			case b:
+				h = (r - g) / d + 4
+				break
+		}
+		h /= 6
+	}
+	return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
+}
+
+export function applyFontColorToDom(color: string | null) {
+	if (typeof document === 'undefined') return
+	if (!color) {
+		document.documentElement.style.removeProperty('--foreground')
+		document.documentElement.style.removeProperty('--custom-text-color')
+		return
+	}
+	const hsl = hexToHslTriple(color)
+	document.documentElement.style.setProperty('--foreground', hsl)
+	document.documentElement.style.setProperty('--custom-text-color', color)
+}
+
 export const SkinStoreView: React.FC = () => {
 	const {
 		activeSkinId,
@@ -75,11 +136,12 @@ export const SkinStoreView: React.FC = () => {
 		customBgUrl,
 		customBgOpacity,
 		customBgBlur,
+		customTextColor,
+		setTextColor,
 		setCustomBg,
 		clearCustomBg,
 	} = useSkinStore()
 
-	const [urlInput, setUrlInput] = useState('')
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
 
 	const handleApplyPreset = (preset: PresetSkin) => {
@@ -113,6 +175,8 @@ export const SkinStoreView: React.FC = () => {
 
 	const handleReset = () => {
 		clearSkin()
+		setTextColor(null)
+		applyFontColorToDom(null)
 		document.documentElement.style.setProperty('--primary-rgb', '0 174 236')
 		document.documentElement.style.setProperty('--primary', '#00AEEC')
 		document.documentElement.style.setProperty('--bili-theme-primary', '#00AEEC')
@@ -126,16 +190,15 @@ export const SkinStoreView: React.FC = () => {
 		reader.onload = (event) => {
 			const res = event.target?.result as string
 			if (res) {
-				setCustomBg(res, customBgOpacity, customBgBlur)
+				setCustomBg(res, customBgOpacity ?? 0.5, customBgBlur ?? 0)
 			}
 		}
 		reader.readAsDataURL(file)
 	}
 
-	const handleApplyUrl = () => {
-		if (!urlInput.trim()) return
-		setCustomBg(urlInput.trim(), customBgOpacity, customBgBlur)
-		setUrlInput('')
+	const handleSetFontColor = (color: string | null) => {
+		setTextColor(color)
+		applyFontColorToDom(color)
 	}
 
 	return (
@@ -219,21 +282,66 @@ export const SkinStoreView: React.FC = () => {
 								<span>上传本地图片</span>
 							</button>
 
-							<div className="flex-1 flex items-center gap-1.5 min-w-[200px]">
-								<input
-									type="text"
-									placeholder="或粘贴网络图片直链 URL..."
-									value={urlInput}
-									onChange={(e) => setUrlInput(e.target.value)}
-									className="flex-1 h-8 px-3 rounded-xl bg-white/5 border border-white/10 text-foreground placeholder:text-muted-foreground/60 text-xs outline-none focus:border-[#00AEEC]/50"
-								/>
-								<button
-									onClick={handleApplyUrl}
-									disabled={!urlInput.trim()}
-									className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-foreground disabled:opacity-40 transition-colors font-medium"
-								>
-									应用
-								</button>
+							{/* UI 字体颜色选项 */}
+							<div className="flex-1 flex items-center justify-between gap-2 min-w-[280px] h-9 px-3 rounded-xl bg-white/5 border border-white/10">
+								<div className="flex items-center gap-1.5 text-muted-foreground flex-shrink-0">
+									<Type className="w-3.5 h-3.5 text-[#00AEEC]" />
+									<span className="text-[11px] font-medium text-foreground">
+										UI 字体颜色
+									</span>
+								</div>
+
+								<div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+									{FONT_COLOR_PRESETS.map((item) => {
+										const isSelected =
+											customTextColor?.toLowerCase() === item.color.toLowerCase() ||
+											(!customTextColor && item.color === '#FFFFFF')
+										return (
+											<button
+												key={item.color}
+												onClick={() =>
+													handleSetFontColor(item.color === '#FFFFFF' ? null : item.color)
+												}
+												title={item.name}
+												className={`w-4 h-4 rounded-full border transition-all flex items-center justify-center flex-shrink-0 ${
+													isSelected
+														? 'ring-2 ring-primary ring-offset-1 ring-offset-[#0b0f17] scale-110 border-white'
+														: 'border-white/20 hover:scale-105'
+												}`}
+												style={{ backgroundColor: item.color }}
+											>
+												{isSelected && (
+													<Check className="w-2.5 h-2.5 text-black stroke-[3]" />
+												)}
+											</button>
+										)
+									})}
+
+									{/* 自定义拾色器 */}
+									<label
+										title="点击调用系统取色器自定义字体颜色"
+										className="w-4 h-4 rounded-full border border-dashed border-white/40 hover:border-white/80 cursor-pointer flex items-center justify-center relative overflow-hidden transition-all hover:scale-105 flex-shrink-0"
+										style={{ backgroundColor: customTextColor || 'transparent' }}
+									>
+										<input
+											type="color"
+											value={customTextColor || '#FFFFFF'}
+											onChange={(e) => handleSetFontColor(e.target.value)}
+											className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+										/>
+										<Pipette className="w-2.5 h-2.5 text-white/80 pointer-events-none" />
+									</label>
+
+									{customTextColor && (
+										<button
+											onClick={() => handleSetFontColor(null)}
+											className="text-[10px] text-muted-foreground hover:text-white px-1 transition-colors flex-shrink-0"
+											title="重置为默认字体颜色"
+										>
+											重置
+										</button>
+									)}
+								</div>
 							</div>
 						</div>
 
@@ -244,7 +352,7 @@ export const SkinStoreView: React.FC = () => {
 								<div className="flex items-center justify-between text-[11px] text-muted-foreground">
 									<span>背景不透明度</span>
 									<span className="font-mono text-foreground font-semibold">
-										{Math.round((customBgOpacity ?? 1.0) * 100)}%
+										{Math.round((customBgOpacity ?? 0.5) * 100)}%
 									</span>
 								</div>
 								<input
@@ -252,12 +360,12 @@ export const SkinStoreView: React.FC = () => {
 									min="0.1"
 									max="1"
 									step="0.05"
-									value={customBgOpacity ?? 1.0}
+									value={customBgOpacity ?? 0.5}
 									onChange={(e) =>
 										setCustomBg(
 											customBgUrl,
 											parseFloat(e.target.value),
-											customBgBlur,
+											customBgBlur ?? 0,
 										)
 									}
 									className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
@@ -281,7 +389,7 @@ export const SkinStoreView: React.FC = () => {
 									onChange={(e) =>
 										setCustomBg(
 											customBgUrl,
-											customBgOpacity,
+											customBgOpacity ?? 0.5,
 											parseInt(e.target.value, 10),
 										)
 									}

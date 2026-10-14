@@ -12,6 +12,7 @@ export interface BilibiliAudioStreamParams {
 	audioQuality: number
 	enableDolby: boolean
 	enableHiRes: boolean
+	preferDolbyFirst?: boolean
 }
 
 /**
