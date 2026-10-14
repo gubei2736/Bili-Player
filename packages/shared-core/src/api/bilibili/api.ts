@@ -53,6 +53,10 @@ export class BilibiliApi {
 		private readonly http: IHttpClient = getDefaultHttpClient(),
 	) {}
 
+	private get activeHttp(): IHttpClient {
+		return getDefaultHttpClient() || this.http
+	}
+
 	getHistory({ signal }: { signal?: AbortSignal } = {}): ResultAsync<
 		BilibiliHistoryVideo[],
 		BilibiliApiError
@@ -698,11 +702,19 @@ export class BilibiliApi {
 		{ url: string; qrcode_key: string },
 		BilibiliApiError
 	> {
-		return this.client.get<{ url: string; qrcode_key: string }>({
-			endpoint: '',
-			fullUrl:
-				'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
-		})
+		return this.client
+			.get<any>({
+				endpoint: '',
+				fullUrl:
+					'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
+			})
+			.map((res) => {
+				const payload = res?.qrcode_key ? res : res?.data ? res.data : res
+				return {
+					url: payload?.url ?? '',
+					qrcode_key: payload?.qrcode_key ?? '',
+				}
+			})
 	}
 
 	pollQrCodeLoginStatus({
@@ -713,13 +725,43 @@ export class BilibiliApi {
 		{ status: BilibiliQrCodeLoginStatus; cookies: string },
 		BilibiliApiError
 	> {
+		const parseRawCookieHeader = (
+			rawHeader: string,
+			targetMap: Record<string, string>,
+		) => {
+			if (!rawHeader) return
+			const parts = rawHeader.split(/[\r\n]+|;;\s*|;\s*/)
+			const ignoredKeys = new Set([
+				'path',
+				'domain',
+				'expires',
+				'max-age',
+				'samesite',
+				'secure',
+				'httponly',
+				'priority',
+			])
+			for (const item of parts) {
+				const eqIdx = item.indexOf('=')
+				if (eqIdx > 0) {
+					const k = item.substring(0, eqIdx).trim()
+					const v = item.substring(eqIdx + 1).trim()
+					if (k && !ignoredKeys.has(k.toLowerCase()) && !k.includes(',')) {
+						targetMap[k] = v
+					}
+				}
+			}
+		}
+
 		const reqFunction = async () => {
-			const response = await this.http.fetch(
-				`https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${qrcodeKey}`,
+			const http = this.activeHttp
+			const response = await http.fetch(
+				`https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${encodeURIComponent(qrcodeKey)}`,
 				{
 					method: 'GET',
 					headers: {
 						'User-Agent': PASSPORT_UA,
+						Referer: 'https://passport.bilibili.com/',
 					},
 					credentials: 'omit',
 				},
@@ -731,19 +773,20 @@ export class BilibiliApi {
 					type: 'RequestFailed',
 				})
 			}
-			const data = (await response.json()) as {
-				data: { code: BilibiliQrCodeLoginStatus }
-				code: number
-			}
-			if (data.code !== 0) {
+			const rawJson = (await response.json()) as any
+			const outerCode = typeof rawJson?.code === 'number' ? rawJson.code : 0
+			if (outerCode !== 0) {
 				throw new BilibiliApiError({
-					message: `获取二维码登录状态失败: ${data.code}`,
-					msgCode: data.code,
-					rawData: data,
+					message: `获取二维码登录状态失败: ${outerCode}`,
+					msgCode: outerCode,
+					rawData: rawJson,
 					type: 'ResponseFailed',
 				})
 			}
-			const code = data.data.code
+
+			const pollData = rawJson?.data ?? rawJson
+			const code = Number(pollData?.code) as BilibiliQrCodeLoginStatus
+
 			if (code !== BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SUCCESS) {
 				return {
 					status: code,
@@ -754,55 +797,48 @@ export class BilibiliApi {
 			// Multi-source cookie aggregation
 			const cookieMap: Record<string, string> = {}
 
-			// 1. Collect from poll response Set-Cookie headers
-			const pollCookies =
-				response.headers.get('Set-Cookie') ||
-				response.headers.get('set-cookie') ||
-				''
-			if (pollCookies) {
-				const items = pollCookies.split(/;\s*/)
-				for (const item of items) {
-					const eqIdx = item.indexOf('=')
-					if (eqIdx > 0) {
-						const k = item.substring(0, eqIdx).trim()
-						const v = item.substring(eqIdx + 1).trim()
+			// 1. Direct query parameter extraction from data.url
+			const dataUrl: string | undefined = pollData?.url
+			if (dataUrl) {
+				try {
+					const parsed = new URL(dataUrl)
+					parsed.searchParams.forEach((val, key) => {
 						if (
-							![
-								'path',
-								'domain',
-								'expires',
-								'max-age',
-								'samesite',
-								'secure',
-								'httponly',
-							].includes(k.toLowerCase())
+							val &&
+							['SESSDATA', 'bili_jct', 'DedeUserID', 'DedeUserID__ckMd5', 'sid'].includes(
+								key,
+							)
 						) {
-							cookieMap[k] = v
+							cookieMap[key] = val
+						}
+					})
+				} catch {
+					// Fallback regex matching in case URL parsing fails
+					const keys = ['SESSDATA', 'bili_jct', 'DedeUserID', 'DedeUserID__ckMd5', 'sid']
+					for (const k of keys) {
+						const match = dataUrl.match(new RegExp(`[?&]${k}=([^&#]+)`))
+						if (match?.[1]) {
+							cookieMap[k] = decodeURIComponent(match[1])
 						}
 					}
 				}
 			}
 
-			// 2. Parse query parameters from data.url
-			const dataUrl = (data.data as any)?.url
-			if (dataUrl) {
-				try {
-					const parsed = new URL(dataUrl)
-					parsed.searchParams.forEach((val, key) => {
-						if (val) {
-							cookieMap[key] = val
-						}
-					})
-				} catch {}
-			}
+			// 2. Collect from poll response Set-Cookie headers
+			const pollCookies =
+				response.headers.get('Set-Cookie') ||
+				response.headers.get('set-cookie') ||
+				''
+			parseRawCookieHeader(pollCookies, cookieMap)
 
 			// 3. If SESSDATA or bili_jct is still missing and dataUrl is provided, follow dataUrl
 			if ((!cookieMap['SESSDATA'] || !cookieMap['bili_jct']) && dataUrl) {
 				try {
-					const crossRes = await this.http.fetch(dataUrl, {
+					const crossRes = await http.fetch(dataUrl, {
 						method: 'GET',
 						headers: {
 							'User-Agent': PASSPORT_UA,
+							Referer: 'https://www.bilibili.com/',
 						},
 						credentials: 'omit',
 					})
@@ -810,36 +846,14 @@ export class BilibiliApi {
 						crossRes.headers.get('Set-Cookie') ||
 						crossRes.headers.get('set-cookie') ||
 						''
-					if (crossCookies) {
-						const items = crossCookies.split(/;\s*/)
-						for (const item of items) {
-							const eqIdx = item.indexOf('=')
-							if (eqIdx > 0) {
-								const k = item.substring(0, eqIdx).trim()
-								const v = item.substring(eqIdx + 1).trim()
-								if (
-									![
-										'path',
-										'domain',
-										'expires',
-										'max-age',
-										'samesite',
-										'secure',
-										'httponly',
-									].includes(k.toLowerCase())
-								) {
-									cookieMap[k] = v
-								}
-							}
-						}
-					}
+					parseRawCookieHeader(crossCookies, cookieMap)
 				} catch {}
 			}
 
 			// 4. Also store refresh_token if available
-			const refreshToken = (data.data as any)?.refresh_token
+			const refreshToken = pollData?.refresh_token
 			if (refreshToken) {
-				cookieMap['refresh_token'] = refreshToken
+				cookieMap['refresh_token'] = String(refreshToken)
 			}
 
 			const cookieString = Object.entries(cookieMap)

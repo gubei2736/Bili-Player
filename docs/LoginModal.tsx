@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { X, RefreshCw, CheckCircle2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import {
@@ -21,13 +21,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 	const [isSuccess, setIsSuccess] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
 
-	const loadQrCode = async () => {
+	const onCloseRef = useRef(onClose)
+	onCloseRef.current = onClose
+	const isPollingRef = useRef(false)
+
+	const loadQrCode = useCallback(async () => {
 		setIsLoading(true)
 		setIsSuccess(false)
+		setQrcodeKey('')
 		setStatusText('正在生成二维码...')
 		const result = await bilibiliApi.getLoginQrCode()
 		setIsLoading(false)
-		if (result.isOk()) {
+		if (result.isOk() && result.value.qrcode_key && result.value.url) {
 			setQrcodeKey(result.value.qrcode_key)
 			setStatusText('请使用哔哩哔哩移动端扫码登录')
 			try {
@@ -41,7 +46,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 				})
 				setQrDataUrl(dataUri)
 			} catch {
-				// Fallback to online generator if canvas fails
 				setQrDataUrl(
 					`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
 						result.value.url,
@@ -51,54 +55,73 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 		} else {
 			setStatusText('获取二维码失败，请点击刷新重试')
 		}
-	}
+	}, [])
 
 	useEffect(() => {
 		if (isOpen) {
 			loadQrCode()
+		} else {
+			setQrcodeKey('')
+			setIsSuccess(false)
 		}
-	}, [isOpen])
+	}, [isOpen, loadQrCode])
 
 	useEffect(() => {
 		if (!qrcodeKey || !isOpen || isSuccess) return
 
+		let cancelled = false
 		const timer = setInterval(async () => {
-			const res = await bilibiliApi.pollQrCodeLoginStatus({ qrcodeKey })
-			if (res.isOk()) {
-				const { status, cookies } = res.value
-				if (status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_WAIT) {
-					setStatusText('等待扫码...')
-				} else if (
-					status ===
-					BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SCANNED_BUT_NOT_CONFIRMED
-				) {
-					setStatusText('已扫码，请在手机上点击确认')
-				} else if (
-					status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SUCCESS
-				) {
-					setIsSuccess(true)
-					setStatusText('登录成功，正在同步账号数据...')
-					setCookie(cookies)
-					clearInterval(timer)
-					try {
-						await fetchUserInfo()
-					} catch (e) {
-						console.warn('fetchUserInfo note:', e)
+			if (isPollingRef.current || cancelled) return
+			isPollingRef.current = true
+
+			try {
+				const res = await bilibiliApi.pollQrCodeLoginStatus({ qrcodeKey })
+				if (cancelled) return
+
+				if (res.isOk()) {
+					const { status, cookies } = res.value
+					if (status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_WAIT) {
+						setStatusText('等待扫码...')
+					} else if (
+						status ===
+						BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SCANNED_BUT_NOT_CONFIRMED
+					) {
+						setStatusText('已扫码，请在手机上点击确认')
+					} else if (
+						status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SUCCESS
+					) {
+						cancelled = true
+						clearInterval(timer)
+						setIsSuccess(true)
+						setStatusText('登录成功，正在同步账号数据...')
+						setCookie(cookies)
+
+						try {
+							await fetchUserInfo()
+						} catch (e) {
+							console.warn('fetchUserInfo note:', e)
+						}
+						setTimeout(() => {
+							onCloseRef.current()
+						}, 800)
+					} else if (
+						status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_QRCODE_EXPIRED
+					) {
+						cancelled = true
+						clearInterval(timer)
+						setStatusText('二维码已过期，请点击刷新')
 					}
-					setTimeout(() => {
-						onClose()
-					}, 1200)
-				} else if (
-					status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_QRCODE_EXPIRED
-				) {
-					setStatusText('二维码已过期，请点击刷新')
-					clearInterval(timer)
 				}
+			} finally {
+				isPollingRef.current = false
 			}
 		}, 1500)
 
-		return () => clearInterval(timer)
-	}, [qrcodeKey, isOpen, isSuccess, setCookie, fetchUserInfo, onClose])
+		return () => {
+			cancelled = true
+			clearInterval(timer)
+		}
+	}, [qrcodeKey, isOpen, isSuccess, setCookie, fetchUserInfo])
 
 	if (!isOpen) return null
 

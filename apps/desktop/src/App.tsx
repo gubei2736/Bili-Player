@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
 	Search,
 	Music,
@@ -186,16 +186,39 @@ export const App: React.FC = () => {
 		loadTracks()
 	}, [])
 
+	// 2.2 Sync saved shortcuts to Rust on startup
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem('bbplayer_shortcuts')
+			if (saved) {
+				const configs = JSON.parse(saved)
+				if (Array.isArray(configs) && configs.length > 0) {
+					invoke('update_shortcuts', { configs }).catch(() => {})
+				}
+			}
+		} catch {}
+	}, [])
+
+	const lastShortcutTriggerTimeRef = useRef<number>(0)
+
 	// 3. Global Shortcuts IPC Event Listener
 	useEffect(() => {
 		let unlistenFn: (() => void) | undefined
 		listen<string>('global-shortcut-event', async (event) => {
+			const now = Date.now()
+			if (now - lastShortcutTriggerTimeRef.current < 200) return
+			lastShortcutTriggerTimeRef.current = now
+
 			const action = event.payload
 			if (action === 'play_pause') {
 				if (desktopAudioEngine.isPlaying()) {
 					desktopAudioEngine.pause()
 				} else {
-					desktopAudioEngine.play()
+					if (!currentTrack && featuredTracks.length > 0) {
+						handlePlayTrack(featuredTracks[0], 0)
+					} else {
+						desktopAudioEngine.play()
+					}
 				}
 			} else if (action === 'prev_track') {
 				const prevTrack = prev()
@@ -217,7 +240,7 @@ export const App: React.FC = () => {
 		return () => {
 			if (unlistenFn) unlistenFn()
 		}
-	}, [next, prev])
+	}, [next, prev, currentTrack, featuredTracks])
 
 	// 4. In-App Single-Key & Global Shortcuts Handling
 	useEffect(() => {
@@ -225,7 +248,7 @@ export const App: React.FC = () => {
 			if (!shortcutStr) return false
 			const parts = shortcutStr.split('+').map((p) => p.trim())
 			const mainKey = parts[parts.length - 1].toLowerCase()
-			const hasCtrl = parts.some((p) => p.toLowerCase() === 'ctrl')
+			const hasCtrl = parts.some((p) => p.toLowerCase() === 'ctrl' || p.toLowerCase() === 'control')
 			const hasAlt = parts.some((p) => p.toLowerCase() === 'alt')
 			const hasShift = parts.some((p) => p.toLowerCase() === 'shift')
 			const hasMeta = parts.some((p) => ['super', 'meta', 'win'].includes(p.toLowerCase()))
@@ -239,10 +262,26 @@ export const App: React.FC = () => {
 			const eventCode = e.code.toLowerCase()
 
 			if (mainKey === 'space' && (eventCode === 'space' || eventKey === ' ')) return true
-			if (mainKey === 'left' && (eventCode === 'arrowleft' || eventKey === 'arrowleft')) return true
-			if (mainKey === 'right' && (eventCode === 'arrowright' || eventKey === 'arrowright')) return true
-			if (mainKey === 'up' && (eventCode === 'arrowup' || eventKey === 'arrowup')) return true
-			if (mainKey === 'down' && (eventCode === 'arrowdown' || eventKey === 'arrowdown')) return true
+			if (
+				(mainKey === 'left' || mainKey === 'arrowleft') &&
+				(eventCode === 'arrowleft' || eventKey === 'arrowleft')
+			)
+				return true
+			if (
+				(mainKey === 'right' || mainKey === 'arrowright') &&
+				(eventCode === 'arrowright' || eventKey === 'arrowright')
+			)
+				return true
+			if (
+				(mainKey === 'up' || mainKey === 'arrowup') &&
+				(eventCode === 'arrowup' || eventKey === 'arrowup')
+			)
+				return true
+			if (
+				(mainKey === 'down' || mainKey === 'arrowdown') &&
+				(eventCode === 'arrowdown' || eventKey === 'arrowdown')
+			)
+				return true
 
 			return (
 				eventKey === mainKey ||
@@ -263,8 +302,8 @@ export const App: React.FC = () => {
 
 			let shortcutsConfig = [
 				{ id: 'play_pause', key: 'Alt+Shift+Space' },
-				{ id: 'prev_track', key: 'Alt+Shift+Left' },
-				{ id: 'next_track', key: 'Alt+Shift+Right' },
+				{ id: 'prev_track', key: 'Alt+Shift+ArrowLeft' },
+				{ id: 'next_track', key: 'Alt+Shift+ArrowRight' },
 			]
 			try {
 				const saved = localStorage.getItem('bbplayer_shortcuts')
@@ -277,17 +316,33 @@ export const App: React.FC = () => {
 
 			if (matchesShortcut(e, playPauseKey) || (!playPauseKey && e.code === 'Space')) {
 				e.preventDefault()
+				const now = Date.now()
+				if (now - lastShortcutTriggerTimeRef.current < 200) return
+				lastShortcutTriggerTimeRef.current = now
+
 				if (desktopAudioEngine.isPlaying()) {
 					desktopAudioEngine.pause()
 				} else {
-					desktopAudioEngine.play()
+					if (!currentTrack && featuredTracks.length > 0) {
+						handlePlayTrack(featuredTracks[0], 0)
+					} else {
+						desktopAudioEngine.play()
+					}
 				}
 			} else if (matchesShortcut(e, prevKey)) {
 				e.preventDefault()
+				const now = Date.now()
+				if (now - lastShortcutTriggerTimeRef.current < 200) return
+				lastShortcutTriggerTimeRef.current = now
+
 				const prevTrack = prev()
 				if (prevTrack) playTrackWithProxy(prevTrack).catch(() => {})
 			} else if (matchesShortcut(e, nextKey)) {
 				e.preventDefault()
+				const now = Date.now()
+				if (now - lastShortcutTriggerTimeRef.current < 200) return
+				lastShortcutTriggerTimeRef.current = now
+
 				const nextTrack = next()
 				if (nextTrack) playTrackWithProxy(nextTrack).catch(() => {})
 			}
@@ -295,17 +350,25 @@ export const App: React.FC = () => {
 
 		window.addEventListener('keydown', handleLocalKeyDown)
 		return () => window.removeEventListener('keydown', handleLocalKeyDown)
-	}, [next, prev])
+	}, [next, prev, currentTrack, featuredTracks])
 
-	// 4. IPC Lyrics Synchronization to Desktop Floating Lyrics Window
+	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window
 	useEffect(() => {
+		let lastSentMs = 0
+		let lastPlayState = false
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
-			emit('lyrics-sync', {
-				type: 'STATE_SYNC',
-				isPlaying: desktopAudioEngine.isPlaying(),
-				currentTimeMs: event.currentTime * 1000,
-				timestamp: Date.now(),
-			}).catch(() => {})
+			const now = Date.now()
+			const isPlaying = desktopAudioEngine.isPlaying()
+			if (isPlaying !== lastPlayState || now - lastSentMs > 250) {
+				lastSentMs = now
+				lastPlayState = isPlaying
+				emit('lyrics-sync', {
+					type: 'STATE_SYNC',
+					isPlaying,
+					currentTimeMs: event.currentTime * 1000,
+					timestamp: now,
+				}).catch(() => {})
+			}
 		})
 		return unsubscribe
 	}, [])

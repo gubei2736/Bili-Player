@@ -16,12 +16,12 @@ const DEFAULT_SHORTCUTS: ShortcutItem[] = [
 	},
 	{
 		id: 'prev_track',
-		key: 'Alt+Shift+Left',
+		key: 'Alt+Shift+ArrowLeft',
 		description: '全局：上一首',
 	},
 	{
 		id: 'next_track',
-		key: 'Alt+Shift+Right',
+		key: 'Alt+Shift+ArrowRight',
 		description: '全局：下一首',
 	},
 	{
@@ -170,6 +170,7 @@ export const ShortcutsSettingsView: React.FC = () => {
 							<div>
 								{isEditing ? (
 									<div
+										ref={(el) => el?.focus()}
 										tabIndex={0}
 										onKeyDown={(e) => handleKeyDown(e, item.id)}
 										onBlur={() => setEditingId(null)}
