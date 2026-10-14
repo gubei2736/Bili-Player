@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react'
-import { Keyboard, RotateCcw, Check, Sparkles, AlertCircle } from 'lucide-react'
+import {
+	Keyboard,
+	RotateCcw,
+	Check,
+	Sparkles,
+	AlertTriangle,
+	CheckCircle2,
+} from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface ShortcutItem {
 	id: string
 	key: string
 	description: string
+}
+
+export interface ShortcutStatus {
+	id: string
+	key: string
+	registered: boolean
+	error: string | null
 }
 
 const DEFAULT_SHORTCUTS: ShortcutItem[] = [
@@ -49,6 +63,16 @@ export const ShortcutsSettingsView: React.FC = () => {
 
 	const [editingId, setEditingId] = useState<string | null>(null)
 	const [saveStatus, setSaveStatus] = useState<string | null>(null)
+	const [statusMap, setStatusMap] = useState<Record<string, ShortcutStatus>>({})
+
+	const applyStatuses = (list: ShortcutStatus[]) => {
+		if (!Array.isArray(list)) return
+		const nextMap: Record<string, ShortcutStatus> = {}
+		for (const item of list) {
+			nextMap[item.id] = item
+		}
+		setStatusMap(nextMap)
+	}
 
 	useEffect(() => {
 		const saved = localStorage.getItem('bbplayer_shortcuts')
@@ -57,7 +81,9 @@ export const ShortcutsSettingsView: React.FC = () => {
 				const parsed = JSON.parse(saved)
 				if (Array.isArray(parsed) && parsed.length > 0) {
 					setShortcuts(parsed)
-					invoke('update_shortcuts', { configs: parsed }).catch(() => {})
+					invoke<ShortcutStatus[]>('update_shortcuts', { configs: parsed })
+						.then(applyStatuses)
+						.catch(() => {})
 					return
 				}
 			} catch {}
@@ -66,7 +92,14 @@ export const ShortcutsSettingsView: React.FC = () => {
 			.then((items) => {
 				if (items && items.length > 0) {
 					setShortcuts(items)
+					return invoke<ShortcutStatus[]>('update_shortcuts', {
+						configs: items,
+					})
 				}
+				return []
+			})
+			.then((statuses) => {
+				if (statuses) applyStatuses(statuses)
 			})
 			.catch(() => {})
 	}, [])
@@ -75,7 +108,7 @@ export const ShortcutsSettingsView: React.FC = () => {
 		e.preventDefault()
 		e.stopPropagation()
 
-		// Discard isolated modifier presses
+		// 忽略单独按下的修饰键
 		if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
 			return
 		}
@@ -87,12 +120,23 @@ export const ShortcutsSettingsView: React.FC = () => {
 		if (e.metaKey) modifiers.push('Super')
 
 		let mainKey = e.key
-		if (mainKey === ' ' || mainKey === 'Spacebar') mainKey = 'Space'
-		else if (mainKey === 'ArrowLeft') mainKey = 'Left'
-		else if (mainKey === 'ArrowRight') mainKey = 'Right'
-		else if (mainKey === 'ArrowUp') mainKey = 'Up'
-		else if (mainKey === 'ArrowDown') mainKey = 'Down'
-		else if (mainKey.length === 1) mainKey = mainKey.toUpperCase()
+		if (e.code === 'Space' || mainKey === ' ' || mainKey === 'Spacebar') {
+			mainKey = 'Space'
+		} else if (mainKey === 'ArrowLeft' || e.code === 'ArrowLeft') {
+			mainKey = 'ArrowLeft'
+		} else if (mainKey === 'ArrowRight' || e.code === 'ArrowRight') {
+			mainKey = 'ArrowRight'
+		} else if (mainKey === 'ArrowUp' || e.code === 'ArrowUp') {
+			mainKey = 'ArrowUp'
+		} else if (mainKey === 'ArrowDown' || e.code === 'ArrowDown') {
+			mainKey = 'ArrowDown'
+		} else if (e.code.startsWith('Key') && e.code.length === 4) {
+			mainKey = e.code.slice(3).toUpperCase()
+		} else if (e.code.startsWith('Digit') && e.code.length === 6) {
+			mainKey = e.code.slice(5)
+		} else if (mainKey.length === 1) {
+			mainKey = mainKey.toUpperCase()
+		}
 
 		const shortcutString =
 			modifiers.length > 0 ? `${modifiers.join('+')}+${mainKey}` : mainKey
@@ -107,11 +151,23 @@ export const ShortcutsSettingsView: React.FC = () => {
 
 	const saveShortcuts = async (items: ShortcutItem[]) => {
 		localStorage.setItem('bbplayer_shortcuts', JSON.stringify(items))
-		window.dispatchEvent(new CustomEvent('bbplayer-shortcuts-updated', { detail: items }))
+		window.dispatchEvent(
+			new CustomEvent('bbplayer-shortcuts-updated', { detail: items }),
+		)
 		try {
-			await invoke('update_shortcuts', { configs: items })
-			setSaveStatus('快捷键已成功注册并生效')
-			setTimeout(() => setSaveStatus(null), 2500)
+			const statuses = await invoke<ShortcutStatus[]>('update_shortcuts', {
+				configs: items,
+			})
+			applyStatuses(statuses)
+			const failedCount = statuses.filter((s) => !s.registered).length
+			if (failedCount === 0) {
+				setSaveStatus('全部全局热键已在系统中成功注册并生效')
+			} else {
+				setSaveStatus(
+					`已保存配置，但有 ${failedCount} 个热键未能注册为后台全局热键（详见下方提示）`,
+				)
+			}
+			setTimeout(() => setSaveStatus(null), 3500)
 		} catch (err: any) {
 			console.warn('Update shortcuts note:', err)
 			setSaveStatus('已保存本地快捷键')
@@ -133,7 +189,7 @@ export const ShortcutsSettingsView: React.FC = () => {
 						<span>自定义全局快捷键</span>
 					</h3>
 					<p className="text-[11px] text-muted-foreground mt-0.5">
-						点击快捷键输入框即可直接按下按键录制（支持单键如 Space 空格、方向键，或 Alt / Ctrl / Shift 组合键）
+						点击右侧键位按钮直接按下组合键录制（后台全局热键需包含 Ctrl / Alt / Shift 修饰键）
 					</p>
 				</div>
 				<button
@@ -147,55 +203,101 @@ export const ShortcutsSettingsView: React.FC = () => {
 
 			{saveStatus && (
 				<div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-					<Check className="w-3.5 h-3.5" />
+					<Check className="w-3.5 h-3.5 shrink-0" />
 					<span>{saveStatus}</span>
 				</div>
 			)}
+
 			<div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-muted-foreground space-y-1">
 				<p className="text-foreground font-semibold flex items-center gap-1.5">
 					<Sparkles className="w-3.5 h-3.5 text-primary" />
-					<span>独立按键说明</span>
+					<span>前台与后台热键机制说明</span>
 				</p>
 				<p className="text-[11px] leading-relaxed">
-					应用处于前台时，按 <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-primary font-mono text-[10px]">Space</kbd>（空格键）默认可直接控制播放/暂停，不受全局快捷键配置限制。下方设置用于在您使用其他软件或窗口处于后台时，进行全局热键监听与控制。
+					1. <strong>前台单键</strong>：应用处于焦点时，直接按{' '}
+					<kbd className="px-1.5 py-0.5 rounded bg-white/10 text-primary font-mono text-[10px]">
+						Space
+					</kbd>{' '}
+					即可播放/暂停。<br />
+					2. <strong>后台全局热键</strong>：当切换到浏览器或其他软件时，需使用带修饰键的组合（如{' '}
+					<code className="text-foreground/90">Ctrl+Alt+Space</code>）。若显示“热键被占用”，说明与当前电脑上的 QQ/微信/显卡驱动热键冲突，点击更换为其他组合（如{' '}
+					<code className="text-foreground/90">Ctrl+Shift+Space</code> 或{' '}
+					<code className="text-foreground/90">Alt+P</code>）即可立即生效。
 				</p>
 			</div>
 
 			<div className="space-y-2 rounded-xl bg-white/5 p-3 border border-white/5">
 				{shortcuts.map((item) => {
 					const isEditing = editingId === item.id
+					const st = statusMap[item.id]
+					const hasError = st && !st.registered
+
 					return (
 						<div
 							key={item.id}
-							className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-white/5 transition-colors text-xs"
+							className="flex flex-col py-2 px-2.5 rounded-lg hover:bg-white/5 transition-colors text-xs gap-1.5"
 						>
-							<div className="flex-1 mr-4">
-								<p className="font-medium text-foreground">{item.description}</p>
-								<p className="text-[10px] text-muted-foreground font-mono">
-									ID: {item.id}
-								</p>
+							<div className="flex items-center justify-between">
+								<div className="flex-1 mr-4">
+									<div className="flex items-center gap-2">
+										<p className="font-medium text-foreground">
+											{item.description}
+										</p>
+										{st?.registered && (
+											<span
+												className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400"
+												title="已在操作系统成功注册全局热键，后台失焦可用"
+											>
+												<CheckCircle2 className="w-2.5 h-2.5" />
+												<span>全局已就绪</span>
+											</span>
+										)}
+										{hasError && (
+											<span
+												className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400"
+												title={st.error || '热键冲突'}
+											>
+												<AlertTriangle className="w-2.5 h-2.5" />
+												<span>热键冲突/受限</span>
+											</span>
+										)}
+									</div>
+									<p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+										ID: {item.id}
+									</p>
+								</div>
+
+								<div>
+									{isEditing ? (
+										<div
+											ref={(el) => el?.focus()}
+											tabIndex={0}
+											onKeyDown={(e) => handleKeyDown(e, item.id)}
+											onBlur={() => setEditingId(null)}
+											className="px-3 py-1.5 rounded-lg bg-primary/20 border border-primary text-primary text-xs font-mono animate-pulse cursor-pointer outline-none"
+										>
+											请按下组合键...
+										</div>
+									) : (
+										<button
+											onClick={() => setEditingId(item.id)}
+											className={`px-3 py-1.5 rounded-lg border text-xs font-mono transition-all duration-150 ${
+												hasError
+													? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:border-amber-400'
+													: 'bg-white/10 hover:bg-white/15 border-white/10 text-foreground hover:border-primary/50'
+											}`}
+										>
+											{item.key || '未设置'}
+										</button>
+									)}
+								</div>
 							</div>
 
-							<div>
-								{isEditing ? (
-									<div
-										ref={(el) => el?.focus()}
-										tabIndex={0}
-										onKeyDown={(e) => handleKeyDown(e, item.id)}
-										onBlur={() => setEditingId(null)}
-										className="px-3 py-1.5 rounded-lg bg-primary/20 border border-primary text-primary text-xs font-mono animate-pulse cursor-pointer outline-none"
-									>
-										请按下组合键...
-									</div>
-								) : (
-									<button
-										onClick={() => setEditingId(item.id)}
-										className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-foreground text-xs font-mono transition-all duration-150 hover:border-primary/50"
-									>
-										{item.key || '未设置'}
-									</button>
-								)}
-							</div>
+							{hasError && st.error && (
+								<p className="text-[10px] text-amber-400/90 flex items-center gap-1 pl-0.5">
+									<span>⚠️ {st.error}（建议点击右侧按钮录制其他组合键）</span>
+								</p>
+							)}
 						</div>
 					)
 				})}

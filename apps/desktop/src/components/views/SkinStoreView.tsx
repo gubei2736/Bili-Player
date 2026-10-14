@@ -282,16 +282,16 @@ export const SkinStoreView: React.FC = () => {
 								<span>上传本地图片</span>
 							</button>
 
-							{/* UI 字体颜色选项 */}
-							<div className="flex-1 flex items-center justify-between gap-2 min-w-[280px] h-9 px-3 rounded-xl bg-white/5 border border-white/10">
-								<div className="flex items-center gap-1.5 text-muted-foreground flex-shrink-0">
-									<Type className="w-3.5 h-3.5 text-[#00AEEC]" />
-									<span className="text-[11px] font-medium text-foreground">
-										UI 字体颜色
+							{/* UI 字体颜色选项（紧凑设计） */}
+							<div className="flex-1 flex items-center justify-between gap-1.5 min-w-[240px] h-8 px-2.5 rounded-lg bg-white/5 border border-white/10">
+								<div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
+									<Type className="w-3 h-3 text-[#00AEEC]" />
+									<span className="text-[10px] font-medium text-foreground">
+										字体颜色
 									</span>
 								</div>
 
-								<div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+								<div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
 									{FONT_COLOR_PRESETS.map((item) => {
 										const isSelected =
 											customTextColor?.toLowerCase() === item.color.toLowerCase() ||
@@ -303,15 +303,15 @@ export const SkinStoreView: React.FC = () => {
 													handleSetFontColor(item.color === '#FFFFFF' ? null : item.color)
 												}
 												title={item.name}
-												className={`w-4 h-4 rounded-full border transition-all flex items-center justify-center flex-shrink-0 ${
+												className={`w-3.5 h-3.5 rounded-full border transition-all flex items-center justify-center flex-shrink-0 ${
 													isSelected
-														? 'ring-2 ring-primary ring-offset-1 ring-offset-[#0b0f17] scale-110 border-white'
+														? 'ring-1.5 ring-primary ring-offset-1 ring-offset-[#0b0f17] scale-110 border-white'
 														: 'border-white/20 hover:scale-105'
 												}`}
 												style={{ backgroundColor: item.color }}
 											>
 												{isSelected && (
-													<Check className="w-2.5 h-2.5 text-black stroke-[3]" />
+													<Check className="w-2 h-2 text-black stroke-[3]" />
 												)}
 											</button>
 										)
@@ -319,8 +319,8 @@ export const SkinStoreView: React.FC = () => {
 
 									{/* 自定义拾色器 */}
 									<label
-										title="点击调用系统取色器自定义字体颜色"
-										className="w-4 h-4 rounded-full border border-dashed border-white/40 hover:border-white/80 cursor-pointer flex items-center justify-center relative overflow-hidden transition-all hover:scale-105 flex-shrink-0"
+										title="取色器自定义"
+										className="w-3.5 h-3.5 rounded-full border border-dashed border-white/40 hover:border-white/80 cursor-pointer flex items-center justify-center relative overflow-hidden transition-all hover:scale-105 flex-shrink-0"
 										style={{ backgroundColor: customTextColor || 'transparent' }}
 									>
 										<input
@@ -329,13 +329,13 @@ export const SkinStoreView: React.FC = () => {
 											onChange={(e) => handleSetFontColor(e.target.value)}
 											className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
 										/>
-										<Pipette className="w-2.5 h-2.5 text-white/80 pointer-events-none" />
+										<Pipette className="w-2 h-2 text-white/80 pointer-events-none" />
 									</label>
 
 									{customTextColor && (
 										<button
 											onClick={() => handleSetFontColor(null)}
-											className="text-[10px] text-muted-foreground hover:text-white px-1 transition-colors flex-shrink-0"
+											className="text-[9px] text-muted-foreground hover:text-white px-1 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-colors flex-shrink-0"
 											title="重置为默认字体颜色"
 										>
 											重置

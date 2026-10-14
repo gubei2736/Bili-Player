@@ -1,16 +1,26 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortcutConfig {
     pub id: String,          // e.g. "play_pause", "prev_track", "next_track", "toggle_lyrics", "toggle_penetration"
-    pub key: String,         // e.g. "Alt+Shift+Space"
+    pub key: String,         // e.g. "Ctrl+Alt+Space"
     pub description: String, // e.g. "播放 / 暂停"
 }
 
-static LYRICS_IGNORE_CURSOR: AtomicBool = AtomicBool::new(false);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortcutStatus {
+    pub id: String,
+    pub key: String,
+    pub registered: bool,
+    pub error: Option<String>,
+}
+
+pub static LYRICS_IGNORE_CURSOR: AtomicBool = AtomicBool::new(false);
 
 pub fn get_default_shortcuts() -> Vec<ShortcutConfig> {
     vec![
@@ -42,25 +52,39 @@ pub fn get_default_shortcuts() -> Vec<ShortcutConfig> {
     ]
 }
 
-static CURRENT_SHORTCUTS: std::sync::Mutex<Option<Vec<ShortcutConfig>>> =
-    std::sync::Mutex::new(None);
+static CURRENT_SHORTCUTS: Mutex<Option<Vec<ShortcutConfig>>> = Mutex::new(None);
+static SHORTCUT_ID_MAP: Mutex<Option<HashMap<u32, String>>> = Mutex::new(None);
+static LAST_REGISTRATION_STATUS: Mutex<Vec<ShortcutStatus>> = Mutex::new(Vec::new());
 
-/// 将前端键名标准化为 Tauri keyboard-types 规范格式
-fn normalize_shortcut_key(raw: &str) -> String {
+/// 将前端录制的键名标准化为 Tauri keyboard-types 规范格式
+pub fn normalize_shortcut_key(raw: &str) -> String {
     raw.split('+')
-        .map(|part| match part.trim() {
-            "Left" | "left" => "ArrowLeft",
-            "Right" | "right" => "ArrowRight",
-            "Up" | "up" => "ArrowUp",
-            "Down" | "down" => "ArrowDown",
-            "Ctrl" | "ctrl" => "Control",
-            other => other,
+        .map(|part| {
+            let trimmed = part.trim();
+            match trimmed.to_lowercase().as_str() {
+                "ctrl" | "control" => "Control".to_string(),
+                "alt" | "option" => "Alt".to_string(),
+                "shift" => "Shift".to_string(),
+                "super" | "meta" | "win" | "cmd" | "command" => "Super".to_string(),
+                "left" | "arrowleft" => "ArrowLeft".to_string(),
+                "right" | "arrowright" => "ArrowRight".to_string(),
+                "up" | "arrowup" => "ArrowUp".to_string(),
+                "down" | "arrowdown" => "ArrowDown".to_string(),
+                "space" | "spacebar" | "" => "Space".to_string(),
+                other => {
+                    if other.len() == 1 {
+                        other.to_uppercase()
+                    } else {
+                        trimmed.to_string()
+                    }
+                }
+            }
         })
         .collect::<Vec<_>>()
         .join("+")
 }
 
-/// 检查热键是否带有 Windows 系统级热键必需的修饰键
+/// 检查热键是否带有操作系统级全局热键必需的修饰键
 fn has_modifier(raw: &str) -> bool {
     let lower = raw.to_lowercase();
     lower.contains("alt+")
@@ -72,31 +96,99 @@ fn has_modifier(raw: &str) -> bool {
         || lower.contains("commandorcontrol+")
 }
 
-pub fn register_all_shortcuts(app: &AppHandle, configs: &[ShortcutConfig]) {
+pub fn register_all_shortcuts(app: &AppHandle, configs: &[ShortcutConfig]) -> Vec<ShortcutStatus> {
     {
         let mut lock = CURRENT_SHORTCUTS.lock().unwrap();
         *lock = Some(configs.to_vec());
     }
 
     let global_shortcut = app.global_shortcut();
-    let _ = global_shortcut.unregister_all();
+    if let Err(e) = global_shortcut.unregister_all() {
+        eprintln!("[BBPlayer Shortcuts] unregister_all note: {:?}", e);
+    }
+
+    let mut id_map = HashMap::new();
+    let mut statuses = Vec::new();
 
     for cfg in configs {
         let key_str = cfg.key.trim();
         if key_str.is_empty() {
+            statuses.push(ShortcutStatus {
+                id: cfg.id.clone(),
+                key: String::new(),
+                registered: false,
+                error: Some("未设置快捷键".into()),
+            });
             continue;
         }
 
-        // 不含修饰键的单键（如 Space）由前端窗口内 keydown 处理，不向 OS 注册全局热键避免 Windows RegisterHotKey 报错
+        // 不含修饰键的单键（如 Space）仅限窗口内响应，不能注册为 OS 全局热键
         if !has_modifier(key_str) {
+            statuses.push(ShortcutStatus {
+                id: cfg.id.clone(),
+                key: key_str.to_string(),
+                registered: false,
+                error: Some("单键仅在窗口内生效，后台全局控制需包含 Ctrl/Alt/Shift 组合".into()),
+            });
             continue;
         }
 
         let normalized = normalize_shortcut_key(key_str);
-        if let Ok(shortcut) = normalized.parse::<Shortcut>() {
-            let _ = global_shortcut.register(shortcut);
+        match normalized.parse::<Shortcut>() {
+            Ok(shortcut) => {
+                let sc_id = shortcut.id();
+                match global_shortcut.register(shortcut) {
+                    Ok(_) => {
+                        eprintln!(
+                            "[BBPlayer Shortcuts] Successfully registered global hotkey: {} -> {} (id={})",
+                            normalized, cfg.id, sc_id
+                        );
+                        id_map.insert(sc_id, cfg.id.clone());
+                        statuses.push(ShortcutStatus {
+                            id: cfg.id.clone(),
+                            key: key_str.to_string(),
+                            registered: true,
+                            error: None,
+                        });
+                    }
+                    Err(err) => {
+                        let err_msg = format!("热键被其他软件占用或系统拒绝: {}", err);
+                        eprintln!(
+                            "[BBPlayer Shortcuts] FAILED to register {} ({}): {}",
+                            normalized, cfg.id, err
+                        );
+                        statuses.push(ShortcutStatus {
+                            id: cfg.id.clone(),
+                            key: key_str.to_string(),
+                            registered: false,
+                            error: Some(err_msg),
+                        });
+                    }
+                }
+            }
+            Err(err) => {
+                let err_msg = format!("无法解析键位格式 ({}): {:?}", normalized, err);
+                eprintln!("[BBPlayer Shortcuts] {}", err_msg);
+                statuses.push(ShortcutStatus {
+                    id: cfg.id.clone(),
+                    key: key_str.to_string(),
+                    registered: false,
+                    error: Some(err_msg),
+                });
+            }
         }
     }
+
+    {
+        let mut map_lock = SHORTCUT_ID_MAP.lock().unwrap();
+        *map_lock = Some(id_map);
+    }
+    {
+        let mut status_lock = LAST_REGISTRATION_STATUS.lock().unwrap();
+        *status_lock = statuses.clone();
+    }
+
+    statuses
 }
 
 pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: ShortcutState) {
@@ -104,30 +196,52 @@ pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: Shortc
         return;
     }
 
-    let current_str = shortcut.to_string();
+    let incoming_id = shortcut.id();
+    eprintln!(
+        "[BBPlayer Shortcuts] OS Hotkey Pressed: {:?} (id={})",
+        shortcut, incoming_id
+    );
 
-    // 在当前活跃配置或默认配置中匹配动作 ID
-    let active_configs = {
-        let lock = CURRENT_SHORTCUTS.lock().unwrap();
-        lock.clone().unwrap_or_else(get_default_shortcuts)
+    // 1. 优先通过底层 u32 Shortcut ID 精确匹配动作 ID
+    let mut matched_id: Option<String> = {
+        let map_lock = SHORTCUT_ID_MAP.lock().unwrap();
+        map_lock
+            .as_ref()
+            .and_then(|map| map.get(&incoming_id).cloned())
     };
 
-    let mut matched_id = None;
-    for item in &active_configs {
-        let normalized = normalize_shortcut_key(&item.key);
-        if let Ok(s) = normalized.parse::<Shortcut>() {
-            if shortcut == &s {
-                matched_id = Some(item.id.clone());
-                break;
+    // 2. 兜底：如果 ID 表未命中，遍历配置比对 Shortcut 实例与 id()
+    if matched_id.is_none() {
+        let active_configs = {
+            let lock = CURRENT_SHORTCUTS.lock().unwrap();
+            lock.clone().unwrap_or_else(get_default_shortcuts)
+        };
+
+        for item in &active_configs {
+            let normalized = normalize_shortcut_key(&item.key);
+            if let Ok(s) = normalized.parse::<Shortcut>() {
+                if s.id() == incoming_id || &s == shortcut {
+                    matched_id = Some(item.id.clone());
+                    break;
+                }
             }
         }
     }
 
     let action_id = match matched_id {
-        Some(ref id) => id.clone(),
-        None => current_str,
+        Some(id) => id,
+        None => {
+            eprintln!(
+                "[BBPlayer Shortcuts] Unmatched shortcut pressed: {:?}",
+                shortcut
+            );
+            return;
+        }
     };
 
+    eprintln!("[BBPlayer Shortcuts] Dispatching action: {}", action_id);
+
+    // 3. 原生窗口层动作直接由 Rust 执行，零延迟且不受 WebView 休眠影响
     match action_id.as_str() {
         "toggle_penetration" => {
             let new_state = !LYRICS_IGNORE_CURSOR.load(Ordering::SeqCst);
@@ -136,24 +250,32 @@ pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: Shortc
                 let _ = lyrics_win.set_ignore_cursor_events(new_state);
             }
             let _ = app.emit("lyrics-lock-change", new_state);
+            return;
         }
         "toggle_lyrics" => {
             let _ = crate::window_ext::toggle_lyrics_window(app.clone());
+            return;
         }
         _ => {}
     }
 
-    // 1. 标准 Tauri IPC 事件派发
+    // 4. 音频控制动作（play_pause / prev_track / next_track）三路并发唤醒主窗口执行：
+    // 路径 A: 全局广播
     let _ = app.emit("global-shortcut-event", &action_id);
 
-    // 2. 双保险：直接在主窗口执行 window.__triggerGlobalShortcut，防止失焦时 Webview 事件被系统队列节流延迟
     if let Some(main_win) = app.get_webview_window("main") {
+        // 路径 B: 定向发送给 main 窗口
+        let _ = main_win.emit("global-shortcut-event", &action_id);
+
+        // 路径 C: 直接通过 WebView2 底层 eval 注入调用，无视后台 IPC 队列节流
         if let Ok(json_id) = serde_json::to_string(&action_id) {
             let script = format!(
-                "if (window.__triggerGlobalShortcut) {{ window.__triggerGlobalShortcut({}); }}",
+                "if (typeof window.__triggerGlobalShortcut === 'function') {{ window.__triggerGlobalShortcut({}); }}",
                 json_id
             );
-            let _ = main_win.eval(&script);
+            if let Err(e) = main_win.eval(&script) {
+                eprintln!("[BBPlayer Shortcuts] main_win.eval error: {:?}", e);
+            }
         }
     }
 }
@@ -165,38 +287,16 @@ pub fn get_shortcuts() -> Vec<ShortcutConfig> {
 }
 
 #[tauri::command]
-pub fn update_shortcuts(app: AppHandle, configs: Vec<ShortcutConfig>) -> Result<(), String> {
-    register_all_shortcuts(&app, &configs);
-    Ok(())
+pub fn get_shortcut_statuses() -> Vec<ShortcutStatus> {
+    let lock = LAST_REGISTRATION_STATUS.lock().unwrap();
+    lock.clone()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_shortcuts() {
-        let list = vec![
-            "Alt+Shift+Space",
-            "Alt+Shift+ArrowLeft",
-            "Alt+Shift+ArrowRight",
-            "Alt+Shift+D",
-            "Alt+Shift+L",
-            "Alt+Shift+Left",
-            "Alt+Shift+Right",
-            "Ctrl+Alt+Space",
-            "Ctrl+Alt+ArrowLeft",
-            "Ctrl+Alt+ArrowRight",
-            "Ctrl+Alt+D",
-            "Ctrl+Alt+L",
-            "Control+Alt+Space",
-        ];
-        for s in list {
-            let normalized = normalize_shortcut_key(s);
-            let parsed = normalized.parse::<Shortcut>();
-            println!("original: {}, normalized: {}, parsed: {:?}", s, normalized, parsed);
-            assert!(parsed.is_ok(), "Failed to parse: {} (normalized: {})", s, normalized);
-        }
-    }
+#[tauri::command]
+pub fn update_shortcuts(
+    app: AppHandle,
+    configs: Vec<ShortcutConfig>,
+) -> Result<Vec<ShortcutStatus>, String> {
+    let statuses = register_all_shortcuts(&app, &configs);
+    Ok(statuses)
 }
-

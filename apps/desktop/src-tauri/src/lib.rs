@@ -28,6 +28,7 @@ pub fn run() {
             exporter::export_cached_track_to_m4a,
             http_client::native_http_request,
             shortcuts::get_shortcuts,
+            shortcuts::get_shortcut_statuses,
             shortcuts::update_shortcuts,
         ])
         .setup(|app| {

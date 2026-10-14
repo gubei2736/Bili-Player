@@ -36,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
 	const { isLoggedIn, userInfo, logout } = useAuthStore()
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
+	const customTextColor = useSkinStore((s) => s.customTextColor)
 
 	const discoverGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
 		{ id: 'explore', label: '发现音乐', icon: <Compass className="w-4 h-4" /> },
@@ -63,10 +64,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			<button
 				key={item.id}
 				onClick={() => onSelectTab(item.id)}
+				style={customTextColor ? { color: customTextColor } : undefined}
 				className={`group relative w-full flex items-center gap-3 px-3.5 py-2.5 text-xs rounded-xl transition-all duration-200 ${
 					isActive
-						? 'bg-gradient-to-r from-primary/20 via-primary/10 to-transparent text-white font-semibold shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] border border-primary/25'
-						: 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border border-transparent'
+						? 'bg-gradient-to-r from-primary/20 via-primary/10 to-transparent font-semibold shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] border border-primary/25'
+						: 'hover:bg-white/[0.04] border border-transparent'
 				}`}
 			>
 				{/* 左侧流光胶囊指示条 */}
@@ -77,18 +79,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					className={`transition-transform duration-200 ${
 						isActive
 							? 'text-primary scale-105'
-							: 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'
+							: 'group-hover:scale-105'
 					}`}
+					style={
+						!isActive
+							? customTextColor
+								? { color: customTextColor, opacity: 0.85 }
+								: undefined
+							: undefined
+					}
 				>
 					{item.icon}
 				</span>
-				<span className="truncate">{item.label}</span>
+				<span
+					className="truncate"
+					style={
+						customTextColor
+							? { color: customTextColor, opacity: isActive ? 1 : 0.85 }
+							: undefined
+					}
+				>
+					{item.label}
+				</span>
 			</button>
 		)
 	}
 
 	return (
 		<aside
+			style={customTextColor ? { color: customTextColor } : undefined}
 			className={`w-56 h-full flex flex-col justify-between rounded-2xl ${
 				customBgUrl ? 'bg-black/15' : 'bg-black/25'
 			} border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-md select-none p-3`}
@@ -96,21 +115,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			{/* Top Nav Groups */}
 			<div className="space-y-5 overflow-y-auto no-scrollbar pt-1">
 				<div className="space-y-1">
-					<p className="px-3 pb-1 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+					<p
+						className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60"
+						style={customTextColor ? { color: customTextColor, opacity: 0.65 } : undefined}
+					>
 						音乐馆
 					</p>
 					{discoverGroup.map(renderNavButton)}
 				</div>
 
 				<div className="space-y-1">
-					<p className="px-3 pb-1 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+					<p
+						className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60"
+						style={customTextColor ? { color: customTextColor, opacity: 0.65 } : undefined}
+					>
 						我的私享
 					</p>
 					{myMusicGroup.map(renderNavButton)}
 				</div>
 
 				<div className="space-y-1">
-					<p className="px-3 pb-1 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+					<p
+						className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60"
+						style={customTextColor ? { color: customTextColor, opacity: 0.65 } : undefined}
+					>
 						个性化与系统
 					</p>
 					{systemGroup.map(renderNavButton)}
@@ -136,7 +164,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 								<span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b0f17]" />
 							</div>
 							<div className="overflow-hidden">
-								<p className="text-xs font-bold truncate text-foreground">
+								<p
+									className="text-xs font-bold truncate text-foreground"
+									style={customTextColor ? { color: customTextColor } : undefined}
+								>
 									{userInfo.name}
 								</p>
 								<p className="text-[10px] text-emerald-400/90 font-medium truncate">
@@ -156,21 +187,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					/* 自定义背景下：按钮为纯透明/微透光玻璃质感，完全融入自定义背景，去除彩虹渐变和深黑底 */
 					<button
 						onClick={onOpenLoginModal}
+						style={customTextColor ? { color: customTextColor } : undefined}
 						className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white/[0.08] hover:bg-white/[0.16] border border-white/20 hover:border-white/35 backdrop-blur-sm text-xs font-medium text-white transition-all active:scale-[0.98] shadow-sm"
 					>
-						<LogIn className="w-3.5 h-3.5 text-white/90" />
-						<span>扫码连接 B 站账号</span>
+						<LogIn className="w-3.5 h-3.5 text-white/90" style={customTextColor ? { color: customTextColor } : undefined} />
+						<span style={customTextColor ? { color: customTextColor } : undefined}>扫码连接 B 站账号</span>
 					</button>
 				) : (
 					/* 默认背景下：柔和素雅的科技微光边框，去除刺眼的霓虹彩虹色 */
 					<button
 						onClick={onOpenLoginModal}
+						style={customTextColor ? { color: customTextColor } : undefined}
 						className="group relative w-full overflow-hidden rounded-xl p-[1px] transition-all duration-300 hover:shadow-md hover:shadow-primary/15 active:scale-[0.98]"
 					>
 						<div className="absolute inset-0 bg-gradient-to-r from-primary/35 via-sky-400/25 to-primary/35 opacity-70 group-hover:opacity-100 transition-opacity" />
 						<div className="relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-[11px] bg-black/40 group-hover:bg-black/25 backdrop-blur-sm text-xs font-medium text-white transition-all">
-							<LogIn className="w-3.5 h-3.5 text-primary/90 group-hover:scale-105 transition-transform" />
-							<span>扫码连接 B 站账号</span>
+							<LogIn className="w-3.5 h-3.5 text-primary/90 group-hover:scale-105 transition-transform" style={customTextColor ? { color: customTextColor } : undefined} />
+							<span style={customTextColor ? { color: customTextColor } : undefined}>扫码连接 B 站账号</span>
 							<Sparkles className="w-3 h-3 text-sky-300/70 opacity-80" />
 						</div>
 					</button>

@@ -254,7 +254,7 @@ export const App: React.FC = () => {
 		loadTracks()
 	}, [])
 
-	// 2.2 Sync saved shortcuts to Rust on startup & auto-migrate Alt+Shift to Ctrl+Alt
+	// 2.2 Sync saved shortcuts to Rust on startup & auto-migrate Alt+Shift and Left/Right/Up/Down
 	useEffect(() => {
 		try {
 			const saved = localStorage.getItem('bbplayer_shortcuts')
@@ -263,9 +263,29 @@ export const App: React.FC = () => {
 				let upgraded = false
 				if (Array.isArray(configs)) {
 					configs = configs.map((c: any) => {
-						if (typeof c.key === 'string' && c.key.includes('Alt+Shift')) {
-							upgraded = true
-							return { ...c, key: c.key.replace(/Alt\+Shift/g, 'Ctrl+Alt') }
+						if (typeof c.key === 'string') {
+							let newKey = c.key
+							if (newKey.includes('Alt+Shift')) {
+								newKey = newKey.replace(/Alt\+Shift/g, 'Ctrl+Alt')
+								upgraded = true
+							}
+							if (newKey.includes('Left') && !newKey.includes('ArrowLeft')) {
+								newKey = newKey.replace(/\bLeft\b/g, 'ArrowLeft')
+								upgraded = true
+							}
+							if (newKey.includes('Right') && !newKey.includes('ArrowRight')) {
+								newKey = newKey.replace(/\bRight\b/g, 'ArrowRight')
+								upgraded = true
+							}
+							if (newKey.includes('Up') && !newKey.includes('ArrowUp')) {
+								newKey = newKey.replace(/\bUp\b/g, 'ArrowUp')
+								upgraded = true
+							}
+							if (newKey.includes('Down') && !newKey.includes('ArrowDown')) {
+								newKey = newKey.replace(/\bDown\b/g, 'ArrowDown')
+								upgraded = true
+							}
+							return { ...c, key: newKey }
 						}
 						return c
 					})
@@ -294,52 +314,46 @@ export const App: React.FC = () => {
 
 	const lastShortcutTriggerTimeRef = useRef<number>(0)
 
-	const handleGlobalShortcutAction = useCallback(
-		(action: string) => {
-			const now = Date.now()
-			if (now - lastShortcutTriggerTimeRef.current < 150) return
-			lastShortcutTriggerTimeRef.current = now
+	const handleGlobalShortcutAction = useCallback((action: string) => {
+		const now = Date.now()
+		if (now - lastShortcutTriggerTimeRef.current < 150) return
+		lastShortcutTriggerTimeRef.current = now
 
-			if (action === 'play_pause') {
-				if (desktopAudioEngine.isPlaying()) {
-					desktopAudioEngine.pause()
+		const queueStore = useQueueStore.getState()
+		const current = queueStore.getCurrentTrack()
+
+		if (action === 'play_pause') {
+			if (desktopAudioEngine.isPlaying()) {
+				desktopAudioEngine.pause()
+			} else {
+				if (!current && queueStore.queue.length > 0) {
+					playTrackWithProxy(queueStore.queue[0]!).catch(() => {})
 				} else {
-					if (!currentTrack && featuredTracks.length > 0) {
-						handlePlayTrack(featuredTracks[0]!, 0)
-					} else {
-						desktopAudioEngine.play()
-					}
-				}
-			} else if (action === 'prev_track') {
-				const prevTrack = prev()
-				if (prevTrack) {
-					playTrackWithProxy(prevTrack).catch(() => {})
-				}
-			} else if (action === 'next_track') {
-				const nextTrack = next()
-				if (nextTrack) {
-					playTrackWithProxy(nextTrack).catch(() => {})
+					desktopAudioEngine.play()
 				}
 			}
-		},
-		[next, prev, currentTrack, featuredTracks, handlePlayTrack],
-	)
-
-	// Keep a persistent ref to handleGlobalShortcutAction so listener never gets unmounted
-	const handleGlobalShortcutActionRef = useRef<(action: string) => void>(() => {})
-	useEffect(() => {
-		handleGlobalShortcutActionRef.current = handleGlobalShortcutAction
-	})
+		} else if (action === 'prev_track') {
+			const prevTrack = queueStore.prev()
+			if (prevTrack) {
+				playTrackWithProxy(prevTrack).catch(() => {})
+			}
+		} else if (action === 'next_track') {
+			const nextTrack = queueStore.next()
+			if (nextTrack) {
+				playTrackWithProxy(nextTrack).catch(() => {})
+			}
+		}
+	}, [])
 
 	// 3. Global Shortcuts IPC Event Listener & Eval Hook (Permanent mount)
 	useEffect(() => {
 		;(window as any).__triggerGlobalShortcut = (action: string) => {
-			handleGlobalShortcutActionRef.current(action)
+			handleGlobalShortcutAction(action)
 		}
 
 		let unlistenFn: (() => void) | undefined
-		listen<string>('global-shortcut-event', async (event) => {
-			handleGlobalShortcutActionRef.current(event.payload)
+		listen<string>('global-shortcut-event', (event) => {
+			handleGlobalShortcutAction(event.payload)
 		})
 			.then((fn) => {
 				unlistenFn = fn
@@ -350,7 +364,7 @@ export const App: React.FC = () => {
 			delete (window as any).__triggerGlobalShortcut
 			if (unlistenFn) unlistenFn()
 		}
-	}, [])
+	}, [handleGlobalShortcutAction])
 
 	// 4. In-App Single-Key & Global Shortcuts Handling
 	useEffect(() => {
@@ -413,7 +427,7 @@ export const App: React.FC = () => {
 			// 1. Space 单键独立控制播放/暂停
 			if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
 				e.preventDefault()
-				handleGlobalShortcutActionRef.current('play_pause')
+				handleGlobalShortcutAction('play_pause')
 				return
 			}
 
@@ -433,19 +447,19 @@ export const App: React.FC = () => {
 
 			if (matchesShortcut(e, playPauseKey)) {
 				e.preventDefault()
-				handleGlobalShortcutActionRef.current('play_pause')
+				handleGlobalShortcutAction('play_pause')
 			} else if (matchesShortcut(e, prevKey)) {
 				e.preventDefault()
-				handleGlobalShortcutActionRef.current('prev_track')
+				handleGlobalShortcutAction('prev_track')
 			} else if (matchesShortcut(e, nextKey)) {
 				e.preventDefault()
-				handleGlobalShortcutActionRef.current('next_track')
+				handleGlobalShortcutAction('next_track')
 			}
 		}
 
 		window.addEventListener('keydown', handleLocalKeyDown)
 		return () => window.removeEventListener('keydown', handleLocalKeyDown)
-	}, [])
+	}, [handleGlobalShortcutAction])
 
 	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window (with Offset applied)
 	const currentTrackRef = useRef<Track | null>(currentTrack)
