@@ -41,7 +41,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
 					style={{
 						backgroundImage: `url(${customBgUrl})`,
-						opacity: customBgOpacity ?? 0.35,
+						opacity: customBgOpacity ?? 0.8,
 						filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
 					}}
 				/>
@@ -57,9 +57,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 						className="absolute -top-1/4 -left-1/4 w-[150%] h-[150%] object-cover blur-[120px] opacity-[0.16] saturate-200 scale-125 transition-all duration-1000"
 					/>
 				)}
-				{/* 顶部主题色微光 */}
-				<div className="absolute -top-32 left-1/3 w-[600px] h-[320px] rounded-full bg-primary/20 blur-[110px] opacity-60 transition-colors duration-700" />
-				<div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
+				{/* 顶部主题色微光 (有自定义壁纸时淡化避免遮挡细节) */}
+				{!customBgUrl && (
+					<>
+						<div className="absolute -top-32 left-1/3 w-[600px] h-[320px] rounded-full bg-primary/20 blur-[110px] opacity-60 transition-colors duration-700" />
+						<div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
+					</>
+				)}
 			</div>
 
 			{/* 2. Top frameless title bar */}
@@ -72,7 +76,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					onSelectTab={setActiveTab}
 					onOpenLoginModal={onOpenLoginModal}
 				/>
-				<main className="flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl bg-white/[0.02] border border-white/[0.06] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-xl">
+				<main className="flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl bg-black/25 border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-sm">
 					{children(activeTab)}
 				</main>
 			</div>

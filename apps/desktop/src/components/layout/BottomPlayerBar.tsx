@@ -314,7 +314,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const effectiveVolumePct = (isMuted ? 0 : volume) * 100
 
 	return (
-		<footer className="h-[96px] w-full flex flex-col justify-between px-6 pt-2 pb-3 select-none bg-[#090d16]/95 backdrop-blur-2xl border-t border-white/[0.08] shadow-[0_-12px_40px_rgba(0,0,0,0.6)] z-40 relative">
+		<footer className="h-[96px] w-full flex flex-col justify-between px-6 pt-2 pb-3 select-none bg-black/40 backdrop-blur-md border-t border-white/[0.08] shadow-[0_-10px_30px_rgba(0,0,0,0.4)] z-40 relative">
 			{/* Top: 100% Straight Linear Progress Bar (No wave, pure precision line) */}
 			<div className="w-full flex items-center gap-3 h-5 -mt-0.5">
 				{/* Current Time */}

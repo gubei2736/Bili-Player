@@ -5,7 +5,7 @@ import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { getStoredLyricOffset } from '../../services/lyricService'
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
-import type { Track } from '@bbplayer/shared-core'
+import { useSkinStore, type Track } from '@bbplayer/shared-core'
 
 export interface ImmersiveLyricsViewProps {
 	isOpen: boolean
@@ -162,6 +162,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		return () => cancelAnimationFrame(animId)
 	}, [isOpen])
 
+	const customBgUrl = useSkinStore((s) => s.customBgUrl)
+	const customBgOpacity = useSkinStore((s) => s.customBgOpacity)
+	const customBgBlur = useSkinStore((s) => s.customBgBlur)
+
 	return (
 		<AnimatePresence>
 			{isOpen && (
@@ -170,28 +174,33 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 					animate={{ opacity: 1, y: 0 }}
 					exit={{ opacity: 0, y: '100%' }}
 					transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-					className="fixed inset-0 z-50 overflow-hidden flex flex-col bg-background text-foreground select-none"
+					className="fixed inset-0 z-50 overflow-hidden flex flex-col bg-[#07090e] text-foreground select-none"
 				>
-					{/* Fluid ambient canvas background */}
-					<FluidBackground coverUrl={track?.coverUrl} />
+					{/* Background Layer: Custom Wallpaper or Fluid ambient canvas */}
+					{customBgUrl ? (
+						<div
+							className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
+							style={{
+								backgroundImage: `url(${customBgUrl})`,
+								opacity: customBgOpacity ?? 0.8,
+								filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
+							}}
+						>
+							{/* Subtle contrast mask to ensure lyric text readability */}
+							<div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
+						</div>
+					) : (
+						<FluidBackground coverUrl={track?.coverUrl} />
+					)}
 
-					{/* Top bar */}
+					{/* Top bar (Cleaned up: removed '沉浸式 SPL 歌词体验' hint & icon) */}
 					<header
 						data-tauri-drag-region
-						className="relative z-10 h-14 w-full flex items-center justify-between px-6 bg-black/20 backdrop-blur-md border-b border-white/5"
+						className="relative z-10 h-14 w-full flex items-center justify-end px-6 bg-transparent"
 					>
-						<div className="flex items-center gap-2">
-							<div className="w-5 h-5 rounded-md bg-gradient-to-tr from-pink-500 to-sky-400 flex items-center justify-center text-white font-bold text-[10px]">
-								BB
-							</div>
-							<span className="text-xs font-semibold text-white/80">
-								沉浸式 SPL 歌词体验
-							</span>
-						</div>
-
 						<button
 							onClick={onClose}
-							className="p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+							className="p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/80 hover:text-white transition-all shadow-sm"
 							title="关闭全屏 (Esc)"
 						>
 							<X className="w-5 h-5" />
