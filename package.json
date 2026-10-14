@@ -15,7 +15,8 @@
 		"lint:fix": "oxlint --type-aware --fix",
 		"postinstall": "lefthook install",
 		"publish:update": "pnpm --filter @bbplayer/update-publisher start",
-		"type-check": "tsgo --build --noEmit"
+		"type-check": "tsgo --build --noEmit",
+		"build:desktop": "pnpm --filter desktop tauri build --no-bundle"
 	},
 	"devDependencies": {
 		"@bbplayer/eslint-plugin": "workspace:*",
