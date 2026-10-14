@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { TitleBar } from './TitleBar'
 import { Sidebar, type NavTab } from './Sidebar'
 import { BottomPlayerBar } from './BottomPlayerBar'
@@ -66,7 +66,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 			</div>
 
 			{/* 4. Bottom audio controller bar */}
-			<BottomPlayerBar onToggleFullscreenLyrics={onToggleFullscreenLyrics} />
+			<BottomPlayerBar
+				onToggleFullscreenLyrics={onToggleFullscreenLyrics}
+				onToggleLyricsWindow={onToggleLyricsWindow}
+			/>
 		</div>
 	)
 }
