@@ -9,6 +9,11 @@ import './styles/globals.css'
 // Route all API requests through Rust native HTTP engine (CORS & Set-Cookie safe)
 setDefaultHttpClient(new DesktopTauriHttpClient())
 
+// 彻底禁用系统/WebView2 默认的浏览器上下文菜单（返回、刷新、另存为、检查等）
+document.addEventListener('contextmenu', (e) => {
+	e.preventDefault()
+})
+
 const isLyricsWindow = window.location.hash.includes('lyrics')
 if (isLyricsWindow) {
 	document.body.classList.remove('bg-[#0b0f17]')

@@ -16,27 +16,27 @@ pub fn get_default_shortcuts() -> Vec<ShortcutConfig> {
     vec![
         ShortcutConfig {
             id: "play_pause".into(),
-            key: "Alt+Shift+Space".into(),
+            key: "Ctrl+Alt+Space".into(),
             description: "全局：播放 / 暂停".into(),
         },
         ShortcutConfig {
             id: "prev_track".into(),
-            key: "Alt+Shift+ArrowLeft".into(),
+            key: "Ctrl+Alt+ArrowLeft".into(),
             description: "全局：上一首".into(),
         },
         ShortcutConfig {
             id: "next_track".into(),
-            key: "Alt+Shift+ArrowRight".into(),
+            key: "Ctrl+Alt+ArrowRight".into(),
             description: "全局：下一首".into(),
         },
         ShortcutConfig {
             id: "toggle_lyrics".into(),
-            key: "Alt+Shift+D".into(),
+            key: "Ctrl+Alt+D".into(),
             description: "全局：显示/隐藏桌面歌词".into(),
         },
         ShortcutConfig {
             id: "toggle_penetration".into(),
-            key: "Alt+Shift+L".into(),
+            key: "Ctrl+Alt+L".into(),
             description: "全局：切换歌词鼠标穿透".into(),
         },
     ]
@@ -183,6 +183,12 @@ mod tests {
             "Alt+Shift+L",
             "Alt+Shift+Left",
             "Alt+Shift+Right",
+            "Ctrl+Alt+Space",
+            "Ctrl+Alt+ArrowLeft",
+            "Ctrl+Alt+ArrowRight",
+            "Ctrl+Alt+D",
+            "Ctrl+Alt+L",
+            "Control+Alt+Space",
         ];
         for s in list {
             let normalized = normalize_shortcut_key(s);

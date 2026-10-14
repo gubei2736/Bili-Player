@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { X, FolderPlus, Sparkles, Loader2, Cloud, HardDrive, CheckCircle2 } from 'lucide-react'
-import { useAuthStore, usePlaylistStore, bilibiliApi } from '@bbplayer/shared-core'
+import { useAuthStore, usePlaylistStore, useLocalPlaylistStore, bilibiliApi } from '@bbplayer/shared-core'
 
 export interface CreatePlaylistModalProps {
 	isOpen: boolean
@@ -58,16 +58,7 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 				}
 			} else {
 				// Local playlist creation
-				const localPlaylistsRaw = localStorage.getItem('bbplayer_local_playlists') || '[]'
-				const localPlaylists = JSON.parse(localPlaylistsRaw)
-				localPlaylists.push({
-					id: Date.now(),
-					title: title.trim(),
-					intro: intro.trim(),
-					createdAt: Date.now(),
-					trackCount: 0,
-				})
-				localStorage.setItem('bbplayer_local_playlists', JSON.stringify(localPlaylists))
+				useLocalPlaylistStore.getState().createPlaylist(title.trim(), intro.trim())
 				setCreatedSuccess(true)
 				setTimeout(() => {
 					setCreatedSuccess(false)

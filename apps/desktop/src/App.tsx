@@ -29,6 +29,7 @@ import { SearchView } from './components/views/SearchView'
 import { ShortcutsSettingsView } from './components/views/ShortcutsSettingsView'
 import { FavoritesView } from './components/views/FavoritesView'
 import { CollectionsView } from './components/views/CollectionsView'
+import { LibraryView } from './components/views/LibraryView'
 import { AudioQualitySettingsCard } from './components/views/AudioQualitySettingsCard'
 import { initDesktopDatabase } from './db/desktopDb'
 import {
@@ -148,13 +149,6 @@ export const App: React.FC = () => {
 		}
 	}, [isLoggedIn, userInfo?.mid, syncRemotePlaylists])
 
-	// Auto fetch favorite playlists when entering library tab if empty
-	useEffect(() => {
-		if (activeTab === 'library' && isLoggedIn && userInfo?.mid && (!favoritePlaylists || favoritePlaylists.length === 0)) {
-			syncRemotePlaylists(userInfo.mid).catch(() => {})
-		}
-	}, [activeTab, isLoggedIn, userInfo?.mid, favoritePlaylists, syncRemotePlaylists])
-
 	// Auto fetch lyrics dynamically for current track
 	useEffect(() => {
 		if (currentTrack) {
@@ -236,14 +230,27 @@ export const App: React.FC = () => {
 		loadTracks()
 	}, [])
 
-	// 2.2 Sync saved shortcuts to Rust on startup
+	// 2.2 Sync saved shortcuts to Rust on startup & auto-migrate Alt+Shift to Ctrl+Alt
 	useEffect(() => {
 		try {
 			const saved = localStorage.getItem('bbplayer_shortcuts')
 			if (saved) {
-				const configs = JSON.parse(saved)
-				if (Array.isArray(configs) && configs.length > 0) {
-					invoke('update_shortcuts', { configs }).catch(() => {})
+				let configs = JSON.parse(saved)
+				let upgraded = false
+				if (Array.isArray(configs)) {
+					configs = configs.map((c: any) => {
+						if (typeof c.key === 'string' && c.key.includes('Alt+Shift')) {
+							upgraded = true
+							return { ...c, key: c.key.replace(/Alt\+Shift/g, 'Ctrl+Alt') }
+						}
+						return c
+					})
+					if (upgraded) {
+						localStorage.setItem('bbplayer_shortcuts', JSON.stringify(configs))
+					}
+					if (configs.length > 0) {
+						invoke('update_shortcuts', { configs }).catch(() => {})
+					}
 				}
 			}
 		} catch {}
@@ -258,7 +265,7 @@ export const App: React.FC = () => {
 				console.error('Failed to play track with proxy:', err)
 			}
 		},
-		[featuredTracks, setQueue, playTrackWithProxy],
+		[featuredTracks, setQueue],
 	)
 
 	const lastShortcutTriggerTimeRef = useRef<number>(0)
@@ -291,19 +298,25 @@ export const App: React.FC = () => {
 				}
 			}
 		},
-		[next, prev, currentTrack, featuredTracks, playTrackWithProxy, handlePlayTrack],
+		[next, prev, currentTrack, featuredTracks, handlePlayTrack],
 	)
 
-	// 3. Global Shortcuts IPC Event Listener & Eval Hook
+	// Keep a persistent ref to handleGlobalShortcutAction so listener never gets unmounted
+	const handleGlobalShortcutActionRef = useRef<(action: string) => void>(() => {})
+	useEffect(() => {
+		handleGlobalShortcutActionRef.current = handleGlobalShortcutAction
+	})
+
+	// 3. Global Shortcuts IPC Event Listener & Eval Hook (Permanent mount)
 	useEffect(() => {
 		// 绑定全局 eval 触发钩子，确保即使应用失焦或 WebView2 IPC 事件被节流也能直接调用执行
 		;(window as any).__triggerGlobalShortcut = (action: string) => {
-			handleGlobalShortcutAction(action)
+			handleGlobalShortcutActionRef.current(action)
 		}
 
 		let unlistenFn: (() => void) | undefined
 		listen<string>('global-shortcut-event', async (event) => {
-			handleGlobalShortcutAction(event.payload)
+			handleGlobalShortcutActionRef.current(event.payload)
 		})
 			.then((fn) => {
 				unlistenFn = fn
@@ -314,7 +327,7 @@ export const App: React.FC = () => {
 			delete (window as any).__triggerGlobalShortcut
 			if (unlistenFn) unlistenFn()
 		}
-	}, [handleGlobalShortcutAction])
+	}, [])
 
 	// 4. In-App Single-Key & Global Shortcuts Handling
 	useEffect(() => {
@@ -374,10 +387,17 @@ export const App: React.FC = () => {
 				return
 			}
 
+			// 1. Space 单键独立控制播放/暂停（无任何修饰键时，在非输入框下直接切换，独立于全局快捷键）
+			if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+				e.preventDefault()
+				handleGlobalShortcutActionRef.current('play_pause')
+				return
+			}
+
 			let shortcutsConfig = [
-				{ id: 'play_pause', key: 'Alt+Shift+Space' },
-				{ id: 'prev_track', key: 'Alt+Shift+ArrowLeft' },
-				{ id: 'next_track', key: 'Alt+Shift+ArrowRight' },
+				{ id: 'play_pause', key: 'Ctrl+Alt+Space' },
+				{ id: 'prev_track', key: 'Ctrl+Alt+ArrowLeft' },
+				{ id: 'next_track', key: 'Ctrl+Alt+ArrowRight' },
 			]
 			try {
 				const saved = localStorage.getItem('bbplayer_shortcuts')
@@ -388,43 +408,21 @@ export const App: React.FC = () => {
 			const prevKey = shortcutsConfig.find((s) => s.id === 'prev_track')?.key
 			const nextKey = shortcutsConfig.find((s) => s.id === 'next_track')?.key
 
-			if (matchesShortcut(e, playPauseKey) || (!playPauseKey && e.code === 'Space')) {
+			if (matchesShortcut(e, playPauseKey)) {
 				e.preventDefault()
-				const now = Date.now()
-				if (now - lastShortcutTriggerTimeRef.current < 200) return
-				lastShortcutTriggerTimeRef.current = now
-
-				if (desktopAudioEngine.isPlaying()) {
-					desktopAudioEngine.pause()
-				} else {
-					if (!currentTrack && featuredTracks.length > 0) {
-						handlePlayTrack(featuredTracks[0], 0)
-					} else {
-						desktopAudioEngine.play()
-					}
-				}
+				handleGlobalShortcutActionRef.current('play_pause')
 			} else if (matchesShortcut(e, prevKey)) {
 				e.preventDefault()
-				const now = Date.now()
-				if (now - lastShortcutTriggerTimeRef.current < 200) return
-				lastShortcutTriggerTimeRef.current = now
-
-				const prevTrack = prev()
-				if (prevTrack) playTrackWithProxy(prevTrack).catch(() => {})
+				handleGlobalShortcutActionRef.current('prev_track')
 			} else if (matchesShortcut(e, nextKey)) {
 				e.preventDefault()
-				const now = Date.now()
-				if (now - lastShortcutTriggerTimeRef.current < 200) return
-				lastShortcutTriggerTimeRef.current = now
-
-				const nextTrack = next()
-				if (nextTrack) playTrackWithProxy(nextTrack).catch(() => {})
+				handleGlobalShortcutActionRef.current('next_track')
 			}
 		}
 
 		window.addEventListener('keydown', handleLocalKeyDown)
 		return () => window.removeEventListener('keydown', handleLocalKeyDown)
-	}, [next, prev, currentTrack, featuredTracks])
+	}, [])
 
 	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window
 	useEffect(() => {
@@ -583,74 +581,11 @@ export const App: React.FC = () => {
 						)}
 
 						{tab === 'library' && (
-							<div className="space-y-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<h2 className="text-base font-bold text-foreground">
-											我的音乐库
-										</h2>
-										<p className="text-xs text-muted-foreground mt-0.5">
-											管理你的本地曲库与自建歌单
-										</p>
-									</div>
-									<div className="flex items-center gap-2">
-										<button
-											onClick={() => setPlaylistImportOpen(true)}
-											className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
-										>
-											<Import className="w-3.5 h-3.5" />
-											<span>导入网易云/QQ歌单</span>
-										</button>
-										<button
-											onClick={() => setCreatePlaylistOpen(true)}
-											className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all"
-										>
-											<FolderPlus className="w-3.5 h-3.5" />
-											<span>新建歌单</span>
-										</button>
-									</div>
-								</div>
-
-								{/* Library Playlists List */}
-								{favoritePlaylists && favoritePlaylists.length > 0 ? (
-									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-										{favoritePlaylists.map((pl) => (
-											<div
-												key={pl.id}
-												onClick={() => {
-													usePlaylistStore.getState().setSelectedPlaylistId(pl.id)
-													setActiveTab('favorites')
-												}}
-												className="p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-											>
-												<div className="flex items-center justify-between">
-													<div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
-														<Music className="w-5 h-5" />
-													</div>
-													<span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground">
-														{pl.media_count} 首
-													</span>
-												</div>
-												<div>
-													<p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-														{pl.title}
-													</p>
-													<p className="text-[10px] text-muted-foreground mt-0.5">
-														云端收藏夹 · 点击浏览曲目
-													</p>
-												</div>
-											</div>
-										))}
-									</div>
-								) : (
-									<div className="p-12 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground space-y-3">
-										<FolderPlus className="w-10 h-10 mx-auto opacity-30" />
-										<p className="text-xs">
-											暂无自定义歌单，可点击上方“新建歌单”或“导入网易云/QQ歌单”
-										</p>
-									</div>
-								)}
-							</div>
+							<LibraryView
+								onOpenImport={() => setPlaylistImportOpen(true)}
+								onOpenCreate={() => setCreatePlaylistOpen(true)}
+								onExportTrack={setExportModalTrack}
+							/>
 						)}
 
 						{tab === 'favorites' && (

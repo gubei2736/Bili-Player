@@ -13,6 +13,8 @@ import {
 	type GenericPlaylist,
 	type GenericTrack,
 	type MatchResult,
+	useLocalPlaylistStore,
+	type Track,
 } from '@bbplayer/shared-core'
 
 export interface PlaylistImportModalProps {
@@ -143,6 +145,50 @@ export const PlaylistImportModal: React.FC<PlaylistImportModalProps> = ({
 		setMatchResults([])
 	}
 
+	const handleConfirmImport = () => {
+		const confirmedTracks: Track[] = matchResults
+			.filter((item) => item.matchedVideo !== null)
+			.map((item, idx) => ({
+				id: Date.now() + idx,
+				uniqueKey: `bilibili_${item.matchedVideo!.bvid}_0`,
+				title: item.track.title,
+				artist: {
+					id: item.matchedVideo!.mid || idx + 1000,
+					name: item.track.artists.join(', ') || item.matchedVideo!.author || 'B站音乐',
+					source: 'bilibili' as const,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+				coverUrl: (item.matchedVideo!.pic || item.track.coverUrl || '').replace('http://', 'https://'),
+				duration: typeof item.matchedVideo!.duration === 'number'
+					? item.matchedVideo!.duration
+					: typeof item.matchedVideo!.duration === 'string' && item.matchedVideo!.duration.includes(':')
+					? item.matchedVideo!.duration.split(':').reduce((acc: number, time: string) => 60 * acc + +time, 0)
+					: Number(item.matchedVideo!.duration) || Math.round(item.track.duration / 1000) || 0,
+				source: 'bilibili' as const,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				bilibiliMetadata: {
+					bvid: item.matchedVideo!.bvid,
+					cid: null,
+					isMultiPage: false,
+					videoIsValid: true,
+				},
+			}))
+
+		useLocalPlaylistStore
+			.getState()
+			.createPlaylist(
+				playlist?.title || '导入外部歌单',
+				playlist?.description,
+				playlist?.coverUrl,
+				confirmedTracks,
+			)
+
+		onImportSuccess?.()
+		onClose()
+	}
+
 	const matchedCount = matchResults.filter((r) => r.matchedVideo !== null).length
 
 	return (
@@ -265,15 +311,17 @@ export const PlaylistImportModal: React.FC<PlaylistImportModalProps> = ({
 						<div className="flex justify-end gap-2 pt-2">
 							<button
 								onClick={handleReset}
-								className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-white/5"
+								className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-white/5 transition-colors"
 							>
 								导入其他歌单
 							</button>
 							<button
-								onClick={onClose}
-								className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary/90 shadow-md"
+								onClick={handleConfirmImport}
+								disabled={matchedCount === 0}
+								className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20 flex items-center gap-1.5 transition-all disabled:opacity-50"
 							>
-								完成
+								<CheckCircle2 className="w-3.5 h-3.5" />
+								<span>确认导入至我的音乐库 ({matchedCount} 首)</span>
 							</button>
 						</div>
 					</div>

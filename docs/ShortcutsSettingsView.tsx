@@ -11,27 +11,27 @@ export interface ShortcutItem {
 const DEFAULT_SHORTCUTS: ShortcutItem[] = [
 	{
 		id: 'play_pause',
-		key: 'Alt+Shift+Space',
+		key: 'Ctrl+Alt+Space',
 		description: '全局：播放 / 暂停',
 	},
 	{
 		id: 'prev_track',
-		key: 'Alt+Shift+ArrowLeft',
+		key: 'Ctrl+Alt+ArrowLeft',
 		description: '全局：上一首',
 	},
 	{
 		id: 'next_track',
-		key: 'Alt+Shift+ArrowRight',
+		key: 'Ctrl+Alt+ArrowRight',
 		description: '全局：下一首',
 	},
 	{
 		id: 'toggle_lyrics',
-		key: 'Alt+Shift+D',
+		key: 'Ctrl+Alt+D',
 		description: '全局：显示/隐藏桌面歌词',
 	},
 	{
 		id: 'toggle_penetration',
-		key: 'Alt+Shift+L',
+		key: 'Ctrl+Alt+L',
 		description: '全局：切换歌词鼠标穿透',
 	},
 ]
@@ -151,6 +151,15 @@ export const ShortcutsSettingsView: React.FC = () => {
 					<span>{saveStatus}</span>
 				</div>
 			)}
+			<div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-muted-foreground space-y-1">
+				<p className="text-foreground font-semibold flex items-center gap-1.5">
+					<Sparkles className="w-3.5 h-3.5 text-primary" />
+					<span>独立按键说明</span>
+				</p>
+				<p className="text-[11px] leading-relaxed">
+					应用处于前台时，按 <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-primary font-mono text-[10px]">Space</kbd>（空格键）默认可直接控制播放/暂停，不受全局快捷键配置限制。下方设置用于在您使用其他软件或窗口处于后台时，进行全局热键监听与控制。
+				</p>
+			</div>
 
 			<div className="space-y-2 rounded-xl bg-white/5 p-3 border border-white/5">
 				{shortcuts.map((item) => {

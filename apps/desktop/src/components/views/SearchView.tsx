@@ -8,6 +8,7 @@ import {
 	Sparkles,
 	AlertCircle,
 	Loader2,
+	FolderPlus,
 } from 'lucide-react'
 import {
 	bilibiliApi,
@@ -17,6 +18,7 @@ import {
 } from '@bbplayer/shared-core'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
 import { useQueueStore } from '@bbplayer/shared-core'
+import { AddToPlaylistModal } from '../modals/AddToPlaylistModal'
 
 export interface SearchViewProps {
 	keyword: string
@@ -44,6 +46,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 	const [results, setResults] = useState<BilibiliSearchVideo[]>([])
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(null)
 	const { setQueue } = useQueueStore()
 
 	const executeSearch = async (kw: string) => {
@@ -208,18 +211,30 @@ export const SearchView: React.FC<SearchViewProps> = ({
 											<User className="w-3 h-3 flex-shrink-0" />
 											<span className="truncate">{item.author}</span>
 										</span>
-										{onExportTrack && (
+										<div className="flex items-center gap-1">
 											<button
 												onClick={(e) => {
 													e.stopPropagation()
-													onExportTrack(convertToTrack(item, idx + 1000))
+													setAddToPlaylistTrack(convertToTrack(item, idx + 1000))
 												}}
-												title="导出为 .m4a"
-												className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+												title="添加到我的歌单"
+												className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-primary transition-colors"
 											>
-												<Download className="w-3 h-3" />
+												<FolderPlus className="w-3.5 h-3.5" />
 											</button>
-										)}
+											{onExportTrack && (
+												<button
+													onClick={(e) => {
+														e.stopPropagation()
+														onExportTrack(convertToTrack(item, idx + 1000))
+													}}
+													title="导出为 .m4a"
+													className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+												>
+													<Download className="w-3.5 h-3.5" />
+												</button>
+											)}
+										</div>
 									</div>
 								</div>
 							</div>
@@ -227,6 +242,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
 					})}
 				</div>
 			)}
+
+			{/* Add to Playlist Modal */}
+			<AddToPlaylistModal
+				isOpen={!!addToPlaylistTrack}
+				track={addToPlaylistTrack}
+				onClose={() => setAddToPlaylistTrack(null)}
+			/>
 		</div>
 	)
 }

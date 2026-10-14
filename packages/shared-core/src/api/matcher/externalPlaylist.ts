@@ -66,31 +66,39 @@ export class ExternalPlaylistService {
 				.getPlaylist(playlistId)
 				.mapErr((err) => new Error(err.message || '获取网易云歌单网络异常'))
 				.andThen((response) => {
-					if (!response.playlist || !response.playlist.tracks || response.playlist.tracks.length === 0) {
+					const resObj = response as any
+					const playlistData = resObj.playlist || resObj.result
+					const rawTracks = playlistData?.tracks || playlistData?.songlist
+
+					if (!playlistData || !rawTracks || rawTracks.length === 0) {
 						return errAsync(
 							new Error('未找到网易云歌单或歌单为空/暂无公开权限，请检查歌单链接有效性'),
 						)
 					}
 
-					const tracks = response.playlist.tracks.map((track) => ({
-						title: track.name,
-						artists: track.ar.map((a) => a.name),
-						album: track.al.name,
-						duration: track.dt,
-						coverUrl: (track.al.picUrl || '').replace('http://', 'https://'),
-						translatedTitle: track.tns?.[0],
+					const tracks = rawTracks.map((track: any) => ({
+						title: track.name || track.title || '未知曲目',
+						artists: Array.isArray(track.ar)
+							? track.ar.map((a: any) => a.name).filter(Boolean)
+							: Array.isArray(track.artists)
+								? track.artists.map((a: any) => a.name).filter(Boolean)
+								: ['网易云音乐人'],
+						album: track.al?.name || track.album?.name || '',
+						duration: track.dt || track.duration || 180000,
+						coverUrl: (track.al?.picUrl || track.album?.picUrl || '').replace('http://', 'https://'),
+						translatedTitle: track.tns?.[0] || track.transNames?.[0],
 					}))
 
 					return okAsync({
 						playlist: {
-							id: response.playlist.id.toString(),
-							title: response.playlist.name,
-							coverUrl: response.playlist.coverImgUrl,
-							description: response.playlist.description ?? '',
-							trackCount: response.playlist.trackCount || tracks.length,
+							id: (playlistData.id || playlistId).toString(),
+							title: playlistData.name || '网易云歌单',
+							coverUrl: playlistData.coverImgUrl || playlistData.picUrl || '',
+							description: playlistData.description ?? '',
+							trackCount: playlistData.trackCount || tracks.length,
 							author: {
-								name: response.playlist.creator?.nickname ?? '网易云音乐人',
-								id: response.playlist.creator?.userId ?? 0,
+								name: playlistData.creator?.nickname ?? '网易云音乐人',
+								id: playlistData.creator?.userId ?? 0,
 							},
 						},
 						tracks,

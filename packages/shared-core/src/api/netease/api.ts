@@ -196,10 +196,10 @@ export class NeteaseApi {
 	getPlaylist(
 		id: string,
 	): ResultAsync<NeteasePlaylistResponse, NeteaseApiError> {
-		// 1. 优先使用开放稳定的 v3 接口，避免 eapi 状态码不符合预期
+		// 1. 优先尝试标准 POST v3 详情接口与 GET 详情接口
 		return ResultAsync.fromPromise(
 			this.http
-				.fetch('https://music.163.com/api/v3/playlist/detail', {
+				.fetch(`https://music.163.com/api/v3/playlist/detail`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/x-www-form-urlencoded',
@@ -210,14 +210,13 @@ export class NeteaseApi {
 					body: `id=${id}&n=1000&s=0`,
 				})
 				.then(async (res) => {
-					if (!res.ok) {
-						throw new Error(`HTTP status ${res.status}`)
-					}
+					if (!res.ok) throw new Error(`HTTP status ${res.status}`)
 					const json = await res.json()
-					if (!json || json.code !== 200 || !json.playlist) {
+					const pl = json?.playlist || json?.result
+					if (!json || json.code !== 200 || !pl) {
 						throw new Error(json?.message || '歌单返回异常')
 					}
-					return json as NeteasePlaylistResponse
+					return { ...json, playlist: pl } as NeteasePlaylistResponse
 				}),
 			(e) =>
 				new NeteaseApiError({
@@ -225,25 +224,58 @@ export class NeteaseApi {
 					type: 'RequestFailed',
 					cause: e,
 				}),
-		).orElse(() => {
-			// 2. 降级走原有的 eapi 请求
-			const data = {
-				s: '0',
-				id,
-				n: '1000',
-				t: '0',
-			}
-			const requestOptions: RequestOptions = createOption({}, 'eapi')
-			if (this.client) {
-				requestOptions.client = this.client
-			}
+		)
+			.orElse(() => {
+				// 2. 尝试标准 GET 详情接口（部分 CDN 节点对 GET 更友好）
+				return ResultAsync.fromPromise(
+					this.http
+						.fetch(`https://music.163.com/api/playlist/detail?id=${id}`, {
+							method: 'GET',
+							headers: {
+								Referer: 'https://music.163.com/',
+								'User-Agent':
+									'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+							},
+						})
+						.then(async (res) => {
+							if (!res.ok) throw new Error(`HTTP status ${res.status}`)
+							const json = await res.json()
+							const pl = json?.playlist || json?.result
+							if (!json || json.code !== 200 || !pl) {
+								throw new Error(json?.message || '歌单返回异常')
+							}
+							return { ...json, playlist: pl } as NeteasePlaylistResponse
+						}),
+					(e) =>
+						new NeteaseApiError({
+							message: '获取网易云歌单失败',
+							type: 'RequestFailed',
+							cause: e,
+						}),
+				)
+			})
+			.orElse(() => {
+				// 3. 降级走原有的 eapi 请求
+				const data = {
+					s: '0',
+					id,
+					n: '1000',
+					t: '0',
+				}
+				const requestOptions: RequestOptions = createOption({}, 'eapi')
+				if (this.client) {
+					requestOptions.client = this.client
+				}
 
-			return createRequest<object, NeteasePlaylistResponse>(
-				'/api/v6/playlist/detail',
-				data,
-				requestOptions,
-			).map((res) => res.body)
-		})
+				return createRequest<object, NeteasePlaylistResponse>(
+					'/api/v6/playlist/detail',
+					data,
+					requestOptions,
+				).map((res) => {
+					const pl = res.body.playlist || (res.body as any).result
+					return { ...res.body, playlist: pl }
+				})
+			})
 	}
 }
 
