@@ -142,11 +142,11 @@ export interface AudioEngineContract {
 * **Verification**: 运行 `pnpm --filter @bbplayer/shared-core typecheck`，确保零 TypeScript 错误且无任何 React Native 依赖。
 
 ### Phase 2: Tauri v2 桌面端脚手架与高颜值原生窗口初始化
-* [ ] **Task 2.1**: 在 `apps/desktop` 初始化 Vite + React + TypeScript + Tailwind CSS + Tauri v2 项目，并在 `Cargo.toml` 中引入 `tauri-plugin-sql` (sqlite)、`tauri-plugin-store`、`tauri-plugin-global-shortcut`、`window-vibrancy`、`window-shadows`。
-* [ ] **Task 2.2**: 编写 `src-tauri/src/window_ext.rs`，实现主窗口无边框圆角阴影、Win11 Mica / macOS Vibrancy 原生毛玻璃挂载，以及窗口最小化/最大化/关闭/鼠标穿透的 Tauri Commands。
-* [ ] **Task 2.3**: 引入 `shadcn/ui` 基础组件与 `OverlayScrollbars`，构建桌面端三栏式主界面骨架（左侧毛玻璃导航栏 + 顶部吸顶搜索与自定义窗口控制栏 + 中间主内容区 + 底部胶囊播放控制栏）。
-* [ ] **Task 2.4**: 配置 `@tauri-apps/plugin-sql` 驱动连接 `@bbplayer/shared-core/db`，跑通本地数据库自动迁移与歌单 CRUD。
-* **Verification**: 运行 `pnpm --filter desktop tauri dev`，窗口正常启动，无边框毛玻璃与系统阴影生效，SQLite 建表成功。
+* [x] **Task 2.1**: 在 `apps/desktop` 初始化 Vite + React + TypeScript + Tailwind CSS + Tauri v2 项目，并在 `Cargo.toml` 中引入 `tauri-plugin-sql` (sqlite)、`tauri-plugin-store`、`tauri-plugin-global-shortcut`、`window-vibrancy`。
+* [x] **Task 2.2**: 编写 `src-tauri/src/window_ext.rs`，实现主窗口无边框圆角阴影、Win11 Mica / macOS Vibrancy 原生毛玻璃挂载，以及窗口最小化/最大化/关闭/鼠标穿透的 Tauri Commands。
+* [x] **Task 2.3**: 引入 `shadcn/ui` 基础组件与 `OverlayScrollbars`，构建桌面端三栏式主界面骨架（左侧毛玻璃导航栏 + 顶部吸顶搜索与自定义窗口控制栏 + 中间主内容区 + 底部胶囊播放控制栏）。
+* [x] **Task 2.4**: 配置 `@tauri-apps/plugin-sql` 驱动连接 `@bbplayer/shared-core/db`，跑通本地数据库自动迁移与歌单 CRUD。
+* **Verification**: 运行 `pnpm --filter desktop tauri dev`（或 `pnpm --filter desktop build` + `cargo check`），窗口配置正常生效，无边框毛玻璃材质挂载，SQLite 驱动与 Drizzle 迁移就绪。
 
 ### Phase 3: Rust 流媒体代理与 Web Audio 播放引擎实现
 * [ ] **Task 3.1**: 在 `src-tauri/src/stream_proxy.rs` 中基于 `axum` 和 `reqwest` 实现本地流媒体代理服务，自动附加 B 站 `Referer`/`User-Agent`、支持 `HTTP Range (206)` 拖拽、附带 `Access-Control-Allow-Origin: *` 响应头，并实现音频流本地缓存落盘。

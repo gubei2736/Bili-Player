@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		--background: 220 20% 98%;
+		--foreground: 220 20% 10%;
+		--card: 0 0% 100%;
+		--card-foreground: 220 20% 10%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 220 20% 10%;
+		--primary: 215 90% 50%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 220 15% 94%;
+		--secondary-foreground: 220 20% 15%;
+		--muted: 220 15% 92%;
+		--muted-foreground: 220 10% 40%;
+		--accent: 220 15% 90%;
+		--accent-foreground: 220 20% 10%;
+		--destructive: 0 84% 60%;
+		--destructive-foreground: 0 0% 98%;
+		--border: 220 15% 90%;
+		--input: 220 15% 90%;
+		--ring: 215 90% 50%;
+		--radius: 0.75rem;
+
+		/* B站装扮动态主色 (HEX/HSL) */
+		--bili-theme-primary: #00AEEC;
+		--bili-theme-secondary: #FB7299;
+	}
+
+	.dark {
+		--background: 224 25% 8%;
+		--foreground: 210 20% 98%;
+		--card: 224 25% 10%;
+		--card-foreground: 210 20% 98%;
+		--popover: 224 25% 10%;
+		--popover-foreground: 210 20% 98%;
+		--primary: 210 95% 58%;
+		--primary-foreground: 222 47% 11%;
+		--secondary: 217 20% 15%;
+		--secondary-foreground: 210 20% 98%;
+		--muted: 217 20% 15%;
+		--muted-foreground: 215 15% 65%;
+		--accent: 217 20% 18%;
+		--accent-foreground: 210 20% 98%;
+		--destructive: 0 62% 30%;
+		--destructive-foreground: 210 20% 98%;
+		--border: 217 20% 18%;
+		--input: 217 20% 18%;
+		--ring: 212 95% 68%;
+	}
+}
+
+body {
+	color: hsl(var(--foreground));
+	background-color: transparent;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+		'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+	user-select: none;
+	-webkit-user-select: none;
+	overflow: hidden;
+}
+
+/* Win11 Mica / Acrylic 毛玻璃背景支持 */
+.mica-surface {
+	background-color: rgba(18, 20, 24, 0.75);
+	backdrop-filter: blur(24px) saturate(160%);
+	-webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+
+.acrylic-card {
+	background-color: rgba(30, 34, 42, 0.55);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.acrylic-card:hover {
+	background-color: rgba(40, 45, 55, 0.75);
+	border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* 隐藏系统滚动条，由 OverlayScrollbars 接管 */
+::-webkit-scrollbar {
+	display: none;
+}
