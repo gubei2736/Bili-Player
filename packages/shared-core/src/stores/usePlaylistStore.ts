@@ -50,11 +50,18 @@ export const usePlaylistStore = create<PlaylistState>()(
 						bilibiliApi.getCollectionsList({ mid: userMid, pageNumber: 1 }),
 					])
 
-					set({
-						favoritePlaylists: favResult.isOk() ? favResult.value : [],
-						collections: colResult.isOk() ? colResult.value.list : [],
+					const favList = favResult.isOk() ? favResult.value : []
+					const colList = colResult.isOk() ? colResult.value.list : []
+
+					set((state) => ({
+						favoritePlaylists: favList,
+						collections: colList,
+						selectedPlaylistId:
+							state.selectedPlaylistId && favList.some((p) => p.id === state.selectedPlaylistId)
+								? state.selectedPlaylistId
+								: favList[0]?.id || null,
 						isLoading: false,
-					})
+					}))
 				} catch (e) {
 					set({
 						isLoading: false,

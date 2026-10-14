@@ -25,10 +25,15 @@ import { SkinStoreView } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
 import { ShortcutsSettingsView } from './components/views/ShortcutsSettingsView'
+import { FavoritesView } from './components/views/FavoritesView'
+import { CollectionsView } from './components/views/CollectionsView'
+import { AudioQualitySettingsCard } from './components/views/AudioQualitySettingsCard'
 import { initDesktopDatabase } from './db/desktopDb'
 import {
 	useQueueStore,
 	useSkinStore,
+	useAuthStore,
+	usePlaylistStore,
 	bilibiliApi,
 	type Track,
 	type Artist,
@@ -127,6 +132,17 @@ export const App: React.FC = () => {
 
 	const { setQueue, next, prev, getCurrentTrack } = useQueueStore()
 	const currentTrack = getCurrentTrack()
+	const { isLoggedIn, userInfo } = useAuthStore()
+	const { syncRemotePlaylists } = usePlaylistStore()
+
+	// Auto sync remote playlists and collections when logged in
+	useEffect(() => {
+		if (isLoggedIn && userInfo?.mid) {
+			syncRemotePlaylists(userInfo.mid).catch((err) => {
+				console.warn('Auto sync remote playlists failed:', err)
+			})
+		}
+	}, [isLoggedIn, userInfo?.mid, syncRemotePlaylists])
 
 	// 1. Initialize DB
 	useEffect(() => {
@@ -544,14 +560,17 @@ export const App: React.FC = () => {
 						)}
 
 						{tab === 'favorites' && (
-							<div className="space-y-4">
-								<h2 className="text-base font-bold text-foreground">
-									我喜欢的音乐
-								</h2>
-								<div className="p-8 text-center rounded-xl border border-dashed border-white/10 text-muted-foreground text-xs">
-									登录 B 站账号后将自动同步你收藏的音频与视频
-								</div>
-							</div>
+							<FavoritesView
+								onExportTrack={setExportModalTrack}
+								onOpenLoginModal={() => setLoginModalOpen(true)}
+							/>
+						)}
+
+						{tab === 'collections' && (
+							<CollectionsView
+								onExportTrack={setExportModalTrack}
+								onOpenLoginModal={() => setLoginModalOpen(true)}
+							/>
 						)}
 
 						{tab === 'history' && <HistoryHeatmapView />}
@@ -563,6 +582,10 @@ export const App: React.FC = () => {
 								<h2 className="text-base font-bold text-foreground">
 									偏好设置
 								</h2>
+
+								{/* Audio Quality Preferences */}
+								<AudioQualitySettingsCard />
+
 								<div className="space-y-3 rounded-xl bg-white/5 p-4 border border-white/5 text-xs">
 									<div className="flex items-center justify-between">
 										<div>

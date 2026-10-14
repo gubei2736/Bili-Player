@@ -1,5 +1,6 @@
 import { bilibiliApi, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from './DesktopAudioEngine'
+import { getAudioQualityPreference } from './audioSettings'
 import { invoke } from '@tauri-apps/api/core'
 
 export async function playTrackWithProxy(track: Track): Promise<void> {
@@ -19,13 +20,32 @@ export async function playTrackWithProxy(track: Track): Promise<void> {
 			}
 		}
 
-		// 2. Fetch Audio Stream URL from Bilibili
+		// 2. Fetch Audio Stream URL from Bilibili based on quality preference
+		const qualityPref = getAudioQualityPreference()
+		let audioQuality = 30280
+		let enableHiRes = false
+		let enableDolby = false
+
+		if (qualityPref === 'auto_hires') {
+			audioQuality = 30280
+			enableHiRes = true
+			enableDolby = true
+		} else if (qualityPref === 'high_192k') {
+			audioQuality = 30280
+			enableHiRes = false
+			enableDolby = false
+		} else if (qualityPref === 'standard_132k') {
+			audioQuality = 30232
+			enableHiRes = false
+			enableDolby = false
+		}
+
 		const streamRes = await bilibiliApi.getAudioStream({
 			bvid,
 			cid,
-			audioQuality: 30280, // High quality audio 192k
-			enableDolby: false,
-			enableHiRes: false,
+			audioQuality,
+			enableDolby,
+			enableHiRes,
 		})
 
 		if (streamRes.isErr()) {

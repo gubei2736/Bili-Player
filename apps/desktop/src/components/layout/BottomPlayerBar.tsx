@@ -12,9 +12,10 @@ import {
 	Maximize2,
 	Sliders,
 } from 'lucide-react'
-import { useQueueStore, useSkinStore, type Track } from '@bbplayer/shared-core'
+import { useQueueStore, useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
+import { getQualityBadgeInfo } from '../../audio/audioSettings'
 import { WavySlider } from '../player/WavySlider'
 
 export interface BottomPlayerBarProps {
@@ -44,6 +45,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [loudnessEnabled, setLoudnessEnabled] = useState(true)
 
 	const currentTrack = getCurrentTrack()
+	const biliTrack =
+		currentTrack?.source === 'bilibili' ? (currentTrack as BilibiliTrack) : null
+	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
+	const badgeInfo = currentTrack ? getQualityBadgeInfo(currentQualityId) : null
 
 	useEffect(() => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
@@ -190,9 +195,19 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 								>
 									{currentTrack.title}
 								</p>
-								<p className="text-[11px] text-muted-foreground truncate">
-									{currentTrack.artist?.name || '未知歌手'}
-								</p>
+								<div className="flex items-center gap-1.5 mt-0.5">
+									<p className="text-[11px] text-muted-foreground truncate max-w-[130px]">
+										{currentTrack.artist?.name || '未知歌手'}
+									</p>
+									{badgeInfo && (
+										<span
+											className={`text-[9px] px-1 py-0.2 rounded font-medium border leading-tight ${badgeInfo.bg} ${badgeInfo.border} ${badgeInfo.color}`}
+											title={`当前音频流质量 ID: ${currentQualityId || '默认'}`}
+										>
+											{badgeInfo.text}
+										</span>
+									)}
+								</div>
 							</div>
 						</>
 					) : (
