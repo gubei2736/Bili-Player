@@ -6,10 +6,13 @@ use axum::{
     routing::get,
     Router,
 };
+use futures_util::StreamExt;
 use reqwest::Client;
 use serde::Deserialize;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
+use tokio::fs::{self, File};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
@@ -18,6 +21,26 @@ pub static PROXY_PORT: AtomicU16 = AtomicU16::new(0);
 #[tauri::command]
 pub fn get_stream_proxy_port() -> u16 {
     PROXY_PORT.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub async fn get_cached_track_path(
+    app: tauri::AppHandle,
+    bvid: String,
+    cid: u64,
+) -> Result<Option<String>, String> {
+    use tauri::Manager;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("audio_cache");
+    let path = cache_dir.join(format!("{}_{}.m4s", bvid, cid));
+    if path.exists() && fs::metadata(&path).await.map(|m| m.len() > 0).unwrap_or(false) {
+        Ok(Some(path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Clone)]
@@ -33,11 +56,86 @@ pub struct ProxyParams {
     pub cid: Option<u64>,
 }
 
+async fn serve_cached_file(
+    file_path: std::path::PathBuf,
+    range_header: Option<&axum::http::HeaderValue>,
+) -> Result<Response, (StatusCode, String)> {
+    let mut file = File::open(&file_path)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let total_len = file
+        .metadata()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .len();
+
+    let (start, end, status) = if let Some(range_val) = range_header {
+        if let Ok(range_str) = range_val.to_str() {
+            if let Some(spec) = range_str.strip_prefix("bytes=") {
+                let parts: Vec<&str> = spec.split('-').collect();
+                let s = parts[0].parse::<u64>().unwrap_or(0);
+                let e = if parts.len() > 1 && !parts[1].is_empty() {
+                    parts[1].parse::<u64>().unwrap_or(total_len - 1)
+                } else {
+                    total_len - 1
+                };
+                (s, e.min(total_len - 1), StatusCode::PARTIAL_CONTENT)
+            } else {
+                (0, total_len - 1, StatusCode::OK)
+            }
+        } else {
+            (0, total_len - 1, StatusCode::OK)
+        }
+    } else {
+        (0, total_len - 1, StatusCode::OK)
+    };
+
+    let content_len = end - start + 1;
+    file.seek(SeekFrom::Start(start))
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let stream = tokio_util::io::ReaderStream::new(file.take(content_len));
+    let body = Body::from_stream(stream);
+
+    let mut builder = Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "audio/mp4")
+        .header(header::ACCEPT_RANGES, "bytes")
+        .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
+        .header(header::ACCESS_CONTROL_EXPOSE_HEADERS, "*")
+        .header(header::CONTENT_LENGTH, content_len.to_string());
+
+    if status == StatusCode::PARTIAL_CONTENT {
+        builder = builder.header(
+            header::CONTENT_RANGE,
+            format!("bytes {}-{}/{}", start, end, total_len),
+        );
+    }
+
+    builder
+        .body(body)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
 async fn proxy_handler(
     State(state): State<Arc<ProxyState>>,
     headers: HeaderMap,
     Query(params): Query<ProxyParams>,
 ) -> Result<Response, (StatusCode, String)> {
+    let cache_dir = state.cache_dir.join("audio_cache");
+    let target_cache_file = if let Some(ref bvid) = params.bvid {
+        let cid_val = params.cid.unwrap_or(0);
+        let path = cache_dir.join(format!("{}_{}.m4s", bvid, cid_val));
+        if path.exists() && fs::metadata(&path).await.map(|m| m.len() > 0).unwrap_or(false) {
+            return serve_cached_file(path, headers.get(header::RANGE)).await;
+        }
+        Some(path)
+    } else {
+        None
+    };
+
     let mut req = state
         .client
         .get(&params.url)
@@ -79,6 +177,51 @@ async fn proxy_handler(
 
     if let Some(cl) = upstream.headers().get(header::CONTENT_LENGTH) {
         response_builder = response_builder.header(header::CONTENT_LENGTH, cl);
+    }
+
+    // Stream and optionally cache to disk if this is a full stream request
+    let is_range = headers.contains_key(header::RANGE);
+    if !is_range && target_cache_file.is_some() {
+        let cache_path = target_cache_file.unwrap();
+        let _ = fs::create_dir_all(&cache_dir).await;
+        let part_path = cache_path.with_extension("m4s.part");
+
+        let mut upstream_stream = upstream.bytes_stream();
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(32);
+
+        tokio::spawn(async move {
+            let mut file_opt = File::create(&part_path).await.ok();
+            while let Some(chunk_res) = upstream_stream.next().await {
+                match chunk_res {
+                    Ok(bytes) => {
+                        if let Some(ref mut f) = file_opt {
+                            let _ = f.write_all(&bytes).await;
+                        }
+                        if tx.send(Ok(bytes)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx
+                            .send(Err(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string(),
+                            )))
+                            .await;
+                        break;
+                    }
+                }
+            }
+            if let Some(mut f) = file_opt {
+                let _ = f.flush().await;
+                let _ = fs::rename(&part_path, &cache_path).await;
+            }
+        });
+
+        let body = Body::from_stream(tokio_stream::wrappers::ReceiverStream::new(rx));
+        return response_builder
+            .body(body)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
 
     let stream = upstream.bytes_stream();

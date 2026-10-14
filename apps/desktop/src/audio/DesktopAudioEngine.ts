@@ -79,24 +79,105 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	private setupEventListeners(): void {
 		this.audio.addEventListener('play', () => {
-			this.emit({ type: 'play', currentTime: this.getCurrentTime(), duration: this.getDuration() })
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.playbackState = 'playing'
+			}
+			this.emit({
+				type: 'play',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+			})
 		})
 
 		this.audio.addEventListener('pause', () => {
-			this.emit({ type: 'pause', currentTime: this.getCurrentTime(), duration: this.getDuration() })
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.playbackState = 'paused'
+			}
+			this.emit({
+				type: 'pause',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+			})
 		})
 
 		this.audio.addEventListener('timeupdate', () => {
-			this.emit({ type: 'timeupdate', currentTime: this.getCurrentTime(), duration: this.getDuration() })
+			if ('mediaSession' in navigator && !isNaN(this.audio.duration)) {
+				try {
+					navigator.mediaSession.setPositionState({
+						duration: this.audio.duration || 0,
+						playbackRate: this.audio.playbackRate || 1,
+						position: this.audio.currentTime || 0,
+					})
+				} catch {
+					// Position state update fallback
+				}
+			}
+			this.emit({
+				type: 'timeupdate',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+			})
 		})
 
 		this.audio.addEventListener('ended', () => {
-			this.emit({ type: 'ended', currentTime: this.getCurrentTime(), duration: this.getDuration() })
+			this.emit({
+				type: 'ended',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+			})
 		})
 
 		this.audio.addEventListener('loadedmetadata', () => {
-			this.emit({ type: 'loadedmetadata', currentTime: this.getCurrentTime(), duration: this.getDuration() })
+			this.emit({
+				type: 'loadedmetadata',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+			})
 		})
+	}
+
+	private updateMediaSession(track: Track): void {
+		if ('mediaSession' in navigator) {
+			const artwork = track.coverUrl
+				? [
+						{ src: track.coverUrl, sizes: '96x96', type: 'image/jpeg' },
+						{ src: track.coverUrl, sizes: '256x256', type: 'image/jpeg' },
+						{ src: track.coverUrl, sizes: '512x512', type: 'image/jpeg' },
+					]
+				: []
+
+			navigator.mediaSession.metadata = new MediaMetadata({
+				title: track.title,
+				artist: track.artist?.name || '未知歌手',
+				album: 'BBPlayer',
+				artwork,
+			})
+		}
+	}
+
+	public setupMediaSessionHandlers(handlers: {
+		onPlay?: () => void
+		onPause?: () => void
+		onNext?: () => void
+		onPrev?: () => void
+		onSeek?: (time: number) => void
+	}): void {
+		if (!('mediaSession' in navigator)) return
+		if (handlers.onPlay)
+			navigator.mediaSession.setActionHandler('play', handlers.onPlay)
+		if (handlers.onPause)
+			navigator.mediaSession.setActionHandler('pause', handlers.onPause)
+		if (handlers.onNext)
+			navigator.mediaSession.setActionHandler('nexttrack', handlers.onNext)
+		if (handlers.onPrev)
+			navigator.mediaSession.setActionHandler('previoustrack', handlers.onPrev)
+		if (handlers.onSeek) {
+			navigator.mediaSession.setActionHandler('seekto', (details) => {
+				if (details.seekTime !== undefined && details.seekTime !== null) {
+					handlers.onSeek!(details.seekTime)
+				}
+			})
+		}
 	}
 
 	private emit(event: Parameters<PlaybackListener>[0]): void {
@@ -125,6 +206,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 		this.audio.src = proxyStreamUrl
 		this.applyLoudnessGain()
+		this.updateMediaSession(track)
 
 		await this.audio.play()
 	}

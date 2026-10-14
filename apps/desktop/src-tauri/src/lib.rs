@@ -13,6 +13,7 @@ pub fn run() {
             window_ext::set_ignore_cursor_events,
             window_ext::toggle_lyrics_window,
             stream_proxy::get_stream_proxy_port,
+            stream_proxy::get_cached_track_path,
         ])
         .setup(|app| {
             // 1. Apply native window effects to main window

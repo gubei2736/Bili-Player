@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useQueueStore, useSkinStore, type Track } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
+import { playTrackWithProxy } from '../../audio/playTrackHelper'
 import { WavySlider } from '../player/WavySlider'
 
 export interface BottomPlayerBarProps {
@@ -63,11 +64,43 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		return unsubscribe
 	}, [next])
 
+	useEffect(() => {
+		desktopAudioEngine.setupMediaSessionHandlers({
+			onPlay: () => desktopAudioEngine.play(),
+			onPause: () => desktopAudioEngine.pause(),
+			onNext: () => next(),
+			onPrev: () => prev(),
+			onSeek: (time) => desktopAudioEngine.seek(time),
+		})
+	}, [next, prev])
+
+	useEffect(() => {
+		if (
+			currentTrack &&
+			currentTrack.uniqueKey !== desktopAudioEngine.getCurrentTrack()?.uniqueKey
+		) {
+			playTrackWithProxy(currentTrack).catch((err) =>
+				console.error('Failed to auto play track:', err),
+			)
+		}
+	}, [currentTrack])
+
 	const togglePlayPause = async () => {
 		if (isPlaying) {
 			desktopAudioEngine.pause()
 		} else {
-			await desktopAudioEngine.play()
+			if (
+				currentTrack &&
+				currentTrack.uniqueKey !== desktopAudioEngine.getCurrentTrack()?.uniqueKey
+			) {
+				try {
+					await playTrackWithProxy(currentTrack)
+				} catch (err) {
+					console.error('Failed to play track:', err)
+				}
+			} else {
+				await desktopAudioEngine.play()
+			}
 		}
 	}
 

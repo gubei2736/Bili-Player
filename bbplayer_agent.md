@@ -149,10 +149,10 @@ export interface AudioEngineContract {
 * **Verification**: 运行 `pnpm --filter desktop tauri dev`（或 `pnpm --filter desktop build` + `cargo check`），窗口配置正常生效，无边框毛玻璃材质挂载，SQLite 驱动与 Drizzle 迁移就绪。
 
 ### Phase 3: Rust 流媒体代理与 Web Audio 播放引擎实现
-* [ ] **Task 3.1**: 在 `src-tauri/src/stream_proxy.rs` 中基于 `axum` 和 `reqwest` 实现本地流媒体代理服务，自动附加 B 站 `Referer`/`User-Agent`、支持 `HTTP Range (206)` 拖拽、附带 `Access-Control-Allow-Origin: *` 响应头，并实现音频流本地缓存落盘。
-* [ ] **Task 3.2**: 编写 `apps/desktop/src/audio/DesktopAudioEngine.ts`，实现 HTML5 Audio + Web Audio API 管线（含响度均衡 `GainNode`、防爆音 `DynamicsCompressorNode`、频谱分析 `AnalyserNode`）。
-* [ ] **Task 3.3**: 接入 `navigator.mediaSession` API，绑定系统级媒体控制（SMTC / macOS Control Center）与封面元数据展示。
-* [ ] **Task 3.4**: 使用 HTML5 Canvas 实现 `WavySlider.tsx`（动态波浪进度条）与封面音频律动光晕组件，并与 `DesktopAudioEngine` 状态绑定。
+* [x] **Task 3.1**: 在 `src-tauri/src/stream_proxy.rs` 中基于 `axum` 和 `reqwest` 实现本地流媒体代理服务，自动附加 B 站 `Referer`/`User-Agent`、支持 `HTTP Range (206)` 拖拽、附带 `Access-Control-Allow-Origin: *` 响应头，并实现音频流本地缓存落盘。
+* [x] **Task 3.2**: 编写 `apps/desktop/src/audio/DesktopAudioEngine.ts`，实现 HTML5 Audio + Web Audio API 管线（含响度均衡 `GainNode`、防爆音 `DynamicsCompressorNode`、频谱分析 `AnalyserNode`）。
+* [x] **Task 3.3**: 接入 `navigator.mediaSession` API，绑定系统级媒体控制（SMTC / macOS Control Center）与封面元数据展示。
+* [x] **Task 3.4**: 使用 HTML5 Canvas 实现 `WavySlider.tsx`（动态波浪进度条）与封面音频律动光晕组件，并与 `DesktopAudioEngine` 状态绑定。
 * **Verification**: 在搜索框输入任意 B 站 BV 号或 `b23.tv` 短链，能够成功解析出音频并流畅播放，拖拽波浪进度条立即响应（`206 Partial Content`），开启/关闭响度均衡音量平滑过渡。
 
 ### Phase 4: SPL 沉浸式全屏歌词与独立穿透桌面歌词窗口
