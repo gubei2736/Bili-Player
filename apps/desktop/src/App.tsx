@@ -23,6 +23,8 @@ import { ExportTrackModal } from './components/modals/ExportTrackModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
 import { SkinStoreView } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
+import { SearchView } from './components/views/SearchView'
+import { ShortcutsSettingsView } from './components/views/ShortcutsSettingsView'
 import { initDesktopDatabase } from './db/desktopDb'
 import {
 	useQueueStore,
@@ -31,8 +33,9 @@ import {
 	type Artist,
 } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from './audio/DesktopAudioEngine'
+import { playTrackWithProxy } from './audio/playTrackHelper'
 import { invoke } from '@tauri-apps/api/core'
-import { emit } from '@tauri-apps/api/event'
+import { emit, listen } from '@tauri-apps/api/event'
 
 const dummyArtist = (id: number, name: string): Artist => ({
 	id,
@@ -121,16 +124,61 @@ export const App: React.FC = () => {
 		},
 	])
 
-	const { setQueue, getCurrentTrack } = useQueueStore()
+	const { setQueue, next, prev, getCurrentTrack } = useQueueStore()
 	const currentTrack = getCurrentTrack()
 
+	// 1. Initialize DB
 	useEffect(() => {
 		initDesktopDatabase()
 			.then(() => setDbReady(true))
 			.catch((e) => console.warn('Database initialization note:', e))
 	}, [])
 
-	// IPC Lyrics Synchronization to Desktop Floating Lyrics Window
+	// 2. Initialize active theme skin colors
+	useEffect(() => {
+		const skin = useSkinStore.getState().activeSkinSuit
+		const color = skin?.suit_items?.skin?.[0]?.properties?.color
+		if (color) {
+			document.documentElement.style.setProperty('--primary', color)
+			document.documentElement.style.setProperty('--bili-theme-primary', color)
+			document.documentElement.style.setProperty('--ring', color)
+		}
+	}, [])
+
+	// 3. Global Shortcuts IPC Event Listener
+	useEffect(() => {
+		let unlistenFn: (() => void) | undefined
+		listen<string>('global-shortcut-event', async (event) => {
+			const action = event.payload
+			if (action === 'play_pause') {
+				if (desktopAudioEngine.isPlaying()) {
+					desktopAudioEngine.pause()
+				} else {
+					desktopAudioEngine.play()
+				}
+			} else if (action === 'prev_track') {
+				const prevTrack = prev()
+				if (prevTrack) {
+					playTrackWithProxy(prevTrack).catch(() => {})
+				}
+			} else if (action === 'next_track') {
+				const nextTrack = next()
+				if (nextTrack) {
+					playTrackWithProxy(nextTrack).catch(() => {})
+				}
+			}
+		})
+			.then((fn) => {
+				unlistenFn = fn
+			})
+			.catch(() => {})
+
+		return () => {
+			if (unlistenFn) unlistenFn()
+		}
+	}, [next, prev])
+
+	// 4. IPC Lyrics Synchronization to Desktop Floating Lyrics Window
 	useEffect(() => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
 			emit('lyrics-sync', {
@@ -155,8 +203,9 @@ export const App: React.FC = () => {
 	}, [currentTrack])
 
 	const handleSearch = (query: string) => {
+		if (!query.trim()) return
 		setSearchQuery(query)
-		console.log('Search triggered:', query)
+		setActiveTab('search')
 	}
 
 	const handleToggleLyricsWindow = async () => {
@@ -167,8 +216,13 @@ export const App: React.FC = () => {
 		}
 	}
 
-	const handlePlayTrack = (track: Track, index: number) => {
+	const handlePlayTrack = async (track: Track, index: number) => {
 		setQueue(featuredTracks, index)
+		try {
+			await playTrackWithProxy(track)
+		} catch (err) {
+			console.error('Failed to play track with proxy:', err)
+		}
 	}
 
 	return (
@@ -229,6 +283,7 @@ export const App: React.FC = () => {
 															'https://i0.hdslb.com/bfs/archive/placeholder.jpg'
 														}
 														alt={track.title}
+														referrerPolicy="no-referrer"
 														className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
 													/>
 													<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -265,6 +320,13 @@ export const App: React.FC = () => {
 									</div>
 								</div>
 							</div>
+						)}
+
+						{tab === 'search' && (
+							<SearchView
+								keyword={searchQuery}
+								onExportTrack={setExportModalTrack}
+							/>
 						)}
 
 						{tab === 'library' && (
@@ -337,6 +399,11 @@ export const App: React.FC = () => {
 										</div>
 										<CheckCircle2 className="w-4 h-4 text-emerald-400" />
 									</div>
+								</div>
+
+								{/* Customizable Shortcuts Settings */}
+								<div className="pt-2">
+									<ShortcutsSettingsView />
 								</div>
 							</div>
 						)}

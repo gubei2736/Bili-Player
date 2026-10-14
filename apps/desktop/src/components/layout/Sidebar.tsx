@@ -15,6 +15,7 @@ import { useAuthStore } from '@bbplayer/shared-core'
 
 export type NavTab =
 	| 'explore'
+	| 'search'
 	| 'library'
 	| 'favorites'
 	| 'collections'

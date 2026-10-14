@@ -1,11 +1,12 @@
 pub mod exporter;
+pub mod http_client;
+pub mod shortcuts;
 pub mod stream_proxy;
 pub mod window_ext;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,16 +16,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        if let Ok(target) = "Alt+Shift+L".parse::<Shortcut>() {
-                            if shortcut == &target {
-                                if let Some(lyrics_win) = app.get_webview_window("lyrics") {
-                                    // Unlock mouse penetration when pressing shortcut
-                                    let _ = lyrics_win.set_ignore_cursor_events(false);
-                                }
-                            }
-                        }
-                    }
+                    shortcuts::handle_shortcut_event(app, shortcut, event.state());
                 })
                 .build(),
         )
@@ -34,6 +26,9 @@ pub fn run() {
             stream_proxy::get_stream_proxy_port,
             stream_proxy::get_cached_track_path,
             exporter::export_cached_track_to_m4a,
+            http_client::native_http_request,
+            shortcuts::get_shortcuts,
+            shortcuts::update_shortcuts,
         ])
         .setup(|app| {
             eprintln!("[BBPlayer] setup closure invoked");
@@ -45,11 +40,9 @@ pub fn run() {
                 eprintln!("[BBPlayer] WARNING: main window NOT found in app.get_webview_window(\"main\")!");
             }
 
-            // 2. Register global shortcut (Alt+Shift+L)
-            if let Ok(shortcut) = "Alt+Shift+L".parse::<Shortcut>() {
-                let reg_res = app.global_shortcut().register(shortcut);
-                eprintln!("[BBPlayer] global shortcut register result: {:?}", reg_res);
-            }
+            // 2. Register default global shortcuts
+            let default_shortcuts = shortcuts::get_default_shortcuts();
+            shortcuts::register_all_shortcuts(app.handle(), &default_shortcuts);
 
             // 3. Setup System Tray Menu
             let toggle_main = MenuItem::with_id(app, "toggle_main", "显示/隐藏主窗口", true, None::<&str>)?;

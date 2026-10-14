@@ -68,11 +68,15 @@ export const SkinStoreView: React.FC = () => {
 		setSkin(mockSuit)
 		// Update CSS root variables
 		document.documentElement.style.setProperty('--primary', preset.color)
+		document.documentElement.style.setProperty('--bili-theme-primary', preset.color)
+		document.documentElement.style.setProperty('--ring', preset.color)
 	}
 
 	const handleReset = () => {
 		clearSkin()
 		document.documentElement.style.setProperty('--primary', '#00AEEC')
+		document.documentElement.style.setProperty('--bili-theme-primary', '#00AEEC')
+		document.documentElement.style.setProperty('--ring', '#00AEEC')
 	}
 
 	return (
