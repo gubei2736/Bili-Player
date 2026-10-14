@@ -231,7 +231,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const effectiveVolumePct = (isMuted ? 0 : volume) * 100
 
 	return (
-		<footer className="h-[84px] w-full flex flex-col justify-between px-5 pt-1 pb-2.5 select-none bg-[#090d16]/85 backdrop-blur-2xl border-t border-white/[0.08] shadow-[0_-10px_30px_rgba(0,0,0,0.45)] z-40">
+		<footer className="h-[88px] w-full flex flex-col justify-between px-5 pt-1 pb-2 select-none bg-[#090d16]/85 backdrop-blur-2xl border-t border-white/[0.08] shadow-[0_-10px_30px_rgba(0,0,0,0.45)] z-40">
 			{/* Top: Wavy Progress Bar */}
 			<div className="w-full px-1">
 				<WavySlider

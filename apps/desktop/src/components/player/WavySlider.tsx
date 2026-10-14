@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useEffect, useState, useCallback } from 'react'
 
 export interface WavySliderProps {
 	value: number // 0 to 1
@@ -23,7 +23,8 @@ export const WavySlider: React.FC<WavySliderProps> = ({
 
 	const phaseRef = useRef(0)
 	const amplitudeRef = useRef(0)
-	const targetAmplitude = isPlaying ? 3.2 : 0
+	// Android 13 Squiggle 标准：6.5px 真实振幅，波峰波谷错落起伏
+	const targetAmplitude = isPlaying ? 6.5 : 0
 	const animationFrameId = useRef<number | null>(null)
 
 	const formatTime = (secs: number) => {
@@ -45,74 +46,106 @@ export const WavySlider: React.FC<WavySliderProps> = ({
 
 		ctx.clearRect(0, 0, width, height)
 
-		amplitudeRef.current += (targetAmplitude - amplitudeRef.current) * 0.1
+		// 振幅平滑插值过渡（播放与暂停时在直线与波浪之间柔和形变）
+		amplitudeRef.current += (targetAmplitude - amplitudeRef.current) * 0.12
 		if (isPlaying) {
-			phaseRef.current += 0.075
+			// 波形向右平滑流动
+			phaseRef.current += 0.08
 		}
 
 		const midY = height / 2
 		const effectiveValue = isDragging ? dragValueRef.current : value
 		const progressX = Math.max(0, Math.min(width, effectiveValue * width))
 
-		// 1. Unplayed Track (right of cursor)
+		// 1. 未播放背景轨道（游标右侧）
 		ctx.beginPath()
-		ctx.lineWidth = 2 * dpr
+		ctx.lineWidth = 3.5 * dpr
 		ctx.lineCap = 'round'
 		ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
 		ctx.moveTo(progressX, midY)
 		ctx.lineTo(width, midY)
 		ctx.stroke()
 
-		// Hover preview highlight on unplayed track
+		// 悬停预览高亮轨道
 		if (hoverValue !== null) {
-			const hoverX = hoverValue * width
+			const hoverX = Math.max(0, Math.min(width, hoverValue * width))
 			if (hoverX > progressX) {
 				ctx.beginPath()
-				ctx.lineWidth = 2 * dpr
-				ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)'
+				ctx.lineWidth = 3.5 * dpr
+				ctx.lineCap = 'round'
+				ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)'
 				ctx.moveTo(progressX, midY)
 				ctx.lineTo(hoverX, midY)
 				ctx.stroke()
 			}
 		}
 
-		// 2. Played Sine Wave (left of cursor) with glow
-		ctx.save()
-		ctx.beginPath()
-		ctx.lineWidth = 2.8 * dpr
-		ctx.lineCap = 'round'
-		ctx.strokeStyle = primaryColor
-		ctx.shadowColor = primaryColor
-		ctx.shadowBlur = 6 * dpr
+		// 2. 已播放流光波浪（游标左侧）
+		if (progressX > 0) {
+			ctx.save()
+			ctx.beginPath()
+			ctx.lineWidth = 3.6 * dpr
+			ctx.lineCap = 'round'
+			ctx.lineJoin = 'round'
 
-		const omega = 0.04 / dpr
-		for (let x = 0; x <= progressX; x += 2) {
-			const y =
-				midY +
-				amplitudeRef.current * dpr * Math.sin(omega * x + phaseRef.current)
-			if (x === 0) {
-				ctx.moveTo(x, y)
-			} else {
-				ctx.lineTo(x, y)
+			// 水平流光多色高光渐变
+			const gradient = ctx.createLinearGradient(0, 0, Math.max(1, progressX), 0)
+			gradient.addColorStop(0, primaryColor)
+			gradient.addColorStop(0.65, '#38bdf8') // 湖水青蓝高光
+			gradient.addColorStop(1, '#f472b6')   // 渐变粉紫波梢
+
+			ctx.strokeStyle = gradient
+			ctx.shadowColor = primaryColor
+			ctx.shadowBlur = 8 * dpr
+
+			// Android 13 灵动波长：约 26px 一个完整波峰，保证密集生动的涟漪视觉
+			const waveLength = 26 * dpr
+			const omega = (Math.PI * 2) / waveLength
+
+			// 两端包络阻尼：起点与游标处平滑归零至 midY，消除生硬折角断层
+			const headDampDist = 18 * dpr
+			const tailDampDist = 22 * dpr
+
+			for (let x = 0; x <= progressX; x += 1.5 * dpr) {
+				let envelope = 1.0
+				if (x < headDampDist) {
+					envelope = Math.sin((x / headDampDist) * (Math.PI / 2))
+				}
+				const distToEnd = progressX - x
+				if (distToEnd < tailDampDist) {
+					envelope *= Math.sin((distToEnd / tailDampDist) * (Math.PI / 2))
+				}
+
+				const y =
+					midY +
+					amplitudeRef.current * dpr * envelope * Math.sin(omega * x - phaseRef.current)
+
+				if (x === 0) {
+					ctx.moveTo(x, y)
+				} else {
+					ctx.lineTo(x, y)
+				}
 			}
+			ctx.lineTo(progressX, midY)
+			ctx.stroke()
+			ctx.restore()
 		}
-		ctx.stroke()
-		ctx.restore()
 
-		// 3. Cursor Handle
-		const cursorY =
-			midY +
-			amplitudeRef.current *
-				dpr *
-				Math.sin(omega * progressX + phaseRef.current)
-
-		const radius = (isDragging || hoverValue !== null ? 6.5 : 5) * dpr
+		// 3. 游标控制手柄（始终稳固贴合于 progressX, midY）
+		const thumbRadius = (isDragging || hoverValue !== null ? 7.5 : 6) * dpr
 		ctx.save()
+		// 外层白玉光晕环
 		ctx.beginPath()
-		ctx.arc(progressX, cursorY, radius, 0, Math.PI * 2)
+		ctx.arc(progressX, midY, thumbRadius, 0, Math.PI * 2)
 		ctx.fillStyle = '#FFFFFF'
 		ctx.shadowColor = primaryColor
-		ctx.shadowBlur = 10 * dpr
+		ctx.shadowBlur = 12 * dpr
+		ctx.fill()
+
+		// 内芯主题色宝石点
+		ctx.beginPath()
+		ctx.arc(progressX, midY, 2.4 * dpr, 0, Math.PI * 2)
+		ctx.fillStyle = primaryColor
 		ctx.fill()
 		ctx.restore()
 
@@ -182,16 +215,17 @@ export const WavySlider: React.FC<WavySliderProps> = ({
 
 	return (
 		<div className="w-full flex items-center gap-3 select-none">
-			<span className="text-[10px] font-mono text-muted-foreground/80 w-9 text-right">
+			<span className="text-[10px] font-mono text-muted-foreground/80 w-9 text-right font-medium">
 				{formatTime(displayValue * duration)}
 			</span>
-			<div className="relative flex-1 h-5 flex items-center cursor-pointer group">
-				{/* Hover Time Tooltip */}
+			<div className="relative flex-1 h-7 flex items-center cursor-pointer group">
+				{/* 悬停时间气泡胶囊 */}
 				{hoverValue !== null && duration > 0 && (
 					<div
-						className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded bg-[#111827]/95 border border-white/15 text-[10px] font-mono text-white shadow-lg pointer-events-none z-20"
-						style={{ left: `${hoverValue * 100}%` }}
+						className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-full bg-[#0d1322]/95 border border-white/20 text-[10px] font-mono font-semibold text-white shadow-xl pointer-events-none z-30 flex items-center gap-1 backdrop-blur-md transition-opacity"
+						style={{ left: `${Math.max(2, Math.min(98, hoverValue * 100))}%` }}
 					>
+						<span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
 						{formatTime(hoverValue * duration)}
 					</div>
 				)}
@@ -204,7 +238,7 @@ export const WavySlider: React.FC<WavySliderProps> = ({
 					className="w-full h-full block"
 				/>
 			</div>
-			<span className="text-[10px] font-mono text-muted-foreground/80 w-9 text-left">
+			<span className="text-[10px] font-mono text-muted-foreground/80 w-9 text-left font-medium">
 				{formatTime(duration)}
 			</span>
 		</div>
