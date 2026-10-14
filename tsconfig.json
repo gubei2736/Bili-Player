@@ -11,7 +11,8 @@
 		{ "path": "./apps/update-publisher/tsconfig.json" },
 		{ "path": "./apps/backend/tsconfig.json" },
 		{ "path": "./apps/update-server/web" },
-		{ "path": "./apps/hot-update-cli" }
+		{ "path": "./apps/hot-update-cli" },
+		{ "path": "./packages/shared-core/tsconfig.json" }
 	],
 	"compilerOptions": {
 		"skipLibCheck": true,

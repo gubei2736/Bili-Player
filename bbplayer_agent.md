@@ -135,10 +135,10 @@ export interface AudioEngineContract {
 > **Agent 执行法则**：请按顺序逐一执行以下 Phase。每完成一个 Task，运行对应的 Verification 命令，确认无误后将 `[ ]` 标记为 `[x]`，再进入下一阶段。
 
 ### Phase 1: Monorepo 抽离与共享核心包 (`packages/shared-core`) 构建
-* [ ] **Task 1.1**: 创建 `packages/shared-core`，配置 `package.json` 与 `tsconfig.json`。
-* [ ] **Task 1.2**: 将 `apps/mobile` 中的 WBI 签名算法、Bilibili API 请求模块（扫码登录、视频详情 `view`、音频流 `playurl`、收藏夹同步、装扮检索）以及网易云/QQ歌单解析逻辑迁移至 `packages/shared-core/src/api`。将底层 HTTP 调用抽象为 `HttpClient` 接口。
-* [ ] **Task 1.3**: 将 Drizzle ORM 的 Schema 定义（`tracks`, `playlists`, `playlist_tracks`, `history`, `lyrics_cache`）迁移至 `packages/shared-core/src/db/schema.ts`。
-* [ ] **Task 1.4**: 将播放队列管理、歌单状态、用户认证等 Zustand Stores 迁移至 `packages/shared-core/src/stores`。
+* [x] **Task 1.1**: 创建 `packages/shared-core`，配置 `package.json` 与 `tsconfig.json`。
+* [x] **Task 1.2**: 将 `apps/mobile` 中的 WBI 签名算法、Bilibili API 请求模块（扫码登录、视频详情 `view`、音频流 `playurl`、收藏夹同步、装扮检索）以及网易云/QQ歌单解析逻辑迁移至 `packages/shared-core/src/api`。将底层 HTTP 调用抽象为 `HttpClient` 接口。
+* [x] **Task 1.3**: 将 Drizzle ORM 的 Schema 定义（`tracks`, `playlists`, `playlist_tracks`, `history`, `lyrics_cache`）迁移至 `packages/shared-core/src/db/schema.ts`。
+* [x] **Task 1.4**: 将播放队列管理、歌单状态、用户认证等 Zustand Stores 迁移至 `packages/shared-core/src/stores`。
 * **Verification**: 运行 `pnpm --filter @bbplayer/shared-core typecheck`，确保零 TypeScript 错误且无任何 React Native 依赖。
 
 ### Phase 2: Tauri v2 桌面端脚手架与高颜值原生窗口初始化
