@@ -16,16 +16,17 @@ import {
 import { MainLayout } from './components/layout/MainLayout'
 import type { NavTab } from './components/layout/Sidebar'
 import { LoginModal } from './components/modals/LoginModal'
-import { initDesktopDatabase, getDatabaseQueries } from './db/desktopDb'
+import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
+import { initDesktopDatabase } from './db/desktopDb'
 import {
 	useQueueStore,
-	usePlaylistStore,
 	useSkinStore,
 	type Track,
 	type Artist,
 } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from './audio/DesktopAudioEngine'
 import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 
 const dummyArtist = (id: number, name: string): Artist => ({
 	id,
@@ -37,6 +38,7 @@ const dummyArtist = (id: number, name: string): Artist => ({
 
 export const App: React.FC = () => {
 	const [loginModalOpen, setLoginModalOpen] = useState(false)
+	const [fullscreenLyricsOpen, setFullscreenLyricsOpen] = useState(false)
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 	const [searchQuery, setSearchQuery] = useState('')
 	const [dbReady, setDbReady] = useState(false)
@@ -111,13 +113,38 @@ export const App: React.FC = () => {
 		},
 	])
 
-	const { setQueue } = useQueueStore()
+	const { setQueue, getCurrentTrack } = useQueueStore()
+	const currentTrack = getCurrentTrack()
 
 	useEffect(() => {
 		initDesktopDatabase()
 			.then(() => setDbReady(true))
 			.catch((e) => console.warn('Database initialization note:', e))
 	}, [])
+
+	// IPC Lyrics Synchronization to Desktop Floating Lyrics Window
+	useEffect(() => {
+		const unsubscribe = desktopAudioEngine.subscribe((event) => {
+			emit('lyrics-sync', {
+				type: 'STATE_SYNC',
+				isPlaying: desktopAudioEngine.isPlaying(),
+				currentTimeMs: event.currentTime * 1000,
+				timestamp: Date.now(),
+			}).catch(() => {})
+		})
+		return unsubscribe
+	}, [])
+
+	useEffect(() => {
+		if (currentTrack) {
+			emit('lyrics-sync', {
+				type: 'TRACK_CHANGE',
+				title: currentTrack.title,
+				artist: currentTrack.artist?.name || '未知歌手',
+				durationMs: (currentTrack.duration || 0) * 1000,
+			}).catch(() => {})
+		}
+	}, [currentTrack])
 
 	const handleSearch = (query: string) => {
 		setSearchQuery(query)
@@ -141,6 +168,9 @@ export const App: React.FC = () => {
 			<MainLayout
 				onSearch={handleSearch}
 				onToggleLyricsWindow={handleToggleLyricsWindow}
+				onToggleFullscreenLyrics={() =>
+					setFullscreenLyricsOpen(!fullscreenLyricsOpen)
+				}
 				onOpenLoginModal={() => setLoginModalOpen(true)}
 			>
 				{(tab) => (
@@ -184,7 +214,10 @@ export const App: React.FC = () => {
 											>
 												<div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2.5 bg-black/40">
 													<img
-														src={track.coverUrl || 'https://i0.hdslb.com/bfs/archive/placeholder.jpg'}
+														src={
+															track.coverUrl ||
+															'https://i0.hdslb.com/bfs/archive/placeholder.jpg'
+														}
 														alt={track.title}
 														className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
 													/>
@@ -298,6 +331,12 @@ export const App: React.FC = () => {
 			<LoginModal
 				isOpen={loginModalOpen}
 				onClose={() => setLoginModalOpen(false)}
+			/>
+
+			<ImmersiveLyricsView
+				isOpen={fullscreenLyricsOpen}
+				onClose={() => setFullscreenLyricsOpen(false)}
+				track={currentTrack}
 			/>
 		</>
 	)

@@ -156,9 +156,9 @@ export interface AudioEngineContract {
 * **Verification**: 在搜索框输入任意 B 站 BV 号或 `b23.tv` 短链，能够成功解析出音频并流畅播放，拖拽波浪进度条立即响应（`206 Partial Content`），开启/关闭响度均衡音量平滑过渡。
 
 ### Phase 4: SPL 沉浸式全屏歌词与独立穿透桌面歌词窗口
-* [ ] **Task 4.1**: 开发 `FluidBackground.tsx`（Canvas 封面主色流体渐变背景）与 `ImmersiveLyricsView.tsx`（使用 Framer Motion 实现点击左下角封面平滑展开全屏，接入 `@bbplayer/splash` 渲染逐字音节染色、罗马音、双语翻译及远近景深模糊动效）。
-* [ ] **Task 4.2**: 在 `tauri.conf.json` 中注册 `lyrics` 独立透明置顶窗口，编写 `apps/desktop/src/windows/lyrics/DesktopLyricsApp.tsx`。
-* [ ] **Task 4.3**: 实现主窗口与 `lyrics` 窗口的 `LyricsSyncEvent` IPC 同步机制，以及系统托盘菜单（显示/隐藏歌词、锁定/穿透鼠标点击、退出应用）。
+* [x] **Task 4.1**: 开发 `FluidBackground.tsx`（Canvas 封面主色流体渐变背景）与 `ImmersiveLyricsView.tsx`（使用 Framer Motion 实现点击左下角封面平滑展开全屏，接入 `@bbplayer/splash` 渲染逐字音节染色、罗马音、双语翻译及远近景深模糊动效）。
+* [x] **Task 4.2**: 在 `tauri.conf.json` 中注册 `lyrics` 独立透明置顶窗口，编写 `apps/desktop/src/windows/lyrics/DesktopLyricsApp.tsx`。
+* [x] **Task 4.3**: 实现主窗口与 `lyrics` 窗口的 `LyricsSyncEvent` IPC 同步机制，以及系统托盘菜单（显示/隐藏歌词、锁定/穿透鼠标点击、退出应用）。
 * **Verification**: 展开全屏歌词页帧率稳定在 60fps+；开启桌面悬浮歌词并点击“锁定”，鼠标可穿透歌词正常点击后方桌面窗口，逐字高亮与音频严密同步。
 
 ### Phase 5: 歌单迁移、B站主题装扮与纯 Rust `.m4a` 导出
