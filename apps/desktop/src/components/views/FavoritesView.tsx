@@ -11,6 +11,11 @@ import {
 	LogIn,
 	Music,
 	Loader2,
+	EyeOff,
+	Eye,
+	SlidersHorizontal,
+	X,
+	Check,
 } from 'lucide-react'
 import {
 	useAuthStore,
@@ -22,6 +27,11 @@ import {
 } from '@bbplayer/shared-core'
 import { convertFavoriteItemToTrack, formatDuration } from '../../utils/trackConverter'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
+import {
+	getHiddenFavoriteIds,
+	toggleHideFavorite,
+	setHiddenFavoriteIds,
+} from '../../utils/filterSettings'
 
 export interface FavoritesViewProps {
 	onExportTrack?: (track: Track) => void
@@ -46,6 +56,24 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 	const [tracks, setTracks] = useState<BilibiliTrack[]>([])
 	const [loadingTracks, setLoadingTracks] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [hiddenIds, setHiddenIds] = useState<number[]>(getHiddenFavoriteIds())
+	const [showManageModal, setShowManageModal] = useState(false)
+
+	// Listen for hidden favorites change
+	useEffect(() => {
+		const handleFilterChange = (e: any) => {
+			setHiddenIds(e.detail || getHiddenFavoriteIds())
+		}
+		window.addEventListener('bbplayer:hidden-favorites-change', handleFilterChange)
+		return () => {
+			window.removeEventListener('bbplayer:hidden-favorites-change', handleFilterChange)
+		}
+	}, [])
+
+	// Filter visible playlists
+	const visiblePlaylists = favoritePlaylists.filter(
+		(p) => !hiddenIds.includes(p.id),
+	)
 
 	// Fetch tracks when selectedPlaylistId changes
 	const fetchPlaylistTracks = async (favoriteId: number) => {
@@ -75,12 +103,22 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 	}
 
 	useEffect(() => {
+		// If current selected is hidden, auto select first visible
+		if (selectedPlaylistId && hiddenIds.includes(selectedPlaylistId)) {
+			if (visiblePlaylists.length > 0 && visiblePlaylists[0]) {
+				setSelectedPlaylistId(visiblePlaylists[0].id)
+			} else {
+				setSelectedPlaylistId(null)
+			}
+			return
+		}
+
 		if (selectedPlaylistId) {
 			fetchPlaylistTracks(selectedPlaylistId)
-		} else if (favoritePlaylists.length > 0 && favoritePlaylists[0]) {
-			setSelectedPlaylistId(favoritePlaylists[0].id)
+		} else if (visiblePlaylists.length > 0 && visiblePlaylists[0]) {
+			setSelectedPlaylistId(visiblePlaylists[0].id)
 		}
-	}, [selectedPlaylistId, favoritePlaylists])
+	}, [selectedPlaylistId, favoritePlaylists, hiddenIds])
 
 	const handleRefresh = async () => {
 		if (!userInfo?.mid) return
@@ -107,6 +145,15 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		} catch (err) {
 			console.error('Failed to play track:', err)
 		}
+	}
+
+	const handleToggleHide = (id: number, e?: React.MouseEvent) => {
+		e?.stopPropagation()
+		toggleHideFavorite(id)
+	}
+
+	const handleUnhideAll = () => {
+		setHiddenFavoriteIds([])
 	}
 
 	if (!isLoggedIn) {
@@ -156,6 +203,20 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 
 				<div className="flex items-center gap-2.5">
 					<button
+						onClick={() => setShowManageModal(true)}
+						className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-foreground transition-all duration-150"
+						title="管理或隐藏非音乐收藏夹"
+					>
+						<SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+						<span>过滤管理</span>
+						{hiddenIds.length > 0 && (
+							<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/20 text-primary font-semibold">
+								已隐藏 {hiddenIds.length}
+							</span>
+						)}
+					</button>
+
+					<button
 						onClick={handleRefresh}
 						disabled={isSyncingPlaylists || loadingTracks}
 						className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-foreground transition-all duration-150 disabled:opacity-50"
@@ -181,26 +242,47 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 			</div>
 
 			{/* Playlist Tabs / Selector */}
-			{favoritePlaylists.length > 0 && (
+			{visiblePlaylists.length > 0 ? (
 				<div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-					{favoritePlaylists.map((pl) => {
+					{visiblePlaylists.map((pl) => {
 						const isSelected = pl.id === selectedPlaylistId
 						return (
-							<button
+							<div
 								key={pl.id}
-								onClick={() => setSelectedPlaylistId(pl.id)}
-								className={`px-3.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-150 flex items-center gap-2 border ${
+								className={`group/tab relative flex items-center rounded-xl border transition-all duration-150 ${
 									isSelected
 										? 'bg-primary/20 border-primary/40 text-primary font-semibold shadow-sm'
 										: 'bg-white/5 border-white/5 text-foreground/75 hover:bg-white/10 hover:text-foreground'
 								}`}
 							>
-								<FolderHeart className="w-3.5 h-3.5" />
-								<span>{pl.title}</span>
-								<span className="text-[10px] opacity-60">({pl.media_count})</span>
-							</button>
+								<button
+									onClick={() => setSelectedPlaylistId(pl.id)}
+									className="px-3.5 py-1.5 text-xs font-medium whitespace-nowrap flex items-center gap-2"
+								>
+									<FolderHeart className="w-3.5 h-3.5" />
+									<span>{pl.title}</span>
+									<span className="text-[10px] opacity-60">({pl.media_count})</span>
+								</button>
+								<button
+									onClick={(e) => handleToggleHide(pl.id, e)}
+									title="隐藏此收藏夹"
+									className="pr-2 opacity-0 group-hover/tab:opacity-100 hover:text-red-400 transition-opacity"
+								>
+									<EyeOff className="w-3 h-3" />
+								</button>
+							</div>
 						)
 					})}
+				</div>
+			) : (
+				<div className="p-6 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground space-y-2">
+					<p className="text-xs">所有收藏夹均已隐藏</p>
+					<button
+						onClick={handleUnhideAll}
+						className="text-xs text-primary hover:underline font-medium"
+					>
+						恢复显示全部收藏夹
+					</button>
 				</div>
 			)}
 
@@ -294,6 +376,94 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 								</div>
 							)
 						})}
+					</div>
+				</div>
+			)}
+
+			{/* Modal: Favorite Visibility Management */}
+			{showManageModal && (
+				<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+					<div className="bg-background/95 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-2">
+								<SlidersHorizontal className="w-4 h-4 text-primary" />
+								<h3 className="font-bold text-sm text-foreground">
+									收藏夹显示与隐藏设置
+								</h3>
+							</div>
+							<button
+								onClick={() => setShowManageModal(false)}
+								className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+							>
+								<X className="w-4 h-4" />
+							</button>
+						</div>
+
+						<p className="text-xs text-muted-foreground leading-relaxed">
+							针对非音乐类收藏夹（如知识合辑、生活日常），可点击右侧眼睛图标隐藏，隐藏后在播放器列表中不予显示。
+						</p>
+
+						<div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+							{favoritePlaylists.map((pl) => {
+								const isHidden = hiddenIds.includes(pl.id)
+								return (
+									<div
+										key={pl.id}
+										onClick={() => handleToggleHide(pl.id)}
+										className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-colors ${
+											isHidden
+												? 'bg-white/[0.01] border-white/5 opacity-50'
+												: 'bg-white/5 border-white/10 hover:bg-white/10'
+										}`}
+									>
+										<div className="flex items-center gap-2.5 overflow-hidden">
+											<FolderHeart
+												className={`w-4 h-4 ${
+													isHidden ? 'text-muted-foreground' : 'text-primary'
+												}`}
+											/>
+											<span className="text-xs font-medium truncate text-foreground">
+												{pl.title}
+											</span>
+											<span className="text-[10px] text-muted-foreground">
+												({pl.media_count} 首)
+											</span>
+										</div>
+
+										<button
+											onClick={(e) => handleToggleHide(pl.id, e)}
+											className={`p-1.5 rounded-lg transition-colors ${
+												isHidden
+													? 'text-muted-foreground hover:text-foreground'
+													: 'text-primary hover:bg-primary/10'
+											}`}
+											title={isHidden ? '点击显示' : '点击隐藏'}
+										>
+											{isHidden ? (
+												<EyeOff className="w-4 h-4" />
+											) : (
+												<Eye className="w-4 h-4" />
+											)}
+										</button>
+									</div>
+								)
+							})}
+						</div>
+
+						<div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs">
+							<button
+								onClick={handleUnhideAll}
+								className="text-muted-foreground hover:text-primary transition-colors text-xs"
+							>
+								恢复全部显示
+							</button>
+							<button
+								onClick={() => setShowManageModal(false)}
+								className="px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow transition-colors"
+							>
+								完成
+							</button>
+						</div>
 					</div>
 				</div>
 			)}

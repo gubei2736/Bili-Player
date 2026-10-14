@@ -13,6 +13,10 @@ import {
 	Loader2,
 	ChevronRight,
 	ArrowLeft,
+	EyeOff,
+	Eye,
+	SlidersHorizontal,
+	X,
 } from 'lucide-react'
 import {
 	useAuthStore,
@@ -29,6 +33,11 @@ import {
 	formatCoverUrl,
 } from '../../utils/trackConverter'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
+import {
+	getHiddenCollectionIds,
+	toggleHideCollection,
+	setHiddenCollectionIds,
+} from '../../utils/filterSettings'
 
 export interface CollectionsViewProps {
 	onExportTrack?: (track: Track) => void
@@ -53,6 +62,21 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 	const [tracks, setTracks] = useState<BilibiliTrack[]>([])
 	const [loadingTracks, setLoadingTracks] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [hiddenIds, setHiddenIds] = useState<number[]>(getHiddenCollectionIds())
+	const [showManageModal, setShowManageModal] = useState(false)
+
+	// Listen for hidden collections change
+	useEffect(() => {
+		const handleFilterChange = (e: any) => {
+			setHiddenIds(e.detail || getHiddenCollectionIds())
+		}
+		window.addEventListener('bbplayer:hidden-collections-change', handleFilterChange)
+		return () => {
+			window.removeEventListener('bbplayer:hidden-collections-change', handleFilterChange)
+		}
+	}, [])
+
+	const visibleCollections = collections.filter((c) => !hiddenIds.includes(c.id))
 
 	// Fetch tracks when an activeCollection is selected
 	const fetchCollectionTracks = async (col: BilibiliCollection) => {
@@ -147,6 +171,15 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 		}
 	}
 
+	const handleToggleHide = (id: number, e?: React.MouseEvent) => {
+		e?.stopPropagation()
+		toggleHideCollection(id)
+	}
+
+	const handleUnhideAll = () => {
+		setHiddenCollectionIds([])
+	}
+
 	if (!isLoggedIn) {
 		return (
 			<div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
@@ -204,6 +237,22 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 				</div>
 
 				<div className="flex items-center gap-2.5">
+					{!activeCollection && (
+						<button
+							onClick={() => setShowManageModal(true)}
+							className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-foreground transition-all duration-150"
+							title="管理或隐藏非音乐合集"
+						>
+							<SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+							<span>过滤管理</span>
+							{hiddenIds.length > 0 && (
+								<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/20 text-primary font-semibold">
+									已隐藏 {hiddenIds.length}
+								</span>
+							)}
+						</button>
+					)}
+
 					<button
 						onClick={handleRefresh}
 						disabled={isSyncing || loadingTracks}
@@ -232,20 +281,30 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 			{/* View 1: Collections Cards Grid */}
 			{!activeCollection && (
 				<>
-					{collections.length === 0 ? (
+					{visibleCollections.length === 0 ? (
 						<div className="p-12 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground space-y-3">
 							<FolderHeart className="w-10 h-10 mx-auto opacity-30" />
 							<p className="text-xs">
-								暂无订阅合集，在 B 站收藏喜爱的视频合集后点击右上角“刷新同步”
+								{collections.length > 0
+									? '所有追更合集均已隐藏'
+									: '暂无订阅合集，在 B 站收藏喜爱的视频合集后点击右上角“刷新同步”'}
 							</p>
+							{collections.length > 0 && (
+								<button
+									onClick={handleUnhideAll}
+									className="text-xs text-primary hover:underline font-medium"
+								>
+									恢复显示全部合集
+								</button>
+							)}
 						</div>
 					) : (
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-							{collections.map((col) => (
+							{visibleCollections.map((col) => (
 								<div
 									key={col.id}
 									onClick={() => handleSelectCollection(col)}
-									className="group rounded-xl p-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all duration-200 cursor-pointer flex flex-col justify-between"
+									className="group relative rounded-xl p-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all duration-200 cursor-pointer flex flex-col justify-between"
 								>
 									<div className="relative w-full aspect-video rounded-lg overflow-hidden mb-2.5 bg-gradient-to-tr from-sky-950/60 to-purple-950/60 flex items-center justify-center">
 										<img
@@ -260,6 +319,16 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 										<div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white backdrop-blur-sm">
 											{col.media_count} P
 										</div>
+
+										{/* Quick Hide Button on Hover */}
+										<button
+											onClick={(e) => handleToggleHide(col.id, e)}
+											title="隐藏此合集"
+											className="absolute top-1.5 left-1.5 p-1 rounded-md bg-black/60 hover:bg-black/90 text-white/70 hover:text-red-400 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+										>
+											<EyeOff className="w-3.5 h-3.5" />
+										</button>
+
 										<div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
 											<ChevronRight className="w-6 h-6 text-white" />
 										</div>
@@ -374,6 +443,94 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 							</div>
 						</div>
 					)}
+				</div>
+			)}
+
+			{/* Modal: Collection Visibility Management */}
+			{showManageModal && (
+				<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+					<div className="bg-background/95 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-2">
+								<SlidersHorizontal className="w-4 h-4 text-sky-400" />
+								<h3 className="font-bold text-sm text-foreground">
+									追更合集显示与隐藏设置
+								</h3>
+							</div>
+							<button
+								onClick={() => setShowManageModal(false)}
+								className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+							>
+								<X className="w-4 h-4" />
+							</button>
+						</div>
+
+						<p className="text-xs text-muted-foreground leading-relaxed">
+							针对非音乐类合集（如影视追剧、游戏解说），可点击右侧眼睛图标隐藏，隐藏后在播放器列表中不予显示。
+						</p>
+
+						<div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+							{collections.map((col) => {
+								const isHidden = hiddenIds.includes(col.id)
+								return (
+									<div
+										key={col.id}
+										onClick={() => handleToggleHide(col.id)}
+										className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-colors ${
+											isHidden
+												? 'bg-white/[0.01] border-white/5 opacity-50'
+												: 'bg-white/5 border-white/10 hover:bg-white/10'
+										}`}
+									>
+										<div className="flex items-center gap-2.5 overflow-hidden">
+											<Layers
+												className={`w-4 h-4 ${
+													isHidden ? 'text-muted-foreground' : 'text-sky-400'
+												}`}
+											/>
+											<span className="text-xs font-medium truncate text-foreground">
+												{col.title}
+											</span>
+											<span className="text-[10px] text-muted-foreground">
+												({col.media_count} P)
+											</span>
+										</div>
+
+										<button
+											onClick={(e) => handleToggleHide(col.id, e)}
+											className={`p-1.5 rounded-lg transition-colors ${
+												isHidden
+													? 'text-muted-foreground hover:text-foreground'
+													: 'text-primary hover:bg-primary/10'
+											}`}
+											title={isHidden ? '点击显示' : '点击隐藏'}
+										>
+											{isHidden ? (
+												<EyeOff className="w-4 h-4" />
+											) : (
+												<Eye className="w-4 h-4" />
+											)}
+										</button>
+									</div>
+								)
+							})}
+						</div>
+
+						<div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs">
+							<button
+								onClick={handleUnhideAll}
+								className="text-muted-foreground hover:text-primary transition-colors text-xs"
+							>
+								恢复全部显示
+							</button>
+							<button
+								onClick={() => setShowManageModal(false)}
+								className="px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow transition-colors"
+							>
+								完成
+							</button>
+						</div>
+					</div>
 				</div>
 			)}
 		</div>
