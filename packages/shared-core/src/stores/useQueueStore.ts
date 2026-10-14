@@ -137,18 +137,23 @@ export const useQueueStore = create<QueueState>()(
 			},
 
 			next: () => {
-				const { queue, currentIndex, playMode, shuffledIndices } = get()
+				const { queue, currentIndex, playMode } = get()
+				let { shuffledIndices } = get()
 				if (queue.length === 0) return null
 
 				if (playMode === 'repeat_one') {
-					return queue[currentIndex] ?? null
+					const validIdx = currentIndex >= 0 && currentIndex < queue.length ? currentIndex : 0
+					return queue[validIdx] ?? null
 				}
 
 				if (playMode === 'shuffle') {
+					if (shuffledIndices.length !== queue.length) {
+						shuffledIndices = generateShuffleIndices(queue.length)
+					}
 					const currShufflePos = shuffledIndices.indexOf(currentIndex)
 					const nextShufflePos = (currShufflePos + 1) % shuffledIndices.length
 					const nextIdx = shuffledIndices[nextShufflePos] ?? 0
-					set({ currentIndex: nextIdx })
+					set({ currentIndex: nextIdx, shuffledIndices })
 					return queue[nextIdx] ?? null
 				}
 
@@ -166,20 +171,25 @@ export const useQueueStore = create<QueueState>()(
 			},
 
 			prev: () => {
-				const { queue, currentIndex, playMode, shuffledIndices } = get()
+				const { queue, currentIndex, playMode } = get()
+				let { shuffledIndices } = get()
 				if (queue.length === 0) return null
 
 				if (playMode === 'repeat_one') {
-					return queue[currentIndex] ?? null
+					const validIdx = currentIndex >= 0 && currentIndex < queue.length ? currentIndex : 0
+					return queue[validIdx] ?? null
 				}
 
 				if (playMode === 'shuffle') {
+					if (shuffledIndices.length !== queue.length) {
+						shuffledIndices = generateShuffleIndices(queue.length)
+					}
 					const currShufflePos = shuffledIndices.indexOf(currentIndex)
 					const prevShufflePos =
 						(currShufflePos - 1 + shuffledIndices.length) %
 						shuffledIndices.length
 					const prevIdx = shuffledIndices[prevShufflePos] ?? 0
-					set({ currentIndex: prevIdx })
+					set({ currentIndex: prevIdx, shuffledIndices })
 					return queue[prevIdx] ?? null
 				}
 
@@ -219,6 +229,7 @@ export const useQueueStore = create<QueueState>()(
 				queue: state.queue,
 				currentIndex: state.currentIndex,
 				playMode: state.playMode,
+				shuffledIndices: state.shuffledIndices,
 			}),
 		},
 	),

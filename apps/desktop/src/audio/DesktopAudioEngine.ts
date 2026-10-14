@@ -112,7 +112,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 					navigator.mediaSession.setPositionState({
 						duration: this.audio.duration || 0,
 						playbackRate: this.audio.playbackRate || 1,
-						position: this.audio.currentTime || 0,
+						position: Math.min(this.audio.currentTime || 0, this.audio.duration || 0),
 					})
 				} catch {
 					// Position state update fallback
@@ -136,6 +136,14 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		this.audio.addEventListener('loadedmetadata', () => {
 			this.emit({
 				type: 'loadedmetadata',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+			})
+		})
+
+		this.audio.addEventListener('error', () => {
+			this.emit({
+				type: 'error',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
 			})
@@ -216,7 +224,11 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		// 只有在音频源真正改变时才重新为 audio.src 赋值，防止重复从 0 秒重播
 		if (!isSameTrack || !isSameSrc) {
 			this.audio.src = proxyStreamUrl
+		} else if (this.audio.ended) {
+			// 如果是单曲循环播放完毕后再次触发同一音频源，显式归零进度
+			this.audio.currentTime = 0
 		}
+
 		this.applyLoudnessGain()
 		this.updateMediaSession(track)
 
@@ -259,6 +271,9 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		if (this.audioCtx?.state === 'suspended') {
 			await this.audioCtx.resume()
 		}
+		if (this.audio.ended) {
+			this.audio.currentTime = 0
+		}
 		await this.audio.play()
 	}
 
@@ -268,7 +283,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	public seek(timeInSeconds: number): void {
 		if (isFinite(timeInSeconds)) {
-			this.audio.currentTime = timeInSeconds
+			this.audio.currentTime = Math.max(0, timeInSeconds)
 		}
 	}
 

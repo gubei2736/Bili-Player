@@ -1,14 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import {
-	Lock,
-	Unlock,
-	X,
-	Play,
-	Pause,
-	SkipBack,
-	SkipForward,
-	Settings,
-} from 'lucide-react'
+import { Lock, X } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
@@ -55,30 +46,35 @@ export const DesktopLyricsApp: React.FC = () => {
 		}
 	}, [splContent])
 
-	// IPC Event Listener from Main Window
+	// IPC Event Listener from Main Window & Global Shortcuts
 	useEffect(() => {
-		const unlistenPromise = listen<LyricsSyncEvent>('lyrics-sync', (event) => {
+		const unlistenSyncPromise = listen<LyricsSyncEvent>('lyrics-sync', (event) => {
 			const payload = event.payload
 			if (payload.type === 'TRACK_CHANGE') {
 				setTitle(payload.title)
 				setArtist(payload.artist)
-				setSplContent(payload.splContent || null)
+				if (payload.splContent !== undefined) {
+					setSplContent(payload.splContent || null)
+				}
 			} else if (payload.type === 'STATE_SYNC') {
 				setIsPlaying(payload.isPlaying)
 				setCurrentTimeMs(payload.currentTimeMs)
 			} else if (payload.type === 'STYLE_UPDATE') {
 				setFontSize(payload.fontSize)
 				setPrimaryColor(payload.primaryColor)
-				if (payload.lockMouse !== isLocked) {
-					setIsLocked(payload.lockMouse)
-				}
+				setIsLocked(payload.lockMouse)
 			}
 		})
 
+		const unlistenLockPromise = listen<boolean>('lyrics-lock-change', (event) => {
+			setIsLocked( Boolean(event.payload) )
+		})
+
 		return () => {
-			unlistenPromise.then((unlisten) => unlisten())
+			unlistenSyncPromise.then((unlisten) => unlisten())
+			unlistenLockPromise.then((unlisten) => unlisten())
 		}
-	}, [isLocked])
+	}, [])
 
 	// Determine active line
 	const activeLine: LyricLine | null = useMemo(() => {
@@ -128,13 +124,13 @@ export const DesktopLyricsApp: React.FC = () => {
 					data-tauri-drag-region
 					className="absolute top-0 left-0 right-0 h-7 flex items-center justify-between px-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-t-2xl cursor-move text-white/80"
 				>
-					<span className="text-[11px] font-medium tracking-wide">
+					<span className="text-[11px] font-medium tracking-wide truncate max-w-[75%]">
 						{title} - {artist}
 					</span>
 					<div className="flex items-center gap-1.5">
 						<button
 							onClick={toggleLock}
-							title="锁定/穿透鼠标 (Alt+Shift+L 解锁)"
+							title="锁定/穿透鼠标 (Ctrl+Alt+L 解锁)"
 							className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors"
 						>
 							<Lock className="w-3.5 h-3.5" />

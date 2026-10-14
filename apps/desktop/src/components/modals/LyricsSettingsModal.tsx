@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import {
 	X,
 	FileText,
 	Search,
-	Clock,
-	Sliders,
 	Check,
 	RotateCcw,
 	Loader2,
-	Sparkles,
 	Save,
 } from 'lucide-react'
 import type { Track } from '@bbplayer/shared-core'
@@ -20,7 +17,6 @@ import {
 	getStoredCustomLyric,
 	setStoredCustomLyric,
 	type LyricSearchCandidate,
-	cleanTrackTitle,
 } from '../../services/lyricService'
 
 export interface LyricsSettingsModalProps {
@@ -41,7 +37,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [candidates, setCandidates] = useState<LyricSearchCandidate[]>([])
 	const [isSearching, setIsSearching] = useState(false)
 	const [customText, setCustomText] = useState('')
-	const [offsetMs, setOffsetMs] = useState(0)
+	const [offsetSec, setOffsetSec] = useState(0)
 	const [loadingCandidateId, setLoadingCandidateId] = useState<string | number | null>(null)
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -49,7 +45,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		if (isOpen && track) {
 			const fullTitle = track.title.trim()
 			setSearchKeyword(fullTitle)
-			setOffsetMs(getStoredLyricOffset(track.uniqueKey))
+			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
 			handleSearch(fullTitle)
 		}
@@ -95,15 +91,25 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		setTimeout(() => setSuccessMsg(null), 2000)
 	}
 
-	const handleAdjustOffset = (deltaMs: number) => {
-		const next = Math.round((offsetMs + deltaMs) * 10) / 10
-		setOffsetMs(next)
+	const handleAdjustOffset = (deltaSec: number) => {
+		const next = Math.round((offsetSec + deltaSec) * 10) / 10
+		setOffsetSec(next)
 		setStoredLyricOffset(track.uniqueKey, next)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:lyric-offset-change', {
+				detail: { trackKey: track.uniqueKey, offsetSec: next },
+			}),
+		)
 	}
 
 	const handleResetOffset = () => {
-		setOffsetMs(0)
+		setOffsetSec(0)
 		setStoredLyricOffset(track.uniqueKey, 0)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:lyric-offset-change', {
+				detail: { trackKey: track.uniqueKey, offsetSec: 0 },
+			}),
+		)
 	}
 
 	return createPortal(
@@ -170,7 +176,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 									: 'text-muted-foreground hover:text-foreground'
 							}`}
 						>
-							时间微调 ({offsetMs >= 0 ? `+${offsetMs}` : offsetMs}s)
+							时间微调 ({offsetSec >= 0 ? `+${offsetSec}` : offsetSec}s)
 						</button>
 					</div>
 
@@ -295,10 +301,10 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 
 							<div className="text-center py-6 bg-white/[0.02] rounded-xl border border-white/5 space-y-1">
 								<span className="text-2xl font-bold font-mono text-primary">
-									{offsetMs >= 0 ? `+${offsetMs.toFixed(2)}` : offsetMs.toFixed(2)} 秒
+									{offsetSec >= 0 ? `+${offsetSec.toFixed(2)}` : offsetSec.toFixed(2)} 秒
 								</span>
 								<p className="text-[11px] text-muted-foreground">
-									{offsetMs > 0 ? '歌词延后显示' : offsetMs < 0 ? '歌词提前显示' : '标准同步'}
+									{offsetSec > 0 ? '歌词提前显示' : offsetSec < 0 ? '歌词延后显示' : '标准同步'}
 								</p>
 							</div>
 

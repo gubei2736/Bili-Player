@@ -135,6 +135,7 @@ pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: Shortc
             if let Some(lyrics_win) = app.get_webview_window("lyrics") {
                 let _ = lyrics_win.set_ignore_cursor_events(new_state);
             }
+            let _ = app.emit("lyrics-lock-change", new_state);
         }
         "toggle_lyrics" => {
             let _ = crate::window_ext::toggle_lyrics_window(app.clone());

@@ -1,4 +1,5 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, SET_COOKIE};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -49,12 +50,13 @@ pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHtt
         .unwrap_or("GET")
         .to_uppercase();
 
+    let mut current_method = method;
     let mut current_url = request.url.clone();
     let mut all_set_cookies: Vec<String> = Vec::new();
     let mut redirect_count = 0;
 
     loop {
-        let req_builder = match method.as_str() {
+        let req_builder = match current_method.as_str() {
             "POST" => client.post(&current_url),
             "PUT" => client.put(&current_url),
             "DELETE" => client.delete(&current_url),
@@ -88,7 +90,7 @@ pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHtt
         }
 
         let mut req_builder = req_builder.headers(header_map);
-        if redirect_count == 0 {
+        if redirect_count == 0 && current_method != "GET" && current_method != "HEAD" {
             if let Some(ref body_str) = request.body {
                 req_builder = req_builder.body(body_str.clone());
             }
@@ -110,12 +112,26 @@ pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHtt
                 if let Ok(loc_str) = loc.to_str() {
                     current_url = if loc_str.starts_with("http://") || loc_str.starts_with("https://") {
                         loc_str.to_string()
-                    } else if loc_str.starts_with('/') {
-                        let base_url = reqwest::Url::parse(&current_url).map_err(|e| e.to_string())?;
-                        format!("{}://{}{}", base_url.scheme(), base_url.host_str().unwrap_or(""), loc_str)
+                    } else if let Ok(base_url) = reqwest::Url::parse(&current_url) {
+                        base_url
+                            .join(loc_str)
+                            .map(|u| u.to_string())
+                            .unwrap_or_else(|_| loc_str.to_string())
                     } else {
                         loc_str.to_string()
                     };
+
+                    // HTTP 标准：301/302/303 重定向时将 POST 转为 GET
+                    if matches!(
+                        status,
+                        StatusCode::MOVED_PERMANENTLY
+                            | StatusCode::FOUND
+                            | StatusCode::SEE_OTHER
+                    ) && current_method == "POST"
+                    {
+                        current_method = "GET".to_string();
+                    }
+
                     redirect_count += 1;
                     continue;
                 }

@@ -1,90 +1,140 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
 	:root {
-		--background: 220 20% 98%;
-		--foreground: 220 20% 10%;
-		--card: 0 0% 100%;
-		--card-foreground: 220 20% 10%;
-		--popover: 0 0% 100%;
-		--popover-foreground: 220 20% 10%;
+		--background: 222 32% 6%;
+		--foreground: 210 25% 98%;
+		--card: 222 28% 9%;
+		--card-foreground: 210 25% 98%;
+		--popover: 222 30% 8%;
+		--popover-foreground: 210 25% 98%;
 		--primary-rgb: 0 174 236;
 		--primary: #00AEEC;
 		--primary-foreground: 0 0% 100%;
-		--secondary: 220 15% 94%;
-		--secondary-foreground: 220 20% 15%;
-		--muted: 220 15% 92%;
-		--muted-foreground: 220 10% 40%;
-		--accent: 220 15% 90%;
-		--accent-foreground: 220 20% 10%;
-		--destructive: 0 84% 60%;
-		--destructive-foreground: 0 0% 98%;
-		--border: 220 15% 90%;
-		--input: 220 15% 90%;
-		--ring: 215 90% 50%;
-		--radius: 0.75rem;
+		--secondary: 218 22% 14%;
+		--secondary-foreground: 210 20% 98%;
+		--muted: 218 22% 13%;
+		--muted-foreground: 215 16% 62%;
+		--accent: 218 25% 16%;
+		--accent-foreground: 210 20% 98%;
+		--destructive: 0 72% 55%;
+		--destructive-foreground: 210 20% 98%;
+		--border: 217 20% 16%;
+		--input: 217 20% 16%;
+		--ring: 197 100% 46%;
+		--radius: 0.85rem;
 
-		/* B站装扮动态主色 (HEX/HSL) */
+		/* B站装扮动态主色 */
 		--bili-theme-primary: #00AEEC;
 		--bili-theme-secondary: #FB7299;
 	}
 
 	.dark {
-		--background: 224 25% 8%;
-		--foreground: 210 20% 98%;
-		--card: 224 25% 10%;
-		--card-foreground: 210 20% 98%;
-		--popover: 224 25% 10%;
-		--popover-foreground: 210 20% 98%;
+		--background: 222 32% 6%;
+		--foreground: 210 25% 98%;
+		--card: 222 28% 9%;
+		--card-foreground: 210 25% 98%;
+		--popover: 222 30% 8%;
+		--popover-foreground: 210 25% 98%;
 		--primary-rgb: 0 174 236;
 		--primary: #00AEEC;
-		--primary-foreground: 222 47% 11%;
-		--secondary: 217 20% 15%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 218 22% 14%;
 		--secondary-foreground: 210 20% 98%;
-		--muted: 217 20% 15%;
-		--muted-foreground: 215 15% 65%;
-		--accent: 217 20% 18%;
+		--muted: 218 22% 13%;
+		--muted-foreground: 215 16% 62%;
+		--accent: 218 25% 16%;
 		--accent-foreground: 210 20% 98%;
-		--destructive: 0 62% 30%;
+		--destructive: 0 62% 35%;
 		--destructive-foreground: 210 20% 98%;
-		--border: 217 20% 18%;
-		--input: 217 20% 18%;
-		--ring: 212 95% 68%;
+		--border: 217 20% 16%;
+		--input: 217 20% 16%;
+		--ring: 197 100% 46%;
 	}
 }
 
 body {
 	color: hsl(var(--foreground));
 	background-color: transparent;
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
-		'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+		'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 	user-select: none;
 	-webkit-user-select: none;
 	overflow: hidden;
 }
 
-/* Win11 Mica / Acrylic 毛玻璃背景支持 */
+/* 高阶流光毛玻璃表面 (带顶部 1px 镜面高光反射) */
 .mica-surface {
-	background-color: rgba(18, 20, 24, 0.75);
-	backdrop-filter: blur(24px) saturate(160%);
-	-webkit-backdrop-filter: blur(24px) saturate(160%);
+	background-color: rgba(11, 14, 22, 0.78);
+	backdrop-filter: blur(28px) saturate(180%);
+	-webkit-backdrop-filter: blur(28px) saturate(180%);
+	box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .acrylic-card {
-	background-color: rgba(30, 34, 42, 0.55);
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: linear-gradient(
+		145deg,
+		rgba(255, 255, 255, 0.055) 0%,
+		rgba(255, 255, 255, 0.018) 100%
+	);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.07);
+	box-shadow:
+		0 8px 24px -4px rgba(0, 0, 0, 0.35),
+		inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+	transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .acrylic-card:hover {
-	background-color: rgba(40, 45, 55, 0.75);
+	background: linear-gradient(
+		145deg,
+		rgba(255, 255, 255, 0.09) 0%,
+		rgba(255, 255, 255, 0.03) 100%
+	);
 	border-color: rgba(255, 255, 255, 0.16);
+	box-shadow:
+		0 14px 32px -6px rgba(0, 0, 0, 0.5),
+		inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
 }
 
-/* 隐藏系统滚动条，由 OverlayScrollbars 接管 */
-::-webkit-scrollbar {
+/* 全屏歌词径向暗角遮罩 */
+.bg-radial-vignette {
+	background: radial-gradient(
+		circle at center,
+		transparent 20%,
+		rgba(6, 8, 14, 0.65) 80%,
+		rgba(6, 8, 14, 0.92) 100%
+	);
+}
+
+/* 隐藏滚动条工具类 */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
 	display: none;
+}
+.no-scrollbar,
+.scrollbar-none {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+/* 全局隐藏默认丑陋滚动条，仅在主视口保留极细微光滚动条 */
+::-webkit-scrollbar {
+	width: 5px;
+	height: 5px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.25);
 }

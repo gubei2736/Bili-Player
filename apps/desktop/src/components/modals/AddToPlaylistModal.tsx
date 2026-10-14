@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
-import { X, FolderPlus, Plus, Music, Check, Sparkles } from 'lucide-react'
+﻿import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
+import { X, FolderPlus, Plus, Music, Check } from 'lucide-react'
 import { useLocalPlaylistStore, type Track } from '@bbplayer/shared-core'
 
 export interface AddToPlaylistModalProps {
@@ -36,7 +37,12 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 
 	const handleCreateAndAdd = () => {
 		if (!newTitle.trim()) return
-		const newPl = createPlaylist(newTitle.trim(), '', track.coverUrl || undefined, [track])
+		const newPl = createPlaylist(
+			newTitle.trim(),
+			'',
+			track.coverUrl || undefined,
+			[track],
+		)
 		setMessage(`已创建【${newPl.title}】并成功添加歌曲`)
 		setTimeout(() => {
 			setMessage(null)
@@ -46,8 +52,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 		}, 1200)
 	}
 
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+	return createPortal(
+		<div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
 			<div className="w-full max-w-sm rounded-2xl bg-background/95 border border-white/10 shadow-2xl overflow-hidden flex flex-col p-5 space-y-4">
 				{/* Header */}
 				<div className="flex items-center justify-between pb-3 border-b border-white/5">
@@ -57,7 +63,10 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 						</div>
 						<div>
 							<h3 className="text-sm font-bold text-foreground">添加到歌单</h3>
-							<p className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={track.title}>
+							<p
+								className="text-[10px] text-muted-foreground truncate max-w-[200px]"
+								title={track.title}
+							>
 								{track.title}
 							</p>
 						</div>
@@ -94,7 +103,12 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 								<div className="flex items-center gap-2.5 overflow-hidden">
 									<div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary overflow-hidden flex-shrink-0">
 										{pl.coverUrl ? (
-											<img src={pl.coverUrl} alt="" className="w-full h-full object-cover" />
+											<img
+												src={pl.coverUrl}
+												alt=""
+												referrerPolicy="no-referrer"
+												className="w-full h-full object-cover"
+											/>
 										) : (
 											<Music className="w-4 h-4" />
 										)}
@@ -146,6 +160,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
 					)}
 				</div>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	)
 }

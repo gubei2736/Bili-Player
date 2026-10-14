@@ -13,12 +13,12 @@ import {
 	Sliders,
 	FileText,
 } from 'lucide-react'
-import { useQueueStore, useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
+import { useQueueStore, useSkinStore, type BilibiliTrack } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
 import { getQualityBadgeInfo } from '../../audio/audioSettings'
 import { WavySlider } from '../player/WavySlider'
-import { parseSpl, type SplLyricData } from '@bbplayer/splash'
+import { parseSpl } from '@bbplayer/splash'
 import {
 	lyricService,
 	getStoredLyricOffset,
@@ -33,8 +33,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	onToggleFullscreenLyrics,
 }) => {
 	const {
-		queue,
-		currentIndex,
 		playMode,
 		setPlayMode,
 		next,
@@ -60,29 +58,45 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const badgeInfo = currentTrack ? getQualityBadgeInfo(currentQualityId) : null
 
 	const [splContent, setSplContent] = useState<string>('')
+	const [lyricOffsetSec, setLyricOffsetSec] = useState<number>(0)
 	const [lyricModalOpen, setLyricModalOpen] = useState(false)
 
-	// Auto fetch lyrics on currentTrack change
+	// Auto fetch lyrics & offset on currentTrack change
 	useEffect(() => {
+		let cancelled = false
 		if (currentTrack) {
+			setLyricOffsetSec(getStoredLyricOffset(currentTrack.uniqueKey))
 			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
-				setSplContent(res?.splContent || '')
+				if (!cancelled) {
+					setSplContent(res?.splContent || '')
+				}
 			})
 		} else {
 			setSplContent('')
+			setLyricOffsetSec(0)
+		}
+		return () => {
+			cancelled = true
 		}
 	}, [currentTrack?.uniqueKey])
 
-	// Listen for custom lyric changes
+	// Listen for custom lyric & offset changes
 	useEffect(() => {
 		const handleCustomLyric = (e: any) => {
 			if (e.detail?.trackKey === currentTrack?.uniqueKey) {
 				setSplContent(e.detail.splContent)
 			}
 		}
+		const handleOffsetChange = (e: any) => {
+			if (e.detail?.trackKey === currentTrack?.uniqueKey) {
+				setLyricOffsetSec(e.detail.offsetSec ?? getStoredLyricOffset(currentTrack.uniqueKey))
+			}
+		}
 		window.addEventListener('bbplayer:custom-lyric-change', handleCustomLyric)
+		window.addEventListener('bbplayer:lyric-offset-change', handleOffsetChange)
 		return () => {
 			window.removeEventListener('bbplayer:custom-lyric-change', handleCustomLyric)
+			window.removeEventListener('bbplayer:lyric-offset-change', handleOffsetChange)
 		}
 	}, [currentTrack?.uniqueKey])
 
@@ -97,15 +111,14 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 	const currentLine = useMemo(() => {
 		if (!splData || splData.lines.length === 0) return null
-		const offset = currentTrack ? getStoredLyricOffset(currentTrack.uniqueKey) : 0
-		const ms = (currentTime + offset) * 1000
+		const ms = (currentTime + lyricOffsetSec) * 1000
 		for (let i = splData.lines.length - 1; i >= 0; i--) {
 			if (ms >= splData.lines[i]!.startTime) {
 				return splData.lines[i]!
 			}
 		}
 		return splData.lines[0] || null
-	}, [splData, currentTime, currentTrack])
+	}, [splData, currentTime, lyricOffsetSec])
 
 	useEffect(() => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
@@ -116,9 +129,16 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				setDuration(event.duration || 0)
 			}
 			if (event.type === 'ended') {
+				const prevUniqueKey = desktopAudioEngine.getCurrentTrack()?.uniqueKey
 				const nextTrack = next()
 				if (!nextTrack) {
 					setIsPlaying(false)
+				} else if (nextTrack.uniqueKey === prevUniqueKey) {
+					// 单曲循环或列表仅一首歌循环时，由于 currentTrack 引用未变，直接原地从 0 秒重播
+					desktopAudioEngine.seek(0)
+					desktopAudioEngine.play().catch((err) =>
+						console.error('Failed to replay track on repeat_one:', err),
+					)
 				}
 			}
 		})
@@ -403,7 +423,16 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				isOpen={lyricModalOpen}
 				onClose={() => setLyricModalOpen(false)}
 				track={currentTrack}
-				onLyricsUpdated={(spl) => setSplContent(spl)}
+				onLyricsUpdated={(spl) => {
+					setSplContent(spl)
+					if (currentTrack) {
+						window.dispatchEvent(
+							new CustomEvent('bbplayer:custom-lyric-change', {
+								detail: { trackKey: currentTrack.uniqueKey, splContent: spl },
+							}),
+						)
+					}
+				}}
 			/>
 		</footer>
 	)

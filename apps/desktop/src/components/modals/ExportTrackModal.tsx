@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, FileAudio, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
+import { desktopDir, downloadDir, join } from '@tauri-apps/api/path'
 import type { Track, BilibiliTrack } from '@bbplayer/shared-core'
 
 export interface ExportTrackModalProps {
@@ -21,20 +23,30 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 	const [error, setError] = useState<string | null>(null)
 
 	useEffect(() => {
+		setExportSuccess(false)
+		setError(null)
 		if (isOpen && track && track.source === 'bilibili') {
 			const bili = track as BilibiliTrack
 			const bvid = bili.bilibiliMetadata.bvid
 			const cid = bili.bilibiliMetadata.cid || 0
 
 			invoke<string | null>('get_cached_track_path', { bvid, cid })
-				.then((path) => {
+				.then(async (path) => {
 					setCachedPath(path)
 					if (path) {
-						const defaultName = `${track.title} - ${track.artist?.name || '未知歌手'}.m4a`.replace(
-							/[\\/:*?"<>|]/g,
-							'_',
-						)
-						setOutputPath(`C:\\Users\\szd\\Desktop\\${defaultName}`)
+						const defaultName = `${track.title} - ${
+							track.artist?.name || '未知歌手'
+						}.m4a`.replace(/[\\/:*?"<>|]/g, '_')
+
+						try {
+							const baseDir = (await desktopDir().catch(() => downloadDir())) || ''
+							const fullPath = baseDir
+								? await join(baseDir, defaultName)
+								: defaultName
+							setOutputPath(fullPath)
+						} catch {
+							setOutputPath(defaultName)
+						}
 					}
 				})
 				.catch((err) => console.error(err))
@@ -67,8 +79,8 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 		}
 	}
 
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+	return createPortal(
+		<div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
 			<div className="w-full max-w-md rounded-2xl bg-background/95 border border-white/10 shadow-2xl overflow-hidden p-6 space-y-4">
 				{/* Header */}
 				<div className="flex items-center justify-between pb-3 border-b border-white/5">
@@ -92,9 +104,9 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 					<div className="space-y-4 py-3">
 						<div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
 							<CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-							<div>
+							<div className="overflow-hidden">
 								<p className="font-semibold">音频导出成功！</p>
-								<p className="text-[11px] text-emerald-300/80 truncate">
+								<p className="text-[11px] text-emerald-300/80 truncate" title={outputPath}>
 									已保存至: {outputPath}
 								</p>
 							</div>
@@ -168,6 +180,7 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 					</div>
 				)}
 			</div>
-		</div>
+		</div>,
+		document.body,
 	)
 }

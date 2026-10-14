@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
-	Search,
 	Music,
 	Play,
-	Plus,
-	Heart,
 	TrendingUp,
-	Disc,
 	Sparkles,
-	Clock,
-	Sliders,
-	FolderPlus,
 	CheckCircle2,
 	Download,
-	Import,
 } from 'lucide-react'
 import { MainLayout } from './components/layout/MainLayout'
 import type { NavTab } from './components/layout/Sidebar'
@@ -22,7 +14,7 @@ import { PlaylistImportModal } from './components/modals/PlaylistImportModal'
 import { CreatePlaylistModal } from './components/modals/CreatePlaylistModal'
 import { ExportTrackModal } from './components/modals/ExportTrackModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
-import { lyricService } from './services/lyricService'
+import { lyricService, getStoredLyricOffset } from './services/lyricService'
 import { SkinStoreView } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
@@ -53,6 +45,22 @@ const dummyArtist = (id: number, name: string): Artist => ({
 	createdAt: new Date(),
 	updatedAt: new Date(),
 })
+
+function hexToRgbTriple(hex: string): string {
+	let c = hex.replace('#', '')
+	if (c.length === 3) {
+		c = c
+			.split('')
+			.map((x) => x + x)
+			.join('')
+	}
+	const num = parseInt(c, 16)
+	if (Number.isNaN(num)) return '0 174 236'
+	const r = (num >> 16) & 255
+	const g = (num >> 8) & 255
+	const b = num & 255
+	return `${r} ${g} ${b}`
+}
 
 export const App: React.FC = () => {
 	const [loginModalOpen, setLoginModalOpen] = useState(false)
@@ -138,7 +146,7 @@ export const App: React.FC = () => {
 	const { setQueue, next, prev, getCurrentTrack } = useQueueStore()
 	const currentTrack = getCurrentTrack()
 	const { isLoggedIn, userInfo } = useAuthStore()
-	const { syncRemotePlaylists, favoritePlaylists } = usePlaylistStore()
+	const { syncRemotePlaylists } = usePlaylistStore()
 
 	// Auto sync remote playlists and collections when logged in
 	useEffect(() => {
@@ -151,12 +159,18 @@ export const App: React.FC = () => {
 
 	// Auto fetch lyrics dynamically for current track
 	useEffect(() => {
+		let cancelled = false
 		if (currentTrack) {
 			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
-				setActiveSplContent(res?.splContent || '')
+				if (!cancelled) {
+					setActiveSplContent(res?.splContent || '')
+				}
 			})
 		} else {
 			setActiveSplContent('')
+		}
+		return () => {
+			cancelled = true
 		}
 	}, [currentTrack?.uniqueKey])
 
@@ -179,11 +193,13 @@ export const App: React.FC = () => {
 			.catch((e) => console.warn('Database initialization note:', e))
 	}, [])
 
-	// 2. Initialize active theme skin colors
+	// 2. Initialize active theme skin colors (including --primary-rgb for Tailwind alpha support)
 	useEffect(() => {
 		const skin = useSkinStore.getState().activeSkinSuit
 		const color = skin?.suit_items?.skin?.[0]?.properties?.color
 		if (color) {
+			const rgb = hexToRgbTriple(color)
+			document.documentElement.style.setProperty('--primary-rgb', rgb)
 			document.documentElement.style.setProperty('--primary', color)
 			document.documentElement.style.setProperty('--bili-theme-primary', color)
 			document.documentElement.style.setProperty('--ring', color)
@@ -281,7 +297,7 @@ export const App: React.FC = () => {
 					desktopAudioEngine.pause()
 				} else {
 					if (!currentTrack && featuredTracks.length > 0) {
-						handlePlayTrack(featuredTracks[0], 0)
+						handlePlayTrack(featuredTracks[0]!, 0)
 					} else {
 						desktopAudioEngine.play()
 					}
@@ -309,7 +325,6 @@ export const App: React.FC = () => {
 
 	// 3. Global Shortcuts IPC Event Listener & Eval Hook (Permanent mount)
 	useEffect(() => {
-		// 绑定全局 eval 触发钩子，确保即使应用失焦或 WebView2 IPC 事件被节流也能直接调用执行
 		;(window as any).__triggerGlobalShortcut = (action: string) => {
 			handleGlobalShortcutActionRef.current(action)
 		}
@@ -334,7 +349,7 @@ export const App: React.FC = () => {
 		const matchesShortcut = (e: KeyboardEvent, shortcutStr?: string): boolean => {
 			if (!shortcutStr) return false
 			const parts = shortcutStr.split('+').map((p) => p.trim())
-			const mainKey = parts[parts.length - 1].toLowerCase()
+			const mainKey = parts[parts.length - 1]!.toLowerCase()
 			const hasCtrl = parts.some((p) => p.toLowerCase() === 'ctrl' || p.toLowerCase() === 'control')
 			const hasAlt = parts.some((p) => p.toLowerCase() === 'alt')
 			const hasShift = parts.some((p) => p.toLowerCase() === 'shift')
@@ -387,7 +402,7 @@ export const App: React.FC = () => {
 				return
 			}
 
-			// 1. Space 单键独立控制播放/暂停（无任何修饰键时，在非输入框下直接切换，独立于全局快捷键）
+			// 1. Space 单键独立控制播放/暂停
 			if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
 				e.preventDefault()
 				handleGlobalShortcutActionRef.current('play_pause')
@@ -424,20 +439,27 @@ export const App: React.FC = () => {
 		return () => window.removeEventListener('keydown', handleLocalKeyDown)
 	}, [])
 
-	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window
+	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window (with Offset applied)
+	const currentTrackRef = useRef<Track | null>(currentTrack)
+	useEffect(() => {
+		currentTrackRef.current = currentTrack
+	}, [currentTrack])
+
 	useEffect(() => {
 		let lastSentMs = 0
 		let lastPlayState = false
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
 			const now = Date.now()
 			const isPlaying = desktopAudioEngine.isPlaying()
-			if (isPlaying !== lastPlayState || now - lastSentMs > 250) {
+			if (isPlaying !== lastPlayState || now - lastSentMs > 200) {
 				lastSentMs = now
 				lastPlayState = isPlaying
+				const activeTrack = currentTrackRef.current
+				const offsetSec = activeTrack ? getStoredLyricOffset(activeTrack.uniqueKey) : 0
 				emit('lyrics-sync', {
 					type: 'STATE_SYNC',
 					isPlaying,
-					currentTimeMs: event.currentTime * 1000,
+					currentTimeMs: Math.max(0, (event.currentTime + offsetSec) * 1000),
 					timestamp: now,
 				}).catch(() => {})
 			}
@@ -445,6 +467,7 @@ export const App: React.FC = () => {
 		return unsubscribe
 	}, [])
 
+	// Sync Track Info AND SPL Lyrics content to Desktop Floating Lyrics Window
 	useEffect(() => {
 		if (currentTrack) {
 			emit('lyrics-sync', {
@@ -452,9 +475,10 @@ export const App: React.FC = () => {
 				title: currentTrack.title,
 				artist: currentTrack.artist?.name || '未知歌手',
 				durationMs: (currentTrack.duration || 0) * 1000,
+				splContent: activeSplContent || undefined,
 			}).catch(() => {})
 		}
-	}, [currentTrack])
+	}, [currentTrack, activeSplContent])
 
 	const handleSearch = (query: string) => {
 		if (!query.trim()) return
