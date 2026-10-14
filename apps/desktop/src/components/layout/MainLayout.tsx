@@ -21,7 +21,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 
 	return (
-		<div className="flex flex-col h-screen w-screen overflow-hidden bg-background/80 mica-surface text-foreground rounded-xl border border-white/10 shadow-2xl">
+		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0b0f17] text-foreground border border-white/10 shadow-2xl">
 			{/* Top frameless title bar */}
 			<TitleBar
 				onSearch={onSearch}

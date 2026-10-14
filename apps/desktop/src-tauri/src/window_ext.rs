@@ -4,19 +4,21 @@ use tauri::{AppHandle, Manager, WebviewWindow};
 pub fn setup_window_effects(window: &WebviewWindow) {
     // 1. Set window shadow (Tauri v2 native method)
     #[cfg(any(target_os = "windows", target_os = "macos"))]
-    {
-        let _ = window.set_shadow(true);
-    }
+    eprintln!("[BBPlayer] setup_window_effects starting for: {}", window.label());
+    let shadow_res = window.set_shadow(true);
+    eprintln!("[BBPlayer] set_shadow result: {:?}", shadow_res);
 
     // 2. Set Mica / Acrylic on Windows
     #[cfg(target_os = "windows")]
     {
         // Try Windows 11 Mica first (dark mode = true)
-        if window_vibrancy::apply_mica(window, Some(true)).is_err() {
-            // Fallback to Acrylic if Mica is unsupported (Win10)
-            let _ = window_vibrancy::apply_acrylic(window, Some((20, 20, 25, 180)));
-        }
+        let _ = window_vibrancy::apply_mica(window, Some(true));
     }
+
+    let show_res = window.show();
+    eprintln!("[BBPlayer] window.show() result: {:?}", show_res);
+    let focus_res = window.set_focus();
+    eprintln!("[BBPlayer] window.set_focus() result: {:?}", focus_res);
 
     // 3. Set Vibrancy on macOS
     #[cfg(target_os = "macos")]

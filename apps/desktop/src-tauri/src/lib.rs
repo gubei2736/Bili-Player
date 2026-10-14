@@ -36,14 +36,19 @@ pub fn run() {
             exporter::export_cached_track_to_m4a,
         ])
         .setup(|app| {
+            eprintln!("[BBPlayer] setup closure invoked");
             // 1. Apply native window effects to main window
             if let Some(main_win) = app.get_webview_window("main") {
+                eprintln!("[BBPlayer] main window found, setting up window effects");
                 window_ext::setup_window_effects(&main_win);
+            } else {
+                eprintln!("[BBPlayer] WARNING: main window NOT found in app.get_webview_window(\"main\")!");
             }
 
             // 2. Register global shortcut (Alt+Shift+L)
             if let Ok(shortcut) = "Alt+Shift+L".parse::<Shortcut>() {
-                let _ = app.global_shortcut().register(shortcut);
+                let reg_res = app.global_shortcut().register(shortcut);
+                eprintln!("[BBPlayer] global shortcut register result: {:?}", reg_res);
             }
 
             // 3. Setup System Tray Menu
