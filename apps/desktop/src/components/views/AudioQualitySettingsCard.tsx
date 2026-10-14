@@ -5,10 +5,14 @@ import {
 	setAudioQualityPreference,
 	type AudioQualityPreference,
 } from '../../audio/audioSettings'
+import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 
 export const AudioQualitySettingsCard: React.FC = () => {
 	const [preference, setPreference] = useState<AudioQualityPreference>(
 		getAudioQualityPreference(),
+	)
+	const [volumeBalance, setVolumeBalance] = useState<boolean>(() =>
+		desktopAudioEngine.isLoudnessNormalizationEnabled(),
 	)
 
 	const handleChange = (pref: AudioQualityPreference) => {
@@ -97,6 +101,40 @@ export const AudioQualitySettingsCard: React.FC = () => {
 						</button>
 					)
 				})}
+			</div>
+
+			{/* Audio Volume Balance Normalization Switch */}
+			<div className="pt-2 border-t border-white/5">
+				<div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+					<div className="space-y-0.5 mr-3">
+						<p className="font-semibold text-foreground text-xs flex items-center gap-1.5">
+							<span>智能音频音量平衡</span>
+							<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">
+								推荐开启
+							</span>
+						</p>
+						<p className="text-[11px] text-muted-foreground leading-relaxed">
+							基于 EBU R128 标准与 Web Audio 动态增益，自动均衡不同歌曲的响度差异，保持曲目间音量统一、防止忽大忽小与突发爆音。
+						</p>
+					</div>
+
+					<button
+						onClick={() => {
+							const next = !volumeBalance
+							setVolumeBalance(next)
+							desktopAudioEngine.setLoudnessNormalization(next)
+						}}
+						className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+							volumeBalance ? 'bg-primary' : 'bg-white/20'
+						}`}
+					>
+						<span
+							className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+								volumeBalance ? 'translate-x-4' : 'translate-x-0'
+							}`}
+						/>
+					</button>
+				</div>
 			</div>
 		</div>
 	)

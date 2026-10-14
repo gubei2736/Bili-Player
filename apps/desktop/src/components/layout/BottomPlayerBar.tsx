@@ -49,7 +49,9 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [duration, setDuration] = useState(0)
 	const [volume, setVolume] = useState(0.8)
 	const [isMuted, setIsMuted] = useState(false)
-	const [loudnessEnabled, setLoudnessEnabled] = useState(true)
+	const [loudnessEnabled, setLoudnessEnabled] = useState(() =>
+		desktopAudioEngine.isLoudnessNormalizationEnabled(),
+	)
 
 	const currentTrack = getCurrentTrack()
 	const biliTrack =

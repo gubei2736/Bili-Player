@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
 	X,
 	FileText,
@@ -105,8 +106,8 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		setStoredLyricOffset(track.uniqueKey, 0)
 	}
 
-	return (
-		<div className="fixed inset-0 z-50 overflow-hidden select-none">
+	return createPortal(
+		<div className="fixed inset-0 z-[999] overflow-hidden select-none">
 			{/* Backdrop overlay */}
 			<div
 				className="absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity"
@@ -338,6 +339,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 					)}
 				</div>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	)
 }

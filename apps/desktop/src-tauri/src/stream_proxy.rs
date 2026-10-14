@@ -191,6 +191,7 @@ async fn proxy_handler(
 
         tokio::spawn(async move {
             let mut file_opt = File::create(&part_path).await.ok();
+            let mut aborted = false;
             while let Some(chunk_res) = upstream_stream.next().await {
                 match chunk_res {
                     Ok(bytes) => {
@@ -198,6 +199,8 @@ async fn proxy_handler(
                             let _ = f.write_all(&bytes).await;
                         }
                         if tx.send(Ok(bytes)).await.is_err() {
+                            // Downstream receiver disconnected early
+                            aborted = true;
                             break;
                         }
                     }
@@ -208,13 +211,20 @@ async fn proxy_handler(
                                 e.to_string(),
                             )))
                             .await;
+                        aborted = true;
                         break;
                     }
                 }
             }
+
             if let Some(mut f) = file_opt {
                 let _ = f.flush().await;
-                let _ = fs::rename(&part_path, &cache_path).await;
+                drop(f);
+                if !aborted {
+                    let _ = fs::rename(&part_path, &cache_path).await;
+                } else {
+                    let _ = fs::remove_file(&part_path).await;
+                }
             }
         });
 

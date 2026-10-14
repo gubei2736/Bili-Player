@@ -39,6 +39,12 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	constructor() {
 		this.audio = new Audio()
 		this.audio.crossOrigin = 'anonymous'
+		try {
+			const saved = localStorage.getItem('bbplayer_audio_volume_balance')
+			if (saved !== null) {
+				this.loudnessNormalizationEnabled = saved === 'true'
+			}
+		} catch {}
 		this.setupEventListeners()
 	}
 
@@ -57,13 +63,13 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		// 2. GainNode (响度均衡前置增益)
 		this.gainNode = this.audioCtx.createGain()
 
-		// 3. DynamicsCompressorNode (防爆音动态压缩)
+		// 3. DynamicsCompressorNode (平滑音乐响度统一动态压缩器)
 		this.compressorNode = this.audioCtx.createDynamicsCompressor()
-		this.compressorNode.threshold.setValueAtTime(-12, this.audioCtx.currentTime)
-		this.compressorNode.knee.setValueAtTime(30, this.audioCtx.currentTime)
-		this.compressorNode.ratio.setValueAtTime(12, this.audioCtx.currentTime)
-		this.compressorNode.attack.setValueAtTime(0.003, this.audioCtx.currentTime)
-		this.compressorNode.release.setValueAtTime(0.25, this.audioCtx.currentTime)
+		this.compressorNode.threshold.setValueAtTime(-16, this.audioCtx.currentTime)
+		this.compressorNode.knee.setValueAtTime(16, this.audioCtx.currentTime)
+		this.compressorNode.ratio.setValueAtTime(4.0, this.audioCtx.currentTime)
+		this.compressorNode.attack.setValueAtTime(0.005, this.audioCtx.currentTime)
+		this.compressorNode.release.setValueAtTime(0.15, this.audioCtx.currentTime)
 
 		// 4. AnalyserNode (FFT 频谱分析)
 		this.analyserNode = this.audioCtx.createAnalyser()
@@ -201,10 +207,16 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			await this.audioCtx.resume()
 		}
 
+		const isSameTrack = this.currentTrack?.uniqueKey === track.uniqueKey
+		const isSameSrc = this.audio.src === proxyStreamUrl
+
 		this.currentTrack = track
 		this.currentLoudnessGainDb = loudnessGainDb
 
-		this.audio.src = proxyStreamUrl
+		// 只有在音频源真正改变时才重新为 audio.src 赋值，防止重复从 0 秒重播
+		if (!isSameTrack || !isSameSrc) {
+			this.audio.src = proxyStreamUrl
+		}
 		this.applyLoudnessGain()
 		this.updateMediaSession(track)
 
@@ -215,15 +227,31 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		if (!this.gainNode || !this.audioCtx) return
 
 		let linearGain = 1.0
-		if (this.loudnessNormalizationEnabled && this.currentLoudnessGainDb !== 0) {
-			// 响度均衡公式: gain = 10^(ΔL / 20)
-			linearGain = Math.pow(10, this.currentLoudnessGainDb / 20)
+		if (this.loudnessNormalizationEnabled) {
+			if (this.currentLoudnessGainDb !== 0) {
+				// 限制增益在安全范围 [-9dB, +9dB] 之间，防止过大失真或过低音量
+				const clampedDb = Math.max(-9, Math.min(9, this.currentLoudnessGainDb))
+				linearGain = Math.pow(10, clampedDb / 20)
+			}
+			// 启用平滑音乐动态压限
+			if (this.compressorNode) {
+				this.compressorNode.threshold.setTargetAtTime(-16, this.audioCtx.currentTime, 0.05)
+				this.compressorNode.knee.setTargetAtTime(16, this.audioCtx.currentTime, 0.05)
+				this.compressorNode.ratio.setTargetAtTime(4.0, this.audioCtx.currentTime, 0.05)
+			}
+		} else {
+			// 关闭音量平衡时，压缩器旁通直通
+			if (this.compressorNode) {
+				this.compressorNode.threshold.setTargetAtTime(0, this.audioCtx.currentTime, 0.05)
+				this.compressorNode.ratio.setTargetAtTime(1.0, this.audioCtx.currentTime, 0.05)
+			}
 		}
 
+		// 80ms 平滑过渡，杜绝音量骤变产生的爆音
 		this.gainNode.gain.setTargetAtTime(
 			linearGain,
 			this.audioCtx.currentTime,
-			0.015,
+			0.08,
 		)
 	}
 
@@ -250,7 +278,14 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	public setLoudnessNormalization(enabled: boolean): void {
 		this.loudnessNormalizationEnabled = enabled
+		try {
+			localStorage.setItem('bbplayer_audio_volume_balance', String(enabled))
+		} catch {}
 		this.applyLoudnessGain()
+	}
+
+	public isLoudnessNormalizationEnabled(): boolean {
+		return this.loudnessNormalizationEnabled
 	}
 
 	public getFrequencyData(buffer: Uint8Array): void {
