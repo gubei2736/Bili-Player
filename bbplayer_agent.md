@@ -162,7 +162,7 @@ export interface AudioEngineContract {
 * **Verification**: 展开全屏歌词页帧率稳定在 60fps+；开启桌面悬浮歌词并点击“锁定”，鼠标可穿透歌词正常点击后方桌面窗口，逐字高亮与音频严密同步。
 
 ### Phase 5: 歌单迁移、B站主题装扮与纯 Rust `.m4a` 导出
-* [ ] **Task 5.1**: 在桌面端 UI 接入 `@bbplayer/shared-core` 的 B 站扫码登录、云端收藏夹同步、以及网易云/QQ音乐歌单智能匹配导入向导弹窗，并构建播放历史热力图统计面板。
-* [ ] **Task 5.2**: 接入 B 站装扮主题引擎，支持搜索并应用 B 站装扮包（动态注入 CSS 主题色变量、主视图背景图叠加、波浪进度条动态游标挂件）。
-* [ ] **Task 5.3**: 在 `src-tauri/src/exporter.rs` 中引入 `mp4ameta` crate，编写 `export_cached_track_to_m4a` Command，将缓存的 `.m4s` 音频流封装为标准 `.m4a` 文件，并内嵌高清封面二进制、歌名、UP主名称与 LRC/SPL 歌词文本。
+* [x] **Task 5.1**: 在桌面端 UI 接入 `@bbplayer/shared-core` 的 B 站扫码登录、云端收藏夹同步、以及网易云/QQ音乐歌单智能匹配导入向导弹窗，并构建播放历史热力图统计面板。
+* [x] **Task 5.2**: 接入 B 站装扮主题引擎，支持搜索并应用 B 站装扮包（动态注入 CSS 主题色变量、主视图背景图叠加、波浪进度条动态游标挂件）。
+* [x] **Task 5.3**: 在 `src-tauri/src/exporter.rs` 中引入 `mp4ameta` crate，编写 `export_cached_track_to_m4a` Command，将缓存的 `.m4s` 音频流封装为标准 `.m4a` 文件，并内嵌高清封面二进制、歌名、UP主名称与 LRC/SPL 歌词文本。
 * **Verification**: 导出缓存歌曲至本地桌面，使用系统自带音乐播放器打开该 `.m4a` 文件，音频正常播放且封面、歌手、内嵌歌词完整显示。

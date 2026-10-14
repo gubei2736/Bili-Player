@@ -12,11 +12,17 @@ import {
 	Sliders,
 	FolderPlus,
 	CheckCircle2,
+	Download,
+	Import,
 } from 'lucide-react'
 import { MainLayout } from './components/layout/MainLayout'
 import type { NavTab } from './components/layout/Sidebar'
 import { LoginModal } from './components/modals/LoginModal'
+import { PlaylistImportModal } from './components/modals/PlaylistImportModal'
+import { ExportTrackModal } from './components/modals/ExportTrackModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
+import { SkinStoreView } from './components/views/SkinStoreView'
+import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { initDesktopDatabase } from './db/desktopDb'
 import {
 	useQueueStore,
@@ -38,6 +44,8 @@ const dummyArtist = (id: number, name: string): Artist => ({
 
 export const App: React.FC = () => {
 	const [loginModalOpen, setLoginModalOpen] = useState(false)
+	const [playlistImportOpen, setPlaylistImportOpen] = useState(false)
+	const [exportModalTrack, setExportModalTrack] = useState<Track | null>(null)
 	const [fullscreenLyricsOpen, setFullscreenLyricsOpen] = useState(false)
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 	const [searchQuery, setSearchQuery] = useState('')
@@ -210,9 +218,11 @@ export const App: React.FC = () => {
 											<div
 												key={track.id}
 												className="group relative rounded-xl p-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all duration-200 cursor-pointer flex flex-col justify-between"
-												onClick={() => handlePlayTrack(track, idx)}
 											>
-												<div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2.5 bg-black/40">
+												<div
+													className="relative w-full aspect-square rounded-lg overflow-hidden mb-2.5 bg-black/40"
+													onClick={() => handlePlayTrack(track, idx)}
+												>
 													<img
 														src={
 															track.coverUrl ||
@@ -227,13 +237,28 @@ export const App: React.FC = () => {
 														</div>
 													</div>
 												</div>
-												<div>
-													<p className="text-xs font-semibold truncate text-foreground group-hover:text-primary transition-colors">
-														{track.title}
-													</p>
-													<p className="text-[11px] text-muted-foreground truncate">
-														{track.artist?.name || '未知歌手'}
-													</p>
+												<div className="flex items-center justify-between">
+													<div
+														className="overflow-hidden flex-1 mr-2"
+														onClick={() => handlePlayTrack(track, idx)}
+													>
+														<p className="text-xs font-semibold truncate text-foreground group-hover:text-primary transition-colors">
+															{track.title}
+														</p>
+														<p className="text-[11px] text-muted-foreground truncate">
+															{track.artist?.name || '未知歌手'}
+														</p>
+													</div>
+													<button
+														onClick={(e) => {
+															e.stopPropagation()
+															setExportModalTrack(track)
+														}}
+														title="导出为 .m4a"
+														className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+													>
+														<Download className="w-3.5 h-3.5" />
+													</button>
 												</div>
 											</div>
 										))}
@@ -248,13 +273,22 @@ export const App: React.FC = () => {
 									<h2 className="text-base font-bold text-foreground">
 										我的音乐库
 									</h2>
-									<button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-medium transition-colors">
-										<FolderPlus className="w-3.5 h-3.5" />
-										<span>新建歌单</span>
-									</button>
+									<div className="flex items-center gap-2">
+										<button
+											onClick={() => setPlaylistImportOpen(true)}
+											className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
+										>
+											<Import className="w-3.5 h-3.5" />
+											<span>导入网易云/QQ歌单</span>
+										</button>
+										<button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-medium transition-colors">
+											<FolderPlus className="w-3.5 h-3.5" />
+											<span>新建歌单</span>
+										</button>
+									</div>
 								</div>
 								<div className="p-8 text-center rounded-xl border border-dashed border-white/10 text-muted-foreground text-xs">
-									暂无自定义歌单，可在播放列表中右键将歌曲收藏至歌单
+									暂无自定义歌单，可点击上方“导入网易云/QQ歌单”快速迁移
 								</div>
 							</div>
 						)}
@@ -270,27 +304,9 @@ export const App: React.FC = () => {
 							</div>
 						)}
 
-						{tab === 'history' && (
-							<div className="space-y-4">
-								<h2 className="text-base font-bold text-foreground">
-									播放历史统计
-								</h2>
-								<div className="p-8 text-center rounded-xl border border-dashed border-white/10 text-muted-foreground text-xs">
-									本地 SQLite 正在记录播放历史与热力图
-								</div>
-							</div>
-						)}
+						{tab === 'history' && <HistoryHeatmapView />}
 
-						{tab === 'skins' && (
-							<div className="space-y-4">
-								<h2 className="text-base font-bold text-foreground">
-									B 站装扮主题引擎
-								</h2>
-								<p className="text-xs text-muted-foreground">
-									支持装扮包动态主题色、背景壁纸与波浪进度条动态游标挂件
-								</p>
-							</div>
-						)}
+						{tab === 'skins' && <SkinStoreView />}
 
 						{tab === 'settings' && (
 							<div className="space-y-4 max-w-xl">
@@ -331,6 +347,17 @@ export const App: React.FC = () => {
 			<LoginModal
 				isOpen={loginModalOpen}
 				onClose={() => setLoginModalOpen(false)}
+			/>
+
+			<PlaylistImportModal
+				isOpen={playlistImportOpen}
+				onClose={() => setPlaylistImportOpen(false)}
+			/>
+
+			<ExportTrackModal
+				isOpen={exportModalTrack !== null}
+				onClose={() => setExportModalTrack(null)}
+				track={exportModalTrack}
 			/>
 
 			<ImmersiveLyricsView

@@ -1,3 +1,4 @@
+pub mod exporter;
 pub mod stream_proxy;
 pub mod window_ext;
 
@@ -32,6 +33,7 @@ pub fn run() {
             window_ext::toggle_lyrics_window,
             stream_proxy::get_stream_proxy_port,
             stream_proxy::get_cached_track_path,
+            exporter::export_cached_track_to_m4a,
         ])
         .setup(|app| {
             // 1. Apply native window effects to main window
