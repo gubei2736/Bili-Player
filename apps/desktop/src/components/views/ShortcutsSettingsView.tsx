@@ -51,6 +51,17 @@ export const ShortcutsSettingsView: React.FC = () => {
 	const [saveStatus, setSaveStatus] = useState<string | null>(null)
 
 	useEffect(() => {
+		const saved = localStorage.getItem('bbplayer_shortcuts')
+		if (saved) {
+			try {
+				const parsed = JSON.parse(saved)
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					setShortcuts(parsed)
+					invoke('update_shortcuts', { configs: parsed }).catch(() => {})
+					return
+				}
+			} catch {}
+		}
 		invoke<ShortcutItem[]>('get_shortcuts')
 			.then((items) => {
 				if (items && items.length > 0) {
@@ -96,13 +107,14 @@ export const ShortcutsSettingsView: React.FC = () => {
 
 	const saveShortcuts = async (items: ShortcutItem[]) => {
 		localStorage.setItem('bbplayer_shortcuts', JSON.stringify(items))
+		window.dispatchEvent(new CustomEvent('bbplayer-shortcuts-updated', { detail: items }))
 		try {
 			await invoke('update_shortcuts', { configs: items })
 			setSaveStatus('快捷键已成功注册并生效')
 			setTimeout(() => setSaveStatus(null), 2500)
 		} catch (err: any) {
 			console.warn('Update shortcuts note:', err)
-			setSaveStatus('已保存设置')
+			setSaveStatus('已保存本地快捷键')
 			setTimeout(() => setSaveStatus(null), 2500)
 		}
 	}

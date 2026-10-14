@@ -39,6 +39,9 @@ pub fn get_default_shortcuts() -> Vec<ShortcutConfig> {
     ]
 }
 
+static CURRENT_SHORTCUTS: std::sync::Mutex<Option<Vec<ShortcutConfig>>> =
+    std::sync::Mutex::new(None);
+
 pub fn register_all_shortcuts(app: &AppHandle, configs: &[ShortcutConfig]) {
     let global_shortcut = app.global_shortcut();
     let _ = global_shortcut.unregister_all();
@@ -60,9 +63,13 @@ pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: Shortc
 
     let current_str = shortcut.to_string();
 
-    // Look for matching action
-    let defaults = get_default_shortcuts();
-    for item in defaults {
+    // Look for matching action in current active shortcuts or defaults
+    let active_configs = {
+        let lock = CURRENT_SHORTCUTS.lock().unwrap();
+        lock.clone().unwrap_or_else(get_default_shortcuts)
+    };
+
+    for item in active_configs {
         if let Ok(s) = item.key.parse::<Shortcut>() {
             if shortcut == &s {
                 match item.id.as_str() {
@@ -87,11 +94,16 @@ pub fn handle_shortcut_event(app: &AppHandle, shortcut: &Shortcut, state: Shortc
 
 #[tauri::command]
 pub fn get_shortcuts() -> Vec<ShortcutConfig> {
-    get_default_shortcuts()
+    let lock = CURRENT_SHORTCUTS.lock().unwrap();
+    lock.clone().unwrap_or_else(get_default_shortcuts)
 }
 
 #[tauri::command]
 pub fn update_shortcuts(app: AppHandle, configs: Vec<ShortcutConfig>) -> Result<(), String> {
+    {
+        let mut lock = CURRENT_SHORTCUTS.lock().unwrap();
+        *lock = Some(configs.clone());
+    }
     register_all_shortcuts(&app, &configs);
     Ok(())
 }

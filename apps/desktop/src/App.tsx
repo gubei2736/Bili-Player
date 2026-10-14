@@ -219,8 +219,39 @@ export const App: React.FC = () => {
 		}
 	}, [next, prev])
 
-	// 4. In-App Single-Key Shortcuts (e.g. Space to play/pause, Arrow keys to navigate)
+	// 4. In-App Single-Key & Global Shortcuts Handling
 	useEffect(() => {
+		const matchesShortcut = (e: KeyboardEvent, shortcutStr?: string): boolean => {
+			if (!shortcutStr) return false
+			const parts = shortcutStr.split('+').map((p) => p.trim())
+			const mainKey = parts[parts.length - 1].toLowerCase()
+			const hasCtrl = parts.some((p) => p.toLowerCase() === 'ctrl')
+			const hasAlt = parts.some((p) => p.toLowerCase() === 'alt')
+			const hasShift = parts.some((p) => p.toLowerCase() === 'shift')
+			const hasMeta = parts.some((p) => ['super', 'meta', 'win'].includes(p.toLowerCase()))
+
+			if (e.ctrlKey !== hasCtrl) return false
+			if (e.altKey !== hasAlt) return false
+			if (e.shiftKey !== hasShift) return false
+			if (e.metaKey !== hasMeta) return false
+
+			const eventKey = e.key.toLowerCase()
+			const eventCode = e.code.toLowerCase()
+
+			if (mainKey === 'space' && (eventCode === 'space' || eventKey === ' ')) return true
+			if (mainKey === 'left' && (eventCode === 'arrowleft' || eventKey === 'arrowleft')) return true
+			if (mainKey === 'right' && (eventCode === 'arrowright' || eventKey === 'arrowright')) return true
+			if (mainKey === 'up' && (eventCode === 'arrowup' || eventKey === 'arrowup')) return true
+			if (mainKey === 'down' && (eventCode === 'arrowdown' || eventKey === 'arrowdown')) return true
+
+			return (
+				eventKey === mainKey ||
+				eventCode === `key${mainKey}` ||
+				eventCode === mainKey ||
+				eventKey.toUpperCase() === mainKey.toUpperCase()
+			)
+		}
+
 		const handleLocalKeyDown = (e: KeyboardEvent) => {
 			if (
 				e.target instanceof HTMLInputElement ||
@@ -244,20 +275,19 @@ export const App: React.FC = () => {
 			const prevKey = shortcutsConfig.find((s) => s.id === 'prev_track')?.key
 			const nextKey = shortcutsConfig.find((s) => s.id === 'next_track')?.key
 
-			if (
-				(playPauseKey === 'Space' && e.code === 'Space') ||
-				(e.code === 'Space' && (!playPauseKey || playPauseKey === 'Alt+Shift+Space'))
-			) {
+			if (matchesShortcut(e, playPauseKey) || (!playPauseKey && e.code === 'Space')) {
 				e.preventDefault()
 				if (desktopAudioEngine.isPlaying()) {
 					desktopAudioEngine.pause()
 				} else {
 					desktopAudioEngine.play()
 				}
-			} else if (prevKey === 'Left' && e.key === 'ArrowLeft') {
+			} else if (matchesShortcut(e, prevKey)) {
+				e.preventDefault()
 				const prevTrack = prev()
 				if (prevTrack) playTrackWithProxy(prevTrack).catch(() => {})
-			} else if (nextKey === 'Right' && e.key === 'ArrowRight') {
+			} else if (matchesShortcut(e, nextKey)) {
+				e.preventDefault()
 				const nextTrack = next()
 				if (nextTrack) playTrackWithProxy(nextTrack).catch(() => {})
 			}
@@ -317,6 +347,8 @@ export const App: React.FC = () => {
 	return (
 		<>
 			<MainLayout
+				activeTab={activeTab}
+				onSelectTab={setActiveTab}
 				onSearch={handleSearch}
 				onToggleLyricsWindow={handleToggleLyricsWindow}
 				onToggleFullscreenLyrics={() =>

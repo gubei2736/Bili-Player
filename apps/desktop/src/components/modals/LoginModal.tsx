@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, RefreshCw, CheckCircle2 } from 'lucide-react'
+import QRCode from 'qrcode'
 import {
 	bilibiliApi,
 	useAuthStore,
@@ -14,7 +15,7 @@ export interface LoginModalProps {
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 	const { setCookie, fetchUserInfo } = useAuthStore()
 
-	const [qrUrl, setQrUrl] = useState('')
+	const [qrDataUrl, setQrDataUrl] = useState('')
 	const [qrcodeKey, setQrcodeKey] = useState('')
 	const [statusText, setStatusText] = useState('请使用哔哩哔哩客户端扫码登录')
 	const [isSuccess, setIsSuccess] = useState(false)
@@ -27,9 +28,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 		const result = await bilibiliApi.getLoginQrCode()
 		setIsLoading(false)
 		if (result.isOk()) {
-			setQrUrl(result.value.url)
 			setQrcodeKey(result.value.qrcode_key)
 			setStatusText('请使用哔哩哔哩移动端扫码登录')
+			try {
+				const dataUri = await QRCode.toDataURL(result.value.url, {
+					margin: 1,
+					width: 200,
+					color: {
+						dark: '#000000',
+						light: '#ffffff',
+					},
+				})
+				setQrDataUrl(dataUri)
+			} catch {
+				// Fallback to online generator if canvas fails
+				setQrDataUrl(
+					`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+						result.value.url,
+					)}`,
+				)
+			}
 		} else {
 			setStatusText('获取二维码失败，请点击刷新重试')
 		}
@@ -61,35 +79,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 					setIsSuccess(true)
 					setStatusText('登录成功，正在同步账号数据...')
 					setCookie(cookies)
+					clearInterval(timer)
 					try {
 						await fetchUserInfo()
 					} catch (e) {
 						console.warn('fetchUserInfo note:', e)
 					}
-					clearInterval(timer)
 					setTimeout(() => {
 						onClose()
-					}, 1000)
+					}, 1200)
 				} else if (
 					status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_QRCODE_EXPIRED
 				) {
-					setStatusText('二维码已过期，请刷新')
+					setStatusText('二维码已过期，请点击刷新')
 					clearInterval(timer)
 				}
 			}
-		}, 2000)
+		}, 1500)
 
 		return () => clearInterval(timer)
 	}, [qrcodeKey, isOpen, isSuccess, setCookie, fetchUserInfo, onClose])
 
 	if (!isOpen) return null
-
-	// Generate QR Code data URI via simple canvas / SVG generator
-	const qrCodeImgSrc = qrUrl
-		? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-				qrUrl,
-			)}`
-		: ''
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
@@ -111,9 +122,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 							<CheckCircle2 className="w-12 h-12" />
 							<span className="text-xs font-semibold">登录成功</span>
 						</div>
-					) : qrCodeImgSrc ? (
+					) : qrDataUrl ? (
 						<img
-							src={qrCodeImgSrc}
+							src={qrDataUrl}
 							alt="Bilibili Login QR"
 							className="w-full h-full object-contain"
 						/>

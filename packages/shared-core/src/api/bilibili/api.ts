@@ -42,6 +42,7 @@ import { bilibiliApiClient, type BilibiliApiClient } from './client'
 import { BilibiliApiError } from './errors'
 import { bv2av } from './utils'
 import getWbiEncodedParams from './wbi'
+import { getDefaultCookieProvider } from '../cookie'
 
 const PASSPORT_UA =
 	'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 BiliApp/6.66.0'
@@ -419,6 +420,16 @@ export class BilibiliApi {
 		})
 	}
 
+	getUserNavInfo({ signal }: { signal?: AbortSignal } = {}): ResultAsync<
+		{ isLogin: boolean; mid: number; uname: string; face: string },
+		BilibiliApiError
+	> {
+		return this.client.get<{ isLogin: boolean; mid: number; uname: string; face: string }>({
+			endpoint: '/x/web-interface/nav',
+			signal,
+		})
+	}
+
 	getOtherUserInfo({
 		mid,
 		signal,
@@ -740,35 +751,112 @@ export class BilibiliApi {
 				}
 			}
 
-			// Try to get cookie from response headers first
-			let cookies =
+			// Multi-source cookie aggregation
+			const cookieMap: Record<string, string> = {}
+
+			// 1. Collect from poll response Set-Cookie headers
+			const pollCookies =
 				response.headers.get('Set-Cookie') ||
 				response.headers.get('set-cookie') ||
 				''
+			if (pollCookies) {
+				const items = pollCookies.split(/;\s*/)
+				for (const item of items) {
+					const eqIdx = item.indexOf('=')
+					if (eqIdx > 0) {
+						const k = item.substring(0, eqIdx).trim()
+						const v = item.substring(eqIdx + 1).trim()
+						if (
+							![
+								'path',
+								'domain',
+								'expires',
+								'max-age',
+								'samesite',
+								'secure',
+								'httponly',
+							].includes(k.toLowerCase())
+						) {
+							cookieMap[k] = v
+						}
+					}
+				}
+			}
 
+			// 2. Parse query parameters from data.url
 			const dataUrl = (data.data as any)?.url
-			if (!cookies && dataUrl) {
+			if (dataUrl) {
 				try {
 					const parsed = new URL(dataUrl)
-					const parts: string[] = []
 					parsed.searchParams.forEach((val, key) => {
-						if (
-							['DedeUserID', 'DedeUserID__ckMd5', 'SESSDATA', 'bili_jct'].includes(
-								key,
-							)
-						) {
-							parts.push(`${key}=${val}`)
+						if (val) {
+							cookieMap[key] = val
 						}
 					})
-					if (parts.length > 0) {
-						cookies = parts.join('; ')
+				} catch {}
+			}
+
+			// 3. If SESSDATA or bili_jct is still missing and dataUrl is provided, follow dataUrl
+			if ((!cookieMap['SESSDATA'] || !cookieMap['bili_jct']) && dataUrl) {
+				try {
+					const crossRes = await this.http.fetch(dataUrl, {
+						method: 'GET',
+						headers: {
+							'User-Agent': PASSPORT_UA,
+						},
+						credentials: 'omit',
+					})
+					const crossCookies =
+						crossRes.headers.get('Set-Cookie') ||
+						crossRes.headers.get('set-cookie') ||
+						''
+					if (crossCookies) {
+						const items = crossCookies.split(/;\s*/)
+						for (const item of items) {
+							const eqIdx = item.indexOf('=')
+							if (eqIdx > 0) {
+								const k = item.substring(0, eqIdx).trim()
+								const v = item.substring(eqIdx + 1).trim()
+								if (
+									![
+										'path',
+										'domain',
+										'expires',
+										'max-age',
+										'samesite',
+										'secure',
+										'httponly',
+									].includes(k.toLowerCase())
+								) {
+									cookieMap[k] = v
+								}
+							}
+						}
 					}
 				} catch {}
 			}
 
+			// 4. Also store refresh_token if available
+			const refreshToken = (data.data as any)?.refresh_token
+			if (refreshToken) {
+				cookieMap['refresh_token'] = refreshToken
+			}
+
+			const cookieString = Object.entries(cookieMap)
+				.map(([k, v]) => `${k}=${v}`)
+				.join('; ')
+
+			// Set immediately in defaultCookieProvider
+			try {
+				const provider = getDefaultCookieProvider()
+				if (provider && provider.setCookie) {
+					provider.setCookie(cookieMap)
+				}
+			} catch {}
+
 			return {
 				status: BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SUCCESS,
-				cookies,
+				cookies: cookieString,
 			}
 		}
 

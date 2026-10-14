@@ -5,6 +5,8 @@ import { BottomPlayerBar } from './BottomPlayerBar'
 
 export interface MainLayoutProps {
 	children: (activeTab: NavTab) => React.ReactNode
+	activeTab?: NavTab
+	onSelectTab?: (tab: NavTab) => void
 	onSearch?: (query: string) => void
 	onToggleLyricsWindow?: () => void
 	onToggleFullscreenLyrics?: () => void
@@ -13,12 +15,16 @@ export interface MainLayoutProps {
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
 	children,
+	activeTab: externalActiveTab,
+	onSelectTab,
 	onSearch,
 	onToggleLyricsWindow,
 	onToggleFullscreenLyrics,
 	onOpenLoginModal,
 }) => {
-	const [activeTab, setActiveTab] = useState<NavTab>('explore')
+	const [internalActiveTab, setInternalActiveTab] = useState<NavTab>('explore')
+	const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab
+	const setActiveTab = onSelectTab || setInternalActiveTab
 
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0b0f17] text-foreground border border-white/10 shadow-2xl relative">

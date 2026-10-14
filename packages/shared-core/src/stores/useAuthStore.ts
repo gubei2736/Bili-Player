@@ -42,7 +42,9 @@ export const useAuthStore = create<AuthState>()(
 
 				set({
 					bilibiliCookie: cookieMap,
-					isLoggedIn: Object.keys(cookieMap).length > 0 && !!cookieMap.bili_jct,
+					isLoggedIn:
+						Object.keys(cookieMap).length > 0 &&
+						!!(cookieMap.bili_jct || cookieMap.SESSDATA),
 				})
 
 				const provider = getDefaultCookieProvider()
@@ -64,12 +66,31 @@ export const useAuthStore = create<AuthState>()(
 						isLoggedIn: true,
 						isLoading: false,
 					})
-				} else {
-					set({
-						isLoading: false,
-						error: res.error.message,
-					})
+					return
 				}
+
+				// Fallback to /x/web-interface/nav if myinfo failed
+				try {
+					const navRes = await bilibiliApi.getUserNavInfo()
+					if (navRes.isOk() && navRes.value.isLogin) {
+						set({
+							userInfo: {
+								mid: navRes.value.mid,
+								name: navRes.value.uname,
+								face: navRes.value.face,
+								sign: '',
+							},
+							isLoggedIn: true,
+							isLoading: false,
+						})
+						return
+					}
+				} catch {}
+
+				set({
+					isLoading: false,
+					error: res.error.message,
+				})
 			},
 
 			logout: () => {
