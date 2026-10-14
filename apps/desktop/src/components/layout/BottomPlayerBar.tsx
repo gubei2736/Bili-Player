@@ -22,6 +22,7 @@ import {
 import {
 	useQueueStore,
 	useLocalPlaylistStore,
+	useSkinStore,
 	type BilibiliTrack,
 } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
@@ -53,6 +54,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		setCurrentIndex,
 		clearQueue,
 	} = useQueueStore()
+	const customBgUrl = useSkinStore((s) => s.customBgUrl)
 
 	const [isPlaying, setIsPlaying] = useState(false)
 	const [currentTime, setCurrentTime] = useState(0)
@@ -314,7 +316,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const effectiveVolumePct = (isMuted ? 0 : volume) * 100
 
 	return (
-		<footer className="h-[96px] w-full flex flex-col justify-between px-6 pt-2 pb-3 select-none bg-black/40 backdrop-blur-md border-t border-white/[0.08] shadow-[0_-10px_30px_rgba(0,0,0,0.4)] z-40 relative">
+		<footer
+			className={`h-[96px] w-full flex flex-col justify-between px-6 pt-2 pb-3 select-none ${
+				customBgUrl
+					? 'bg-black/15 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.15)]'
+					: 'bg-black/40 backdrop-blur-md shadow-[0_-10px_30px_rgba(0,0,0,0.4)]'
+			} border-t border-white/[0.08] z-40 relative`}
+		>
 			{/* Top: 100% Straight Linear Progress Bar (No wave, pure precision line) */}
 			<div className="w-full flex items-center gap-3 h-5 -mt-0.5">
 				{/* Current Time */}

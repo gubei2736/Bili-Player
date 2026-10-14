@@ -182,12 +182,12 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
 							style={{
 								backgroundImage: `url(${customBgUrl})`,
-								opacity: customBgOpacity ?? 0.8,
+								opacity: customBgOpacity ?? 1.0,
 								filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
 							}}
 						>
-							{/* Subtle contrast mask to ensure lyric text readability */}
-							<div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
+							{/* Gentle transparent gradient to keep lyrics legible while keeping custom wallpaper crystal clear */}
+							<div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/15" />
 						</div>
 					) : (
 						<FluidBackground coverUrl={track?.coverUrl} />

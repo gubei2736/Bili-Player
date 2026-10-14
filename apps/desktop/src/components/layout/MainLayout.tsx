@@ -41,7 +41,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
 					style={{
 						backgroundImage: `url(${customBgUrl})`,
-						opacity: customBgOpacity ?? 0.8,
+						opacity: customBgOpacity ?? 1.0,
 						filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
 					}}
 				/>
@@ -76,7 +76,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					onSelectTab={setActiveTab}
 					onOpenLoginModal={onOpenLoginModal}
 				/>
-				<main className="flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl bg-black/25 border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-sm">
+				<main
+					className={`flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl ${
+						customBgUrl ? 'bg-black/10' : 'bg-black/25'
+					} border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-sm`}
+				>
 					{children(activeTab)}
 				</main>
 			</div>

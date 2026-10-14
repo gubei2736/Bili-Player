@@ -11,7 +11,7 @@ import {
 	LogOut,
 	Sparkles,
 } from 'lucide-react'
-import { useAuthStore } from '@bbplayer/shared-core'
+import { useAuthStore, useSkinStore } from '@bbplayer/shared-core'
 
 export type NavTab =
 	| 'explore'
@@ -35,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	onOpenLoginModal,
 }) => {
 	const { isLoggedIn, userInfo, logout } = useAuthStore()
+	const customBgUrl = useSkinStore((s) => s.customBgUrl)
 
 	const discoverGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
 		{ id: 'explore', label: '发现音乐', icon: <Compass className="w-4 h-4" /> },
@@ -87,7 +88,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	}
 
 	return (
-		<aside className="w-56 h-full flex flex-col justify-between rounded-2xl bg-black/25 border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-md select-none p-3">
+		<aside
+			className={`w-56 h-full flex flex-col justify-between rounded-2xl ${
+				customBgUrl ? 'bg-black/15' : 'bg-black/25'
+			} border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-md select-none p-3`}
+		>
 			{/* Top Nav Groups */}
 			<div className="space-y-5 overflow-y-auto no-scrollbar pt-1">
 				<div className="space-y-1">
@@ -115,7 +120,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			{/* Bottom User Profile / Login Pod */}
 			<div className="pt-3 border-t border-white/[0.08]">
 				{isLoggedIn && userInfo ? (
-					<div className="flex items-center justify-between p-2.5 rounded-xl bg-black/35 backdrop-blur-sm border border-white/[0.08] shadow-inner">
+					<div
+						className={`flex items-center justify-between p-2.5 rounded-xl ${
+							customBgUrl ? 'bg-black/20' : 'bg-black/35'
+						} backdrop-blur-sm border border-white/[0.08] shadow-inner`}
+					>
 						<div className="flex items-center gap-2.5 overflow-hidden">
 							<div className="relative flex-shrink-0">
 								<img
@@ -143,7 +152,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 							<LogOut className="w-3.5 h-3.5" />
 						</button>
 					</div>
+				) : customBgUrl ? (
+					/* 自定义背景下：按钮为纯透明/微透光玻璃质感，完全融入自定义背景，去除彩虹渐变和深黑底 */
+					<button
+						onClick={onOpenLoginModal}
+						className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white/[0.08] hover:bg-white/[0.16] border border-white/20 hover:border-white/35 backdrop-blur-sm text-xs font-medium text-white transition-all active:scale-[0.98] shadow-sm"
+					>
+						<LogIn className="w-3.5 h-3.5 text-white/90" />
+						<span>扫码连接 B 站账号</span>
+					</button>
 				) : (
+					/* 默认背景下：保持截图所示的经典渐变边框和配色 */
 					<button
 						onClick={onOpenLoginModal}
 						className="group relative w-full overflow-hidden rounded-xl p-[1px] transition-all duration-300 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98]"

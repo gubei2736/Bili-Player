@@ -12,7 +12,7 @@ export interface SkinState {
 	activeSkinSuit: BilibiliGarbSuitDetailResponse | null
 	themeColors: BilibiliGarbColor | null
 	customBgUrl: string | null
-	customBgOpacity: number // 0.1 to 1.0 (default 0.35)
+	customBgOpacity: number // 0.1 to 1.0 (default 1.0)
 	customBgBlur: number // 0 to 40 px (default 0)
 
 	setSkin: (suit: BilibiliGarbSuitDetailResponse | null) => void
@@ -28,7 +28,7 @@ export const useSkinStore = create<SkinState>()(
 			activeSkinSuit: null,
 			themeColors: null,
 			customBgUrl: null,
-			customBgOpacity: 0.35,
+			customBgOpacity: 1.0,
 			customBgBlur: 0,
 
 			setSkin: (suit) => {
@@ -72,7 +72,7 @@ export const useSkinStore = create<SkinState>()(
 				})
 			},
 
-			setCustomBg: (url, opacity = 0.35, blur = 0) => {
+			setCustomBg: (url, opacity = 1.0, blur = 0) => {
 				set({
 					customBgUrl: url,
 					customBgOpacity: opacity,
@@ -83,7 +83,7 @@ export const useSkinStore = create<SkinState>()(
 			clearCustomBg: () => {
 				set({
 					customBgUrl: null,
-					customBgOpacity: 0.35,
+					customBgOpacity: 1.0,
 					customBgBlur: 0,
 				})
 			},
@@ -91,6 +91,15 @@ export const useSkinStore = create<SkinState>()(
 		{
 			name: 'bbplayer_skin_store',
 			storage: createJSONStorage(() => getDefaultStateStorage()),
+			version: 2,
+			migrate: (persistedState: any, version: number) => {
+				if (version < 2 && persistedState) {
+					if (persistedState.customBgOpacity === 0.35 || persistedState.customBgOpacity === undefined) {
+						persistedState.customBgOpacity = 1.0
+					}
+				}
+				return persistedState as SkinState
+			},
 			partialize: (state) => ({
 				activeSkinId: state.activeSkinId,
 				activeSkinSuit: state.activeSkinSuit,

@@ -244,7 +244,7 @@ export const SkinStoreView: React.FC = () => {
 								<div className="flex items-center justify-between text-[11px] text-muted-foreground">
 									<span>背景不透明度</span>
 									<span className="font-mono text-foreground font-semibold">
-										{Math.round((customBgOpacity ?? 0.35) * 100)}%
+										{Math.round((customBgOpacity ?? 1.0) * 100)}%
 									</span>
 								</div>
 								<input
@@ -252,7 +252,7 @@ export const SkinStoreView: React.FC = () => {
 									min="0.1"
 									max="1"
 									step="0.05"
-									value={customBgOpacity ?? 0.35}
+									value={customBgOpacity ?? 1.0}
 									onChange={(e) =>
 										setCustomBg(
 											customBgUrl,
