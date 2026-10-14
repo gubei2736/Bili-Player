@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "bbplayer",
+  "productName": "Bili Player",
   "version": "0.1.0",
-  "identifier": "com.bbplayer.desktop",
+  "identifier": "com.biliplayer.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "BBPlayer",
+        "title": "Bili Player",
         "width": 1200,
         "height": 800,
         "minWidth": 1020,
@@ -25,7 +25,7 @@
       },
       {
         "label": "lyrics",
-        "title": "BBPlayer - 桌面歌词",
+        "title": "Bili Player - 桌面歌词",
         "url": "index.html#lyrics",
         "width": 800,
         "height": 140,

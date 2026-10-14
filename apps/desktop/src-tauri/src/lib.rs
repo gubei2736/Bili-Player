@@ -48,7 +48,7 @@ pub fn run() {
             // 3. Setup System Tray Menu
             let toggle_main = MenuItem::with_id(app, "toggle_main", "显示/隐藏主窗口", true, None::<&str>)?;
             let toggle_lyrics = MenuItem::with_id(app, "toggle_lyrics", "显示/隐藏桌面歌词", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出 BBPlayer", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出 Bili Player", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle_main, &toggle_lyrics, &quit_item])?;
 
             if let Some(icon) = app.default_window_icon() {

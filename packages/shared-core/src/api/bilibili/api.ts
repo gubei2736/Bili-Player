@@ -298,8 +298,8 @@ export class BilibiliApi {
 		BilibiliApiError
 	> {
 		const { bvid, cid, audioQuality, enableDolby, enableHiRes, preferDolbyFirst } = params
-		// 8144 = 16 (DASH) + 64 (HDR) + 128 (4K) + 256 (Dolby) + 512 (8K) + 1024 (AV1) + 2048 (Dolby Vision) + 4096 (Hi-Res FLAC)
-		const fnval = enableHiRes || enableDolby ? '8144' : '4048'
+		// 4048 = 16 (DASH) + 64 (HDR) + 128 (4K) + 256 (Dolby) + 512 (8K) + 1024 (AV1) + 2048 (Dolby Vision)
+		const fnval = '4048'
 		const wbiParams = getWbiEncodedParams({
 			bvid,
 			cid: String(cid),

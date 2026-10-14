@@ -5,8 +5,8 @@ import {
 	X,
 	Search,
 	Pin,
-	Disc3,
 } from 'lucide-react'
+import { BiliPlayerLogo } from '../common/BiliPlayerLogo'
 
 export interface TitleBarProps {
 	onSearch?: (query: string) => void
@@ -77,13 +77,9 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 		>
 			{/* Left branding */}
 			<div className="flex items-center gap-2.5 pointer-events-none min-w-[190px]">
-				<div className="relative w-6 h-6 rounded-lg bg-gradient-to-br from-pink-500 via-primary to-sky-400 p-[1px] shadow-md shadow-primary/20">
-					<div className="w-full h-full bg-[#090d16] rounded-[7px] flex items-center justify-center">
-						<Disc3 className="w-3.5 h-3.5 text-primary animate-[spin_12s_linear_infinite]" />
-					</div>
-				</div>
+				<BiliPlayerLogo size={24} animated={true} />
 				<span className="font-bold tracking-tight text-foreground text-[13px] bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/70">
-					BBPlayer
+					Bili Player
 				</span>
 				<span className="text-[9px] px-1.5 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/25 font-mono font-medium">
 					PRO

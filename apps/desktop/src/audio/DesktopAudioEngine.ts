@@ -163,7 +163,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			navigator.mediaSession.metadata = new MediaMetadata({
 				title: track.title,
 				artist: track.artist?.name || '未知歌手',
-				album: 'BBPlayer',
+				album: 'Bili Player',
 				artwork,
 			})
 		}
