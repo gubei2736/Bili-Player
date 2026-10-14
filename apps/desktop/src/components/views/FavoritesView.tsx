@@ -209,7 +209,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 				<div>
 					<h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
 						<Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
-						<span>我喜欢的音乐</span>
+						<span>我的收藏</span>
 					</h2>
 					<p className="text-xs text-muted-foreground mt-0.5">
 						已关联 B 站账号，实时同步你的个人收藏夹与音乐列表

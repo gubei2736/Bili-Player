@@ -13,22 +13,41 @@ export interface LocalPlaylist {
 	updatedAt: number
 }
 
+export const DEFAULT_FAVORITES_PLAYLIST_ID = 'local_pl_favorites'
+
+export const createDefaultFavoritesPlaylist = (): LocalPlaylist => ({
+	id: DEFAULT_FAVORITES_PLAYLIST_ID,
+	title: '我喜欢的音乐',
+	intro: '默认红心歌单，播放栏点击添加至我喜欢的音乐即可快速保存至此',
+	coverUrl: '',
+	tracks: [],
+	createdAt: 0,
+	updatedAt: Date.now(),
+})
+
 export interface LocalPlaylistState {
 	playlists: LocalPlaylist[]
 	selectedPlaylistId: string | null
 
 	setSelectedPlaylistId: (id: string | null) => void
-	createPlaylist: (title: string, intro?: string, coverUrl?: string | null, initialTracks?: Track[]) => LocalPlaylist
+	createPlaylist: (
+		title: string,
+		intro?: string,
+		coverUrl?: string | null,
+		initialTracks?: Track[],
+	) => LocalPlaylist
 	deletePlaylist: (id: string) => void
 	addTrackToPlaylist: (playlistId: string, track: Track) => boolean
 	removeTrackFromPlaylist: (playlistId: string, trackUniqueKey: string) => void
 	getPlaylistById: (id: string) => LocalPlaylist | undefined
+	toggleFavoriteTrack: (track: Track) => boolean
+	isFavoriteTrack: (trackUniqueKey: string) => boolean
 }
 
 export const useLocalPlaylistStore = create<LocalPlaylistState>()(
 	persist(
 		(set, get) => ({
-			playlists: [],
+			playlists: [createDefaultFavoritesPlaylist()],
 			selectedPlaylistId: null,
 
 			setSelectedPlaylistId: (id) => {
@@ -47,16 +66,25 @@ export const useLocalPlaylistStore = create<LocalPlaylistState>()(
 				}
 
 				set((state) => ({
-					playlists: [newPlaylist, ...state.playlists],
+					playlists: [
+						...state.playlists.filter((p) => p.id === DEFAULT_FAVORITES_PLAYLIST_ID),
+						newPlaylist,
+						...state.playlists.filter((p) => p.id !== DEFAULT_FAVORITES_PLAYLIST_ID),
+					],
 				}))
 
 				return newPlaylist
 			},
 
 			deletePlaylist: (id) => {
+				if (id === DEFAULT_FAVORITES_PLAYLIST_ID) {
+					// 默认“我喜欢的音乐”歌单禁止被删除
+					return
+				}
 				set((state) => ({
 					playlists: state.playlists.filter((p) => p.id !== id),
-					selectedPlaylistId: state.selectedPlaylistId === id ? null : state.selectedPlaylistId,
+					selectedPlaylistId:
+						state.selectedPlaylistId === id ? null : state.selectedPlaylistId,
 				}))
 			},
 
@@ -74,7 +102,7 @@ export const useLocalPlaylistStore = create<LocalPlaylistState>()(
 						if (pl.id !== playlistId) return pl
 						return {
 							...pl,
-							tracks: [...pl.tracks, track],
+							tracks: [track, ...pl.tracks],
 							coverUrl: pl.coverUrl || track.coverUrl,
 							updatedAt: Date.now(),
 						}
@@ -100,10 +128,81 @@ export const useLocalPlaylistStore = create<LocalPlaylistState>()(
 			getPlaylistById: (id) => {
 				return get().playlists.find((p) => p.id === id)
 			},
+
+			toggleFavoriteTrack: (track) => {
+				const state = get()
+				const favPl = state.playlists.find((p) => p.id === DEFAULT_FAVORITES_PLAYLIST_ID)
+				const exists = favPl ? favPl.tracks.some((t) => t.uniqueKey === track.uniqueKey) : false
+
+				if (exists) {
+					// 从我喜欢的音乐歌单移除
+					set((curr) => ({
+						playlists: curr.playlists.map((pl) => {
+							if (pl.id !== DEFAULT_FAVORITES_PLAYLIST_ID) return pl
+							return {
+								...pl,
+								tracks: pl.tracks.filter((t) => t.uniqueKey !== track.uniqueKey),
+								updatedAt: Date.now(),
+							}
+						}),
+					}))
+					return false
+				} else {
+					// 添加至我喜欢的音乐歌单头部
+					set((curr) => {
+						const hasFav = curr.playlists.some((p) => p.id === DEFAULT_FAVORITES_PLAYLIST_ID)
+						if (hasFav) {
+							return {
+								playlists: curr.playlists.map((pl) => {
+									if (pl.id !== DEFAULT_FAVORITES_PLAYLIST_ID) return pl
+									return {
+										...pl,
+										tracks: [track, ...pl.tracks],
+										coverUrl: track.coverUrl || pl.coverUrl,
+										updatedAt: Date.now(),
+									}
+								}),
+							}
+						} else {
+							const newFav = createDefaultFavoritesPlaylist()
+							newFav.tracks = [track]
+							newFav.coverUrl = track.coverUrl
+							return {
+								playlists: [newFav, ...curr.playlists],
+							}
+						}
+					})
+					return true
+				}
+			},
+
+			isFavoriteTrack: (trackUniqueKey) => {
+				if (!trackUniqueKey) return false
+				const favPl = get().playlists.find((p) => p.id === DEFAULT_FAVORITES_PLAYLIST_ID)
+				if (!favPl) return false
+				return favPl.tracks.some((t) => t.uniqueKey === trackUniqueKey)
+			},
 		}),
 		{
 			name: 'bbplayer_custom_library_playlists',
 			storage: createJSONStorage(() => getDefaultStateStorage()),
+			merge: (persistedState: any, currentState) => {
+				const savedPlaylists = Array.isArray(persistedState?.playlists)
+					? (persistedState.playlists as LocalPlaylist[])
+					: []
+				const hasDefault = savedPlaylists.some(
+					(p) => p.id === DEFAULT_FAVORITES_PLAYLIST_ID,
+				)
+				const finalPlaylists = hasDefault
+					? savedPlaylists
+					: [createDefaultFavoritesPlaylist(), ...savedPlaylists]
+
+				return {
+					...currentState,
+					...persistedState,
+					playlists: finalPlaylists,
+				}
+			},
 		},
 	),
 )

@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import {
 	Compass,
 	Library,
@@ -42,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	]
 
 	const myMusicGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
-		{ id: 'favorites', label: '我喜欢的音乐', icon: <Heart className="w-4 h-4" /> },
+		{ id: 'favorites', label: '我的收藏', icon: <Heart className="w-4 h-4" /> },
 		{ id: 'collections', label: '追更合集', icon: <FolderHeart className="w-4 h-4" /> },
 		{ id: 'history', label: '收听足迹', icon: <History className="w-4 h-4" /> },
 	]

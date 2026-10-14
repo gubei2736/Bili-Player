@@ -19,7 +19,11 @@ import {
 	X,
 	Trash2,
 } from 'lucide-react'
-import { useQueueStore, type BilibiliTrack } from '@bbplayer/shared-core'
+import {
+	useQueueStore,
+	useLocalPlaylistStore,
+	type BilibiliTrack,
+} from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
 import { getQualityBadgeInfo } from '../../audio/audioSettings'
@@ -69,7 +73,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [lyricOffsetSec, setLyricOffsetSec] = useState<number>(0)
 	const [lyricModalOpen, setLyricModalOpen] = useState(false)
 	const [queueOpen, setQueueOpen] = useState(false)
-	const [isLiked, setIsLiked] = useState(false)
 
 	// Linear Progress Bar drag & hover states
 	const [isDragging, setIsDragging] = useState(false)
@@ -96,39 +99,14 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		}
 	}, [currentTrack?.uniqueKey])
 
-	// 2. Favorite state sync with localStorage
-	useEffect(() => {
-		if (!currentTrack) {
-			setIsLiked(false)
-			return
-		}
-		try {
-			const saved = JSON.parse(
-				localStorage.getItem('bbplayer_favorites_keys') || '[]',
-			)
-			setIsLiked(Array.isArray(saved) && saved.includes(currentTrack.uniqueKey))
-		} catch {
-			setIsLiked(false)
-		}
-	}, [currentTrack?.uniqueKey])
+	// Direct link to "我喜欢的音乐" local playlist
+	const toggleFavoriteTrack = useLocalPlaylistStore((s) => s.toggleFavoriteTrack)
+	const isFavoriteTrack = useLocalPlaylistStore((s) => s.isFavoriteTrack)
+	const isLiked = currentTrack ? isFavoriteTrack(currentTrack.uniqueKey) : false
 
 	const toggleLike = () => {
 		if (!currentTrack) return
-		try {
-			const saved: string[] = JSON.parse(
-				localStorage.getItem('bbplayer_favorites_keys') || '[]',
-			)
-			const idx = saved.indexOf(currentTrack.uniqueKey)
-			let nextList: string[]
-			if (idx >= 0) {
-				nextList = saved.filter((k) => k !== currentTrack.uniqueKey)
-				setIsLiked(false)
-			} else {
-				nextList = [currentTrack.uniqueKey, ...saved]
-				setIsLiked(true)
-			}
-			localStorage.setItem('bbplayer_favorites_keys', JSON.stringify(nextList))
-		} catch {}
+		toggleFavoriteTrack(currentTrack)
 	}
 
 	// 3. Listen for custom lyric & offset events

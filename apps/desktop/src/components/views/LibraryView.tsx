@@ -10,10 +10,12 @@ import {
 	Download,
 	Sparkles,
 	MoreVertical,
+	Heart,
 } from 'lucide-react'
 import {
 	useLocalPlaylistStore,
 	useQueueStore,
+	DEFAULT_FAVORITES_PLAYLIST_ID,
 	type Track,
 	type LocalPlaylist,
 } from '@bbplayer/shared-core'
@@ -80,6 +82,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 								referrerPolicy="no-referrer"
 								className="w-full h-full object-cover"
 							/>
+						) : currentPlaylist.id === DEFAULT_FAVORITES_PLAYLIST_ID ? (
+							<div className="w-full h-full bg-rose-500/10 flex items-center justify-center">
+								<Heart className="w-14 h-14 text-rose-500 fill-rose-500" />
+							</div>
 						) : (
 							<Music className="w-12 h-12" />
 						)}
@@ -87,8 +93,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
 					<div className="flex-1 space-y-2">
 						<div className="flex items-center gap-2">
-							<span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-primary/20 text-primary">
-								本地歌单
+							<span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+								currentPlaylist.id === DEFAULT_FAVORITES_PLAYLIST_ID
+									? 'bg-rose-500/20 text-rose-400'
+									: 'bg-primary/20 text-primary'
+							}`}>
+								{currentPlaylist.id === DEFAULT_FAVORITES_PLAYLIST_ID ? '默认歌单' : '本地歌单'}
 							</span>
 							<span className="text-xs text-muted-foreground">
 								共 {currentPlaylist.tracks.length} 首歌曲
@@ -113,18 +123,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 								<span>播放全部</span>
 							</button>
 
-							<button
-								onClick={() => {
-									if (window.confirm(`确定要删除歌单【${currentPlaylist.title}】吗？`)) {
-										deletePlaylist(currentPlaylist.id)
-										setActivePlaylistId(null)
-									}
-								}}
-								className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
-								title="删除歌单"
-							>
-								<Trash2 className="w-4 h-4" />
-							</button>
+							{currentPlaylist.id !== DEFAULT_FAVORITES_PLAYLIST_ID && (
+								<button
+									onClick={() => {
+										if (window.confirm(`确定要删除歌单【${currentPlaylist.title}】吗？`)) {
+											deletePlaylist(currentPlaylist.id)
+											setActivePlaylistId(null)
+										}
+									}}
+									className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+									title="删除歌单"
+								>
+									<Trash2 className="w-4 h-4" />
+								</button>
+							)}
 						</div>
 					</div>
 				</div>
@@ -132,8 +144,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 				{/* Tracks List Table */}
 				{currentPlaylist.tracks.length === 0 ? (
 					<div className="py-20 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.01] text-muted-foreground space-y-2">
-						<Music className="w-8 h-8 mx-auto opacity-30" />
-						<p className="text-xs">歌单内暂无歌曲，可在“发现”或“搜索”页面点击加入此歌单</p>
+						{currentPlaylist.id === DEFAULT_FAVORITES_PLAYLIST_ID ? (
+							<>
+								<Heart className="w-10 h-10 mx-auto text-rose-500/40" />
+								<p className="text-sm font-semibold text-foreground/80">暂无我喜欢的音乐</p>
+								<p className="text-xs text-muted-foreground">可在播放栏点击【爱心】图标快速添加歌曲至此歌单</p>
+							</>
+						) : (
+							<>
+								<Music className="w-8 h-8 mx-auto opacity-30" />
+								<p className="text-xs">歌单内暂无歌曲，可在“发现”或“搜索”页面点击加入此歌单</p>
+							</>
+						)}
 					</div>
 				) : (
 					<div className="rounded-xl border border-white/5 overflow-hidden bg-white/[0.01]">
@@ -259,7 +281,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 							className="group p-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/15 transition-all cursor-pointer flex flex-col justify-between space-y-3"
 						>
 							<div className="flex items-center justify-between">
-								<div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform overflow-hidden">
+								<div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform overflow-hidden relative">
 									{pl.coverUrl ? (
 										<img
 											src={pl.coverUrl}
@@ -267,13 +289,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 											referrerPolicy="no-referrer"
 											className="w-full h-full object-cover"
 										/>
+									) : pl.id === DEFAULT_FAVORITES_PLAYLIST_ID ? (
+										<div className="w-full h-full bg-rose-500/15 flex items-center justify-center">
+											<Heart className="w-6 h-6 text-rose-500 fill-rose-500" />
+										</div>
 									) : (
 										<Music className="w-6 h-6" />
 									)}
 								</div>
-								<span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground">
-									{pl.tracks.length} 首
-								</span>
+								<div className="flex items-center gap-1.5">
+									{pl.id === DEFAULT_FAVORITES_PLAYLIST_ID && (
+										<span className="text-[9px] px-1.5 py-0.2 rounded-full bg-rose-500/15 text-rose-400 font-semibold border border-rose-500/30">
+											默认
+										</span>
+									)}
+									<span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground">
+										{pl.tracks.length} 首
+									</span>
+								</div>
 							</div>
 
 							<div>
