@@ -59,13 +59,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 					status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SUCCESS
 				) {
 					setIsSuccess(true)
-					setStatusText('登录成功！')
+					setStatusText('登录成功，正在同步账号数据...')
 					setCookie(cookies)
-					await fetchUserInfo()
+					try {
+						await fetchUserInfo()
+					} catch (e) {
+						console.warn('fetchUserInfo note:', e)
+					}
 					clearInterval(timer)
 					setTimeout(() => {
 						onClose()
-					}, 1200)
+					}, 1000)
 				} else if (
 					status === BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_QRCODE_EXPIRED
 				) {

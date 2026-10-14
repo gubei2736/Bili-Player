@@ -29,6 +29,7 @@ import { initDesktopDatabase } from './db/desktopDb'
 import {
 	useQueueStore,
 	useSkinStore,
+	bilibiliApi,
 	type Track,
 	type Artist,
 } from '@bbplayer/shared-core'
@@ -53,71 +54,71 @@ export const App: React.FC = () => {
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 	const [searchQuery, setSearchQuery] = useState('')
 	const [dbReady, setDbReady] = useState(false)
-	const [featuredTracks] = useState<Track[]>([
+	const [featuredTracks, setFeaturedTracks] = useState<Track[]>([
 		{
 			id: 1,
-			uniqueKey: 'bilibili_BV1sb411A7t4_0',
-			title: '勾指起誓',
-			artist: dummyArtist(101, '洛天依 / ilem'),
-			coverUrl: 'https://i0.hdslb.com/bfs/archive/c44458514197c36a4ee04d27e997f3b89fa5a939.jpg',
-			duration: 228,
+			uniqueKey: 'bilibili_BV1GJ411x7h7_0',
+			title: 'Never Gonna Give You Up',
+			artist: dummyArtist(101, 'Rick Astley / 索尼音乐'),
+			coverUrl: 'https://i1.hdslb.com/bfs/archive/5242750857121e05146d5d5b13a47a2a6dd36e98.jpg',
+			duration: 213,
 			source: 'bilibili',
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			bilibiliMetadata: {
-				bvid: 'BV1sb411A7t4',
-				cid: null,
+				bvid: 'BV1GJ411x7h7',
+				cid: 137649199,
 				isMultiPage: false,
 				videoIsValid: true,
 			},
 		},
 		{
 			id: 2,
-			uniqueKey: 'bilibili_BV14s411V78B_0',
-			title: '普通 DISCO',
-			artist: dummyArtist(101, '洛天依 / 言和 / ilem'),
-			coverUrl: 'https://i0.hdslb.com/bfs/archive/4784e27f6735e5d3fcbafe72f6a73c1d4715fbc7.jpg',
-			duration: 214,
+			uniqueKey: 'bilibili_BV1Q541167Qg_0',
+			title: '夏娜 · 绯色の空 (绯色之空)',
+			artist: dummyArtist(102, '川田真美 / 灼眼的夏娜'),
+			coverUrl: 'https://i1.hdslb.com/bfs/archive/142397b8ed4c50dceb50a4ed7db18d1d54ab6097.jpg',
+			duration: 249,
 			source: 'bilibili',
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			bilibiliMetadata: {
-				bvid: 'BV14s411V78B',
-				cid: null,
+				bvid: 'BV1Q541167Qg',
+				cid: 168409646,
 				isMultiPage: false,
 				videoIsValid: true,
 			},
 		},
 		{
 			id: 3,
-			uniqueKey: 'bilibili_BV1es411874b_0',
-			title: '达拉崩吧',
-			artist: dummyArtist(101, '洛天依 / 言和 / ilem'),
-			coverUrl: 'https://i0.hdslb.com/bfs/archive/aa07c2937ee2e74211116c27fba2e4a66bb62eec.jpg',
-			duration: 224,
+			uniqueKey: 'bilibili_BV1ab411c7Pn_0',
+			title: '千灯愿 (言和原创曲)',
+			artist: dummyArtist(103, '言和 / OverseerCouncil'),
+			coverUrl: 'https://i0.hdslb.com/bfs/archive/db322e0a56ce7a2434cf52b215af1e783e2478e3.jpg',
+			duration: 189,
 			source: 'bilibili',
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			bilibiliMetadata: {
-				bvid: 'BV1es411874b',
-				cid: null,
+				bvid: 'BV1ab411c7Pn',
+				cid: 62381858,
 				isMultiPage: false,
 				videoIsValid: true,
 			},
 		},
 		{
 			id: 4,
-			uniqueKey: 'bilibili_BV1xx411c7mD_0',
-			title: '万神纪',
-			artist: dummyArtist(102, '肥皂菌 / 墨明棋妙'),
-			coverUrl: 'https://i0.hdslb.com/bfs/archive/f764a8837eec52857e4e1a0df47285bf87da3ee7.jpg',
-			duration: 279,
+			uniqueKey: 'bilibili_BV17x411w7KC_0',
+			title: '保加利亚精选合辑 (DJ版)',
+			artist: dummyArtist(104, 'AZIS / 妖王'),
+			coverUrl: 'https://i2.hdslb.com/bfs/archive/1ada8c32a9d168e4b2ee3e010f24789ba3353785.jpg',
+			duration: 2412,
 			source: 'bilibili',
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			bilibiliMetadata: {
-				bvid: 'BV1xx411c7mD',
-				cid: null,
+				bvid: 'BV17x411w7KC',
+				cid: 279786,
 				isMultiPage: false,
 				videoIsValid: true,
 			},
@@ -143,6 +144,46 @@ export const App: React.FC = () => {
 			document.documentElement.style.setProperty('--bili-theme-primary', color)
 			document.documentElement.style.setProperty('--ring', color)
 		}
+	}, [])
+
+	// 2.1 Fetch online trending music dynamically on mount
+	useEffect(() => {
+		const loadTracks = async () => {
+			try {
+				const res = await bilibiliApi.searchVideos({ keyword: '热门音乐', page: 1 })
+				if (res.isOk() && res.value.result && res.value.result.length > 0) {
+					const tracks: Track[] = res.value.result.slice(0, 8).map((item, idx) => {
+						let cover = item.pic || ''
+						if (cover.startsWith('//')) cover = 'https:' + cover
+						return {
+							id: idx + 100,
+							uniqueKey: `bilibili_${item.bvid}_0`,
+							title: item.title.replace(/<[^>]*>?/gm, ''),
+							artist: {
+								id: item.mid || idx + 100,
+								name: item.author || '哔哩哔哩音乐人',
+								source: 'bilibili',
+								createdAt: new Date(),
+								updatedAt: new Date(),
+							},
+							coverUrl: cover,
+							duration: 240,
+							source: 'bilibili',
+							createdAt: new Date(),
+							updatedAt: new Date(),
+							bilibiliMetadata: {
+								bvid: item.bvid,
+								cid: null,
+								isMultiPage: false,
+								videoIsValid: true,
+							},
+						}
+					})
+					setFeaturedTracks(tracks)
+				}
+			} catch {}
+		}
+		loadTracks()
 	}, [])
 
 	// 3. Global Shortcuts IPC Event Listener
@@ -176,6 +217,54 @@ export const App: React.FC = () => {
 		return () => {
 			if (unlistenFn) unlistenFn()
 		}
+	}, [next, prev])
+
+	// 4. In-App Single-Key Shortcuts (e.g. Space to play/pause, Arrow keys to navigate)
+	useEffect(() => {
+		const handleLocalKeyDown = (e: KeyboardEvent) => {
+			if (
+				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement ||
+				(e.target as HTMLElement)?.isContentEditable
+			) {
+				return
+			}
+
+			let shortcutsConfig = [
+				{ id: 'play_pause', key: 'Alt+Shift+Space' },
+				{ id: 'prev_track', key: 'Alt+Shift+Left' },
+				{ id: 'next_track', key: 'Alt+Shift+Right' },
+			]
+			try {
+				const saved = localStorage.getItem('bbplayer_shortcuts')
+				if (saved) shortcutsConfig = JSON.parse(saved)
+			} catch {}
+
+			const playPauseKey = shortcutsConfig.find((s) => s.id === 'play_pause')?.key
+			const prevKey = shortcutsConfig.find((s) => s.id === 'prev_track')?.key
+			const nextKey = shortcutsConfig.find((s) => s.id === 'next_track')?.key
+
+			if (
+				(playPauseKey === 'Space' && e.code === 'Space') ||
+				(e.code === 'Space' && (!playPauseKey || playPauseKey === 'Alt+Shift+Space'))
+			) {
+				e.preventDefault()
+				if (desktopAudioEngine.isPlaying()) {
+					desktopAudioEngine.pause()
+				} else {
+					desktopAudioEngine.play()
+				}
+			} else if (prevKey === 'Left' && e.key === 'ArrowLeft') {
+				const prevTrack = prev()
+				if (prevTrack) playTrackWithProxy(prevTrack).catch(() => {})
+			} else if (nextKey === 'Right' && e.key === 'ArrowRight') {
+				const nextTrack = next()
+				if (nextTrack) playTrackWithProxy(nextTrack).catch(() => {})
+			}
+		}
+
+		window.addEventListener('keydown', handleLocalKeyDown)
+		return () => window.removeEventListener('keydown', handleLocalKeyDown)
 	}, [next, prev])
 
 	// 4. IPC Lyrics Synchronization to Desktop Floating Lyrics Window
@@ -274,9 +363,10 @@ export const App: React.FC = () => {
 												className="group relative rounded-xl p-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all duration-200 cursor-pointer flex flex-col justify-between"
 											>
 												<div
-													className="relative w-full aspect-square rounded-lg overflow-hidden mb-2.5 bg-black/40"
+													className="relative w-full aspect-square rounded-lg overflow-hidden mb-2.5 bg-gradient-to-tr from-sky-950/60 to-purple-950/60 flex items-center justify-center"
 													onClick={() => handlePlayTrack(track, idx)}
 												>
+													<Music className="w-8 h-8 text-white/20 absolute" />
 													<img
 														src={
 															track.coverUrl ||
@@ -284,9 +374,12 @@ export const App: React.FC = () => {
 														}
 														alt={track.title}
 														referrerPolicy="no-referrer"
-														className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+														className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 relative z-0"
+														onError={(e) => {
+															;(e.currentTarget as HTMLImageElement).style.opacity = '0'
+														}}
 													/>
-													<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+													<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10">
 														<div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shadow-lg">
 															<Play className="w-5 h-5 fill-current ml-0.5" />
 														</div>

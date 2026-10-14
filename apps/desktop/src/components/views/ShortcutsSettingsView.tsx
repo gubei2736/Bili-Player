@@ -75,20 +75,16 @@ export const ShortcutsSettingsView: React.FC = () => {
 		if (e.shiftKey) modifiers.push('Shift')
 		if (e.metaKey) modifiers.push('Super')
 
-		if (modifiers.length === 0) {
-			// Require at least one modifier for safety
-			return
-		}
-
 		let mainKey = e.key
-		if (mainKey === ' ') mainKey = 'Space'
+		if (mainKey === ' ' || mainKey === 'Spacebar') mainKey = 'Space'
 		else if (mainKey === 'ArrowLeft') mainKey = 'Left'
 		else if (mainKey === 'ArrowRight') mainKey = 'Right'
 		else if (mainKey === 'ArrowUp') mainKey = 'Up'
 		else if (mainKey === 'ArrowDown') mainKey = 'Down'
 		else if (mainKey.length === 1) mainKey = mainKey.toUpperCase()
 
-		const shortcutString = `${modifiers.join('+')}+${mainKey}`
+		const shortcutString =
+			modifiers.length > 0 ? `${modifiers.join('+')}+${mainKey}` : mainKey
 
 		const updated = shortcuts.map((s) =>
 			s.id === id ? { ...s, key: shortcutString } : s,
@@ -125,7 +121,7 @@ export const ShortcutsSettingsView: React.FC = () => {
 						<span>自定义全局快捷键</span>
 					</h3>
 					<p className="text-[11px] text-muted-foreground mt-0.5">
-						点击快捷键输入框即可直接按下组合键录制（需包含 Alt / Ctrl / Shift 修饰符）
+						点击快捷键输入框即可直接按下按键录制（支持单键如 Space 空格、方向键，或 Alt / Ctrl / Shift 组合键）
 					</p>
 				</div>
 				<button

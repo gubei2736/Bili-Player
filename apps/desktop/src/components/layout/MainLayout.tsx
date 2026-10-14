@@ -21,7 +21,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 
 	return (
-		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0b0f17] text-foreground border border-white/10 shadow-2xl">
+		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0b0f17] text-foreground border border-white/10 shadow-2xl relative">
+			{/* Top dynamic theme ambient glow */}
+			<div className="absolute top-0 left-0 right-0 h-96 pointer-events-none opacity-25 bg-gradient-to-b from-primary/30 via-primary/5 to-transparent transition-all duration-700 z-0" />
+
 			{/* Top frameless title bar */}
 			<TitleBar
 				onSearch={onSearch}
@@ -29,7 +32,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 			/>
 
 			{/* Middle area: Sidebar + Main Content */}
-			<div className="flex flex-1 overflow-hidden relative">
+			<div className="flex flex-1 overflow-hidden relative z-10">
 				<Sidebar
 					activeTab={activeTab}
 					onSelectTab={setActiveTab}

@@ -739,18 +739,36 @@ export class BilibiliApi {
 					cookies: '',
 				}
 			}
-			const combinedCookieHeader = response.headers.get('Set-Cookie')
-			if (!combinedCookieHeader) {
-				throw new BilibiliApiError({
-					message: '未获取到 Set-Cookie 头信息',
-					msgCode: 0,
-					rawData: null,
-					type: 'ResponseFailed',
-				})
+
+			// Try to get cookie from response headers first
+			let cookies =
+				response.headers.get('Set-Cookie') ||
+				response.headers.get('set-cookie') ||
+				''
+
+			const dataUrl = (data.data as any)?.url
+			if (!cookies && dataUrl) {
+				try {
+					const parsed = new URL(dataUrl)
+					const parts: string[] = []
+					parsed.searchParams.forEach((val, key) => {
+						if (
+							['DedeUserID', 'DedeUserID__ckMd5', 'SESSDATA', 'bili_jct'].includes(
+								key,
+							)
+						) {
+							parts.push(`${key}=${val}`)
+						}
+					})
+					if (parts.length > 0) {
+						cookies = parts.join('; ')
+					}
+				} catch {}
 			}
+
 			return {
 				status: BilibiliQrCodeLoginStatus.QRCODE_LOGIN_STATUS_SUCCESS,
-				cookies: combinedCookieHeader,
+				cookies,
 			}
 		}
 

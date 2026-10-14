@@ -42,6 +42,22 @@ const PRESET_SKINS: PresetSkin[] = [
 	},
 ]
 
+function hexToRgbTriple(hex: string): string {
+	let c = hex.replace('#', '')
+	if (c.length === 3) {
+		c = c
+			.split('')
+			.map((x) => x + x)
+			.join('')
+	}
+	const num = parseInt(c, 16)
+	if (Number.isNaN(num)) return '0 174 236'
+	const r = (num >> 16) & 255
+	const g = (num >> 8) & 255
+	const b = num & 255
+	return `${r} ${g} ${b}`
+}
+
 export const SkinStoreView: React.FC = () => {
 	const { activeSkinId, setSkin, clearSkin } = useSkinStore()
 
@@ -67,6 +83,8 @@ export const SkinStoreView: React.FC = () => {
 		}
 		setSkin(mockSuit)
 		// Update CSS root variables
+		const rgb = hexToRgbTriple(preset.color)
+		document.documentElement.style.setProperty('--primary-rgb', rgb)
 		document.documentElement.style.setProperty('--primary', preset.color)
 		document.documentElement.style.setProperty('--bili-theme-primary', preset.color)
 		document.documentElement.style.setProperty('--ring', preset.color)
@@ -74,6 +92,7 @@ export const SkinStoreView: React.FC = () => {
 
 	const handleReset = () => {
 		clearSkin()
+		document.documentElement.style.setProperty('--primary-rgb', '0 174 236')
 		document.documentElement.style.setProperty('--primary', '#00AEEC')
 		document.documentElement.style.setProperty('--bili-theme-primary', '#00AEEC')
 		document.documentElement.style.setProperty('--ring', '#00AEEC')

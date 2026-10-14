@@ -29,10 +29,16 @@ export class DesktopTauriHttpClient implements IHttpClient {
 				},
 			})
 
-			const headers = new Headers()
+			const headerMap = new Map<string, string>()
 			for (const [key, val] of Object.entries(res.headers)) {
-				headers.set(key, val)
+				headerMap.set(key.toLowerCase(), val)
 			}
+			const headers = {
+				get: (name: string) => headerMap.get(name.toLowerCase()) ?? null,
+				has: (name: string) => headerMap.has(name.toLowerCase()),
+				entries: () => headerMap.entries(),
+				forEach: (callback: any) => headerMap.forEach(callback),
+			} as unknown as Headers
 
 			return {
 				ok: res.ok,
