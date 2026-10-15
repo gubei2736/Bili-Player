@@ -228,9 +228,10 @@ export const App: React.FC = () => {
 	useEffect(() => {
 		const loadTracks = async () => {
 			try {
-				const res = await bilibiliApi.searchVideos({ keyword: '热门音乐', page: 1 })
-				if (res.isOk() && res.value.result && res.value.result.length > 0) {
-					const tracks: Track[] = res.value.result.slice(0, 8).map((item, idx) => {
+				let tracks: Track[] = []
+				const popRes = await bilibiliApi.getPopularVideos({ partition: '28' })
+				if (popRes.isOk() && popRes.value && popRes.value.length > 0) {
+					tracks = popRes.value.slice(0, 12).map((item, idx) => {
 						let cover = item.pic || ''
 						if (cover.startsWith('//')) cover = 'https:' + cover
 						return {
@@ -238,28 +239,63 @@ export const App: React.FC = () => {
 							uniqueKey: `bilibili_${item.bvid}_0`,
 							title: item.title.replace(/<[^>]*>?/gm, ''),
 							artist: {
-								id: item.mid || idx + 100,
-								name: item.author || '哔哩哔哩音乐人',
+								id: item.owner?.mid || idx + 100,
+								name: item.owner?.name || '哔哩哔哩音乐人',
 								source: 'bilibili',
 								createdAt: new Date(),
 								updatedAt: new Date(),
 							},
 							coverUrl: cover,
-							duration: 240,
+							duration: item.duration || 240,
 							source: 'bilibili',
 							createdAt: new Date(),
 							updatedAt: new Date(),
 							bilibiliMetadata: {
 								bvid: item.bvid,
-								cid: null,
-								isMultiPage: false,
+								cid: item.cid || null,
+								isMultiPage: Boolean(item.pages && item.pages.length > 1),
 								videoIsValid: true,
 							},
 						}
 					})
+				} else {
+					const res = await bilibiliApi.searchVideos({ keyword: '热门音乐', page: 1 })
+					if (res.isOk() && res.value.result && res.value.result.length > 0) {
+						tracks = res.value.result.slice(0, 10).map((item, idx) => {
+							let cover = item.pic || ''
+							if (cover.startsWith('//')) cover = 'https:' + cover
+							return {
+								id: idx + 100,
+								uniqueKey: `bilibili_${item.bvid}_0`,
+								title: item.title.replace(/<[^>]*>?/gm, ''),
+								artist: {
+									id: item.mid || idx + 100,
+									name: item.author || '哔哩哔哩音乐人',
+									source: 'bilibili',
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+								coverUrl: cover,
+								duration: 240,
+								source: 'bilibili',
+								createdAt: new Date(),
+								updatedAt: new Date(),
+								bilibiliMetadata: {
+									bvid: item.bvid,
+									cid: null,
+									isMultiPage: false,
+									videoIsValid: true,
+								},
+							}
+						})
+					}
+				}
+				if (tracks.length > 0) {
 					setFeaturedTracks(tracks)
 				}
-			} catch {}
+			} catch (e) {
+				console.warn('Failed to load featured tracks:', e)
+			}
 		}
 		loadTracks()
 	}, [])
@@ -502,9 +538,15 @@ export const App: React.FC = () => {
 	// Sync Track Info AND SPL Lyrics content to Desktop Floating Lyrics Window
 	useEffect(() => {
 		if (currentTrack) {
+			const bili = currentTrack.source === 'bilibili' ? (currentTrack as any) : null
+			const displayTitle =
+				bili?.bilibiliMetadata?.isMultiPage && (bili.bilibiliMetadata.pagePart || bili.bilibiliMetadata.pageIndex)
+					? `[P${bili.bilibiliMetadata.pageIndex || 1}] ${bili.bilibiliMetadata.pagePart || currentTrack.title}`
+					: currentTrack.title
+
 			emit('lyrics-sync', {
 				type: 'TRACK_CHANGE',
-				title: currentTrack.title,
+				title: displayTitle,
 				artist: currentTrack.artist?.name || '未知歌手',
 				durationMs: (currentTrack.duration || 0) * 1000,
 				splContent: activeSplContent || undefined,

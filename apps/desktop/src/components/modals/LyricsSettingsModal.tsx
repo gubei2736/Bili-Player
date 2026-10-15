@@ -55,9 +55,10 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 			setSearchKeyword(cleanTrackTitle(fullTitle) || fullTitle)
 			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
-			// 保留输入框关键词填充，由用户按需手动触发搜索
+			setCandidates([])
+			setIsSearching(false)
 		}
-	}, [isOpen, track])
+	}, [isOpen, track?.uniqueKey])
 
 	if (!isOpen || !track) return null
 

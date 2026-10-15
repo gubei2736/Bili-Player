@@ -54,7 +54,8 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 					const isMulti = pages.length > 1
 					const targetPageIndex = biliTrack.bilibiliMetadata.pageIndex || 1
 					const currentPage =
-						pages.find((p) => p.page === targetPageIndex || (cid && p.cid === cid)) ||
+						(targetPageIndex && pages.find((p) => p.page === targetPageIndex)) ||
+						(cid && pages.find((p) => p.cid === cid)) ||
 						pages[0]!
 
 					cid = currentPage.cid
@@ -95,6 +96,21 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 					throw new Error('无法获取该视频的分 P CID 信息')
 				}
 			} else {
+				if (biliTrack.bilibiliMetadata.isMultiPage && biliTrack.bilibiliMetadata.pages) {
+					const targetIdx = biliTrack.bilibiliMetadata.pageIndex || 1
+					const matchedPage =
+						(targetIdx && biliTrack.bilibiliMetadata.pages.find((p) => p.page === targetIdx)) ||
+						(cid && biliTrack.bilibiliMetadata.pages.find((p) => p.cid === cid))
+					if (matchedPage) {
+						cid = matchedPage.cid
+						biliTrack.bilibiliMetadata.cid = cid
+						biliTrack.bilibiliMetadata.pageIndex = matchedPage.page
+						biliTrack.bilibiliMetadata.pagePart = matchedPage.part
+						if (matchedPage.part) {
+							biliTrack.title = matchedPage.part
+						}
+					}
+				}
 				extraMetadata = {
 					bvid,
 					cid,

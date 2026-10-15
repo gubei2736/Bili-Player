@@ -417,13 +417,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 										onClick={onToggleFullscreenLyrics}
 										className="text-xs font-bold truncate hover:text-[#00AEEC] cursor-pointer text-foreground transition-colors"
 										title={
-											biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
-												? `${biliTrack.bilibiliMetadata.mainTrackTitle || currentTrack.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+											biliTrack?.bilibiliMetadata?.isMultiPage && (biliTrack.bilibiliMetadata.pagePart || biliTrack.bilibiliMetadata.pageIndex)
+												? `${biliTrack.bilibiliMetadata.mainTrackTitle || currentTrack.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart || currentTrack.title}`
 												: currentTrack.title
 										}
 									>
-										{biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
-											? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+										{biliTrack?.bilibiliMetadata?.isMultiPage && (biliTrack.bilibiliMetadata.pagePart || biliTrack.bilibiliMetadata.pageIndex)
+											? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart || currentTrack.title}`
 											: currentTrack.title}
 									</p>
 									{biliTrack?.bilibiliMetadata?.isMultiPage && (

@@ -261,13 +261,13 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 								<h1
 									className="text-lg md:text-xl font-bold tracking-tight text-white drop-shadow truncate"
 									title={
-										biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
-											? `${biliTrack.bilibiliMetadata.mainTrackTitle || track?.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+										biliTrack?.bilibiliMetadata?.isMultiPage && (biliTrack.bilibiliMetadata.pagePart || biliTrack.bilibiliMetadata.pageIndex)
+											? `${biliTrack.bilibiliMetadata.mainTrackTitle || track?.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart || track?.title}`
 											: track?.title
 									}
 								>
-									{biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
-										? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+									{biliTrack?.bilibiliMetadata?.isMultiPage && (biliTrack.bilibiliMetadata.pagePart || biliTrack.bilibiliMetadata.pageIndex)
+										? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart || track?.title}`
 										: (track?.title || '未在播放歌曲')}
 								</h1>
 								{biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.mainTrackTitle && (

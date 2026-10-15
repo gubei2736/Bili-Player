@@ -130,10 +130,9 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 			? (queueCurrentTrack as BilibiliTrack)
 			: null
 
-	const effectiveCid = activeBiliTrack ? activeBiliTrack.bilibiliMetadata.cid : currentCid
-	const effectivePage = activeBiliTrack
-		? activeBiliTrack.bilibiliMetadata.pageIndex
-		: currentPage
+	// 优先以当前正在播放的音轨元数据为准，避免被外部旧 props 污染
+	const activeCid = activeBiliTrack?.bilibiliMetadata?.cid ?? currentCid ?? null
+	const activePage = activeBiliTrack?.bilibiliMetadata?.pageIndex ?? currentPage ?? null
 
 	const handlePlaySinglePart = async (part: BilibiliVideoPart) => {
 		const track = createTrackFromPart(part)
@@ -282,8 +281,8 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 					) : (
 						parts.map((p) => {
 							const isCurrent =
-								(effectiveCid && p.cid === effectiveCid) ||
-								(effectivePage && p.page === effectivePage)
+								Boolean(activePage && p.page === activePage) ||
+								Boolean(activeCid && p.cid === activeCid)
 
 							return (
 								<div
