@@ -10,5 +10,6 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 
 copy /y "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\bbplayer.exe" "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\Bili Player.exe"
 copy /y "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\bbplayer.exe" "G:\Project\Gemini\BBPlayer\release\Bili Player.exe"
+del /f /q "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\bbplayer.*" 2>nul
 
 echo TAURI_BUILD_SUCCESS
