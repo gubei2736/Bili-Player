@@ -72,6 +72,7 @@ export function cleanTrackTitle(title: string): string {
 		.replace(/\(.*?\)/g, '')
 		.replace(/《(.*?)》/g, '$1')
 		.replace(/4K|1080P|60帧|无损音质|官方MV|完整版|高音质/gi, '')
+		.replace(/^(\d{1,3}[\s._-]+|P\d+[\s._-]+)/i, '')
 		.replace(/[-_]/g, ' ')
 		.trim()
 }

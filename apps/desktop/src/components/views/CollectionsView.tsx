@@ -22,6 +22,7 @@ import {
 	useAuthStore,
 	usePlaylistStore,
 	useQueueStore,
+	useCurrentTrack,
 	bilibiliApi,
 	type Track,
 	type BilibiliTrack,
@@ -54,8 +55,8 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 		syncRemotePlaylists,
 		isLoading: isSyncing,
 	} = usePlaylistStore()
-	const { setQueue, getCurrentTrack } = useQueueStore()
-	const currentTrack = getCurrentTrack()
+	const { setQueue } = useQueueStore()
+	const currentTrack = useCurrentTrack()
 
 	const [activeCollection, setActiveCollection] =
 		useState<BilibiliCollection | null>(null)

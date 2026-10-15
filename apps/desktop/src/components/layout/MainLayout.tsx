@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { TitleBar } from './TitleBar'
 import { Sidebar, type NavTab } from './Sidebar'
 import { BottomPlayerBar } from './BottomPlayerBar'
-import { useQueueStore, useSkinStore } from '@bbplayer/shared-core'
+import { useQueueStore, useCurrentTrack, useSkinStore } from '@bbplayer/shared-core'
 
 export interface MainLayoutProps {
 	children: (activeTab: NavTab) => React.ReactNode
@@ -28,7 +28,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 		externalActiveTab !== undefined ? externalActiveTab : internalActiveTab
 	const setActiveTab = onSelectTab || setInternalActiveTab
 
-	const currentTrack = useQueueStore((s) => s.getCurrentTrack())
+	const currentTrack = useCurrentTrack()
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
 	const customBgOpacity = useSkinStore((s) => s.customBgOpacity)
 	const customBgBlur = useSkinStore((s) => s.customBgBlur)

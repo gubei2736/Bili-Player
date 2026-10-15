@@ -15,9 +15,9 @@ export interface ImmersiveLyricsViewProps {
 	splContent?: string | null
 }
 
-const DEFAULT_SPL_SAMPLE = `[ti:BBPlayer]
+const DEFAULT_SPL_SAMPLE = `[ti:Bili Player]
 [ar:洛天依]
-[00:00.00]BBPlayer 沉浸式全屏歌词模式
+[00:00.00]Bili Player 沉浸式全屏歌词模式
 [00:04.00]让音乐与视觉在这一刻完美共鸣
 [00:08.50]支持 SPL 逐字音节染色与罗马音双语对照
 [00:14.00]跟随音轨流动，感受细腻律动
@@ -249,7 +249,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											track?.coverUrl ||
 											'https://i0.hdslb.com/bfs/archive/placeholder.jpg'
 										}
-										alt={track?.title || 'BBPlayer'}
+										alt={track?.title || 'Bili Player'}
 										referrerPolicy="no-referrer"
 										className="w-full h-full object-cover"
 									/>

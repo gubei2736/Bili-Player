@@ -42,7 +42,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
 	const handleClose = async () => {
 		try {
-			const action = localStorage.getItem('bbplayer_close_action') || 'tray'
+			const action =
+				localStorage.getItem('bili_player_close_action') ||
+				localStorage.getItem('bbplayer_close_action') ||
+				'tray'
 			if (action === 'exit') {
 				const { invoke } = await import('@tauri-apps/api/core')
 				await invoke('exit_app')

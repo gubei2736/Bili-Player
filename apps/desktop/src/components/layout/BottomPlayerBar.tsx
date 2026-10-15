@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import {
 	useQueueStore,
+	useCurrentTrack,
 	useLocalPlaylistStore,
 	useSkinStore,
 	type BilibiliTrack,
@@ -52,7 +53,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		setPlayMode,
 		next,
 		prev,
-		getCurrentTrack,
 		setCurrentIndex,
 		clearQueue,
 	} = useQueueStore()
@@ -67,7 +67,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		desktopAudioEngine.isLoudnessNormalizationEnabled(),
 	)
 
-	const currentTrack = getCurrentTrack()
+	const currentTrack = useCurrentTrack()
 	const biliTrack =
 		currentTrack?.source === 'bilibili' ? (currentTrack as BilibiliTrack) : null
 	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality

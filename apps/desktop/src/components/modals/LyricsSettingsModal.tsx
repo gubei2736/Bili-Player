@@ -21,6 +21,7 @@ import {
 	setLyricOptionTranslation,
 	getLyricOptionRomaji,
 	setLyricOptionRomaji,
+	cleanTrackTitle,
 	type LyricSearchCandidate,
 } from '../../services/lyricService'
 
@@ -51,7 +52,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	useEffect(() => {
 		if (isOpen && track) {
 			const fullTitle = track.title.trim()
-			setSearchKeyword(fullTitle)
+			setSearchKeyword(cleanTrackTitle(fullTitle) || fullTitle)
 			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
 			// 保留输入框关键词填充，由用户按需手动触发搜索

@@ -21,6 +21,7 @@ export interface QueueState {
 		uniqueKey: string,
 		streamUrlData: NonNullable<BilibiliTrack['bilibiliMetadata']['bilibiliStreamUrl']>,
 		extraMetadata?: Partial<BilibiliTrack['bilibiliMetadata']>,
+		trackOverrides?: Partial<Pick<BilibiliTrack, 'title' | 'duration' | 'uniqueKey'>>,
 	) => void
 	next: () => Track | null
 	prev: () => Track | null
@@ -141,13 +142,21 @@ export const useQueueStore = create<QueueState>()(
 				}
 			},
 
-			updateTrackStream: (uniqueKey, streamUrlData, extraMetadata) => {
+			updateTrackStream: (uniqueKey, streamUrlData, extraMetadata, trackOverrides) => {
 				const { queue } = get()
 				const newQueue = queue.map((t) => {
-					if (t.uniqueKey === uniqueKey && t.source === 'bilibili') {
+					const isTarget =
+						t.uniqueKey === uniqueKey ||
+						(t.source === 'bilibili' &&
+							extraMetadata?.pages &&
+							(t as BilibiliTrack).bilibiliMetadata.bvid === (extraMetadata as any)?.bvid &&
+							(t as BilibiliTrack).bilibiliMetadata.pageIndex === extraMetadata.pageIndex)
+
+					if (isTarget && t.source === 'bilibili') {
 						const bt = t as BilibiliTrack
 						return {
 							...bt,
+							...(trackOverrides || {}),
 							bilibiliMetadata: {
 								...bt.bilibiliMetadata,
 								...(extraMetadata || {}),
@@ -247,7 +256,7 @@ export const useQueueStore = create<QueueState>()(
 			},
 		}),
 		{
-			name: 'bbplayer_queue_store',
+			name: 'bili_player_queue_store',
 			storage: createJSONStorage(() => getDefaultStateStorage()),
 			partialize: (state) => ({
 				queue: state.queue,
@@ -258,3 +267,10 @@ export const useQueueStore = create<QueueState>()(
 		},
 	),
 )
+
+export const useCurrentTrack = (): Track | null =>
+	useQueueStore((s) =>
+		s.currentIndex >= 0 && s.currentIndex < s.queue.length
+			? s.queue[s.currentIndex] ?? null
+			: null,
+	)

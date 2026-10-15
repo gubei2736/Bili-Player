@@ -27,6 +27,7 @@ import { initDesktopDatabase } from './db/desktopDb'
 import { loginQrService } from './services/loginQrService'
 import {
 	useQueueStore,
+	useCurrentTrack,
 	useSkinStore,
 	useAuthStore,
 	usePlaylistStore,
@@ -74,7 +75,11 @@ export const App: React.FC = () => {
 	const [searchQuery, setSearchQuery] = useState('')
 	const [dbReady, setDbReady] = useState(false)
 	const [closeAction, setCloseAction] = useState<'tray' | 'exit'>(() => {
-		return (localStorage.getItem('bbplayer_close_action') as 'tray' | 'exit') || 'tray'
+		return (
+			(localStorage.getItem('bili_player_close_action') as 'tray' | 'exit') ||
+			(localStorage.getItem('bbplayer_close_action') as 'tray' | 'exit') ||
+			'tray'
+		)
 	})
 	const [featuredTracks, setFeaturedTracks] = useState<Track[]>([
 		{
@@ -147,8 +152,8 @@ export const App: React.FC = () => {
 		},
 	])
 
-	const { setQueue, next, prev, getCurrentTrack } = useQueueStore()
-	const currentTrack = getCurrentTrack()
+	const { setQueue, next, prev } = useQueueStore()
+	const currentTrack = useCurrentTrack()
 	const { isLoggedIn, userInfo } = useAuthStore()
 	const { syncRemotePlaylists } = usePlaylistStore()
 
@@ -680,6 +685,7 @@ export const App: React.FC = () => {
 										<button
 											onClick={() => {
 												setCloseAction('tray')
+												localStorage.setItem('bili_player_close_action', 'tray')
 												localStorage.setItem('bbplayer_close_action', 'tray')
 											}}
 											className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
@@ -716,6 +722,7 @@ export const App: React.FC = () => {
 										<button
 											onClick={() => {
 												setCloseAction('exit')
+												localStorage.setItem('bili_player_close_action', 'exit')
 												localStorage.setItem('bbplayer_close_action', 'exit')
 											}}
 											className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${

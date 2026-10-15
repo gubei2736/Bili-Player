@@ -26,6 +26,7 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 		return
 	}
 
+	const originalKey = track.uniqueKey
 	currentLoadingTrackKey = track.uniqueKey
 	const requestId = ++latestPlayRequestId
 
@@ -37,6 +38,8 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 
 			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID
 			let extraMetadata: Partial<BilibiliTrack['bilibiliMetadata']> = {}
+			let trackOverrides: { title?: string; duration?: number; uniqueKey?: string } | undefined
+
 			if (!biliTrack.bilibiliMetadata.pages || !cid) {
 				const pageListRes = await bilibiliApi.getPageList({ bvid })
 				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
@@ -64,7 +67,23 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 						biliTrack.bilibiliMetadata.mainTrackTitle = biliTrack.title
 					}
 
+					if (isMulti && currentPage.part) {
+						biliTrack.title = currentPage.part
+						if (currentPage.duration) {
+							biliTrack.duration = currentPage.duration
+						}
+						const newKey = `bilibili_${bvid}_${currentPage.page}`
+						biliTrack.uniqueKey = newKey
+						currentLoadingTrackKey = newKey
+						trackOverrides = {
+							title: biliTrack.title,
+							duration: biliTrack.duration,
+							uniqueKey: newKey,
+						}
+					}
+
 					extraMetadata = {
+						bvid,
 						cid,
 						isMultiPage: isMulti,
 						pageIndex: currentPage.page,
@@ -74,6 +93,21 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 					}
 				} else if (!cid) {
 					throw new Error('无法获取该视频的分 P CID 信息')
+				}
+			} else {
+				extraMetadata = {
+					bvid,
+					cid,
+					isMultiPage: biliTrack.bilibiliMetadata.isMultiPage,
+					pageIndex: biliTrack.bilibiliMetadata.pageIndex,
+					pagePart: biliTrack.bilibiliMetadata.pagePart,
+					pages: biliTrack.bilibiliMetadata.pages,
+					mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle,
+				}
+				trackOverrides = {
+					title: biliTrack.title,
+					duration: biliTrack.duration,
+					uniqueKey: biliTrack.uniqueKey,
 				}
 			}
 
@@ -126,7 +160,7 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
 
 			// 实时更新播放队列中的曲目数据，使底栏与全屏歌词瞬间展示当前音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
-			useQueueStore.getState().updateTrackStream(biliTrack.uniqueKey, streamData, extraMetadata)
+			useQueueStore.getState().updateTrackStream(originalKey, streamData, extraMetadata, trackOverrides)
 
 			// 3. Query local stream proxy port from Tauri backend
 			let port = 0
@@ -167,7 +201,7 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			useHistoryStore.getState().addRecord(track)
 		}
 	} finally {
-		if (currentLoadingTrackKey === track.uniqueKey) {
+		if (currentLoadingTrackKey === track.uniqueKey || (track.source === 'bilibili' && currentLoadingTrackKey === originalKey)) {
 			currentLoadingTrackKey = null
 		}
 	}

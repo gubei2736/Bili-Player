@@ -21,6 +21,7 @@ import {
 	useAuthStore,
 	usePlaylistStore,
 	useQueueStore,
+	useCurrentTrack,
 	bilibiliApi,
 	type Track,
 	type BilibiliTrack,
@@ -52,8 +53,8 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		setPlaylistTracksCache,
 		isLoading: isSyncingPlaylists,
 	} = usePlaylistStore()
-	const { setQueue, getCurrentTrack } = useQueueStore()
-	const currentTrack = getCurrentTrack()
+	const { setQueue } = useQueueStore()
+	const currentTrack = useCurrentTrack()
 
 	const [tracks, setTracks] = useState<BilibiliTrack[]>(() => {
 		if (selectedPlaylistId && playlistTracksCache[selectedPlaylistId]) {

@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title BBPlayer Dev Environment
+title Bili Player Dev Environment
 
 set "RUSTUP_HOME=D:\Public_Environment\Rust\rustup"
 set "CARGO_HOME=D:\Public_Environment\Rust\cargo"
@@ -13,6 +13,6 @@ call pnpm --filter desktop tauri dev
 
 if %errorlevel% neq 0 (
     echo.
-    echo [BBPlayer Error] Process exited with code %errorlevel%
+    echo [Bili Player Error] Process exited with code %errorlevel%
     pause
 )

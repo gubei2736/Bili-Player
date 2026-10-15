@@ -4,6 +4,7 @@ import { X, Layers, Play, Plus, Loader2, Music2 } from 'lucide-react'
 import {
 	bilibiliApi,
 	useQueueStore,
+	useCurrentTrack,
 	type BilibiliTrack,
 	type BilibiliVideoPart,
 } from '@bbplayer/shared-core'
@@ -90,9 +91,7 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 	if (!isOpen) return null
 
 	const createTrackFromPart = (part: BilibiliVideoPart): BilibiliTrack => {
-		const partTitle = part.part
-			? `${title} - [P${part.page}] ${part.part}`
-			: `${title} - [P${part.page}]`
+		const partTitle = part.part || `第${part.page}部分`
 
 		return {
 			id: Date.now() + part.page,
@@ -123,11 +122,7 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 		}
 	}
 
-	const queueCurrentTrack = useQueueStore((s) =>
-		s.currentIndex >= 0 && s.currentIndex < s.queue.length
-			? s.queue[s.currentIndex]
-			: null,
-	)
+	const queueCurrentTrack = useCurrentTrack()
 	const activeBiliTrack =
 		queueCurrentTrack &&
 		queueCurrentTrack.source === 'bilibili' &&

@@ -1,8 +1,8 @@
 [package]
 name = "bbplayer"
 version = "0.1.0"
-description = "BBPlayer Desktop Application"
-authors = ["bbplayer"]
+description = "Bili Player Desktop Application"
+authors = ["bili-player"]
 edition = "2021"
 
 [lib]

@@ -66,7 +66,7 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 					output_path: outputPath,
 					title: track.title,
 					artist: track.artist?.name || '未知歌手',
-					album: 'BBPlayer',
+					album: 'Bili Player',
 					cover_url: track.coverUrl,
 					lyrics: null,
 				},
