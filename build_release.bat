@@ -8,4 +8,7 @@ cd /d "G:\Project\Gemini\BBPlayer\apps\desktop"
 call pnpm tauri build --no-bundle
 if %errorlevel% neq 0 exit /b %errorlevel%
 
+copy /y "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\bbplayer.exe" "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\Bili Player.exe"
+copy /y "G:\Project\Gemini\BBPlayer\apps\desktop\src-tauri\target\release\bbplayer.exe" "G:\Project\Gemini\BBPlayer\release\Bili Player.exe"
+
 echo TAURI_BUILD_SUCCESS
