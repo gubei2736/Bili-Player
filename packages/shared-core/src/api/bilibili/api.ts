@@ -341,9 +341,12 @@ export class BilibiliApi {
 				// 1. 如果用户优先选择杜比全景声，先尝试杜比，再降级 Hi-Res
 				if (preferDolbyFirst) {
 					if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
+						const dolbyAudio = dash.dolby.audio[0]
 						return okAsync({
-							url: dash.dolby.audio[0].baseUrl,
-							quality: dash.dolby.audio[0].id || 30250,
+							url: dolbyAudio.baseUrl,
+							quality: dolbyAudio.id || 30250,
+							bandwidth: dolbyAudio.bandwidth,
+							codecs: dolbyAudio.codecs,
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
@@ -353,6 +356,8 @@ export class BilibiliApi {
 						return okAsync({
 							url: dash.flac.audio.baseUrl,
 							quality: dash.flac.audio.id || 30251,
+							bandwidth: dash.flac.audio.bandwidth,
+							codecs: dash.flac.audio.codecs,
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
@@ -364,6 +369,8 @@ export class BilibiliApi {
 						return okAsync({
 							url: dash.flac.audio.baseUrl,
 							quality: dash.flac.audio.id || 30251,
+							bandwidth: dash.flac.audio.bandwidth,
+							codecs: dash.flac.audio.codecs,
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
@@ -371,9 +378,12 @@ export class BilibiliApi {
 					}
 
 					if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
+						const dolbyAudio = dash.dolby.audio[0]
 						return okAsync({
-							url: dash.dolby.audio[0].baseUrl,
-							quality: dash.dolby.audio[0].id || 30250,
+							url: dolbyAudio.baseUrl,
+							quality: dolbyAudio.id || 30250,
+							bandwidth: dolbyAudio.bandwidth,
+							codecs: dolbyAudio.codecs,
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
@@ -400,6 +410,8 @@ export class BilibiliApi {
 					return okAsync({
 						url: targetAudio.baseUrl,
 						quality: targetAudio.id,
+						bandwidth: targetAudio.bandwidth,
+						codecs: targetAudio.codecs,
 						getTime,
 						type: 'dash' as const,
 						volume,

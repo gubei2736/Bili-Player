@@ -40,6 +40,8 @@ export interface BilibiliTrack extends BaseTrack {
 		bilibiliStreamUrl?: {
 			url: string
 			quality: number
+			bandwidth?: number
+			codecs?: string
 			getTime: number
 			type: 'mp4' | 'dash' | 'local'
 			volume?: {

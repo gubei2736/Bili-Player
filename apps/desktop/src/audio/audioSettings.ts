@@ -32,7 +32,11 @@ export function setAudioQualityPreference(pref: AudioQualityPreference): void {
 	window.dispatchEvent(new CustomEvent('bbplayer:audio-quality-change', { detail: pref }))
 }
 
-export function getQualityBadgeInfo(qualityId?: number, isLocal = false): {
+export function getQualityBadgeInfo(
+	qualityId?: number,
+	isLocal = false,
+	bandwidth?: number,
+): {
 	text: string
 	bg: string
 	border: string
@@ -49,6 +53,8 @@ export function getQualityBadgeInfo(qualityId?: number, isLocal = false): {
 		}
 	}
 
+	const measuredKbps = bandwidth ? Math.round(bandwidth / 1000) : null
+
 	switch (qualityId) {
 		case 30251:
 			return {
@@ -56,7 +62,9 @@ export function getQualityBadgeInfo(qualityId?: number, isLocal = false): {
 				bg: 'bg-amber-500/20',
 				border: 'border-amber-400/30',
 				color: 'text-amber-300',
-				tooltip: 'FLAC 无损音轨 (最高 96kHz/24bit)',
+				tooltip: measuredKbps
+					? `FLAC 无损音轨 (${measuredKbps}Kbps, 最高 96kHz/24bit)`
+					: 'FLAC 无损音轨 (最高 96kHz/24bit)',
 			}
 		case 30250:
 			return {
@@ -64,39 +72,61 @@ export function getQualityBadgeInfo(qualityId?: number, isLocal = false): {
 				bg: 'bg-purple-500/20',
 				border: 'border-purple-400/30',
 				color: 'text-purple-300',
-				tooltip: 'Dolby Atmos (E-AC-3 JOC, 最高 768kbps)',
+				tooltip: measuredKbps
+					? `Dolby Atmos (${measuredKbps}Kbps E-AC-3 JOC)`
+					: 'Dolby Atmos (E-AC-3 JOC, 最高 768kbps)',
 			}
-		case 30280:
+		case 30280: {
+			// B站 30280 为常规高码率档位：日常投稿普遍为 192kbps，高规格投稿可达 320kbps
+			let text = '192Kbps AAC'
+			if (measuredKbps) {
+				if (measuredKbps >= 260) {
+					text = '320Kbps AAC'
+				} else if (measuredKbps >= 150) {
+					text = `${measuredKbps >= 180 && measuredKbps <= 200 ? 192 : measuredKbps}Kbps AAC`
+				} else {
+					text = `${measuredKbps}Kbps AAC`
+				}
+			}
 			return {
-				text: '320Kbps AAC',
+				text,
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',
-				tooltip: '320Kbps 极高品质常规 AAC',
+				tooltip: `高品质常规 AAC (${measuredKbps ? measuredKbps + 'Kbps' : '192~320Kbps'} / ID: 30280)`,
 			}
-		case 30232:
+		}
+		case 30232: {
+			const text = measuredKbps
+				? `${measuredKbps >= 125 && measuredKbps <= 140 ? 132 : measuredKbps}Kbps AAC`
+				: '132Kbps AAC'
 			return {
-				text: '132Kbps AAC',
+				text,
 				bg: 'bg-teal-500/20',
 				border: 'border-teal-400/30',
 				color: 'text-teal-300',
-				tooltip: '132Kbps 较高品质常规 AAC',
+				tooltip: `中等品质常规 AAC (${measuredKbps ? measuredKbps + 'Kbps' : '132Kbps'} / ID: 30232)`,
 			}
-		case 30216:
+		}
+		case 30216: {
+			const text = measuredKbps
+				? `${measuredKbps >= 60 && measuredKbps <= 70 ? 64 : measuredKbps}Kbps AAC`
+				: '64Kbps AAC'
 			return {
-				text: '64Kbps AAC',
+				text,
 				bg: 'bg-zinc-500/20',
 				border: 'border-zinc-400/30',
 				color: 'text-zinc-300',
-				tooltip: '64Kbps 普通品质常规 AAC',
+				tooltip: `普通品质常规 AAC (${measuredKbps ? measuredKbps + 'Kbps' : '64Kbps'} / ID: 30216)`,
 			}
+		}
 		default:
 			return {
 				text: '识别音质中...',
 				bg: 'bg-white/10',
 				border: 'border-white/15',
 				color: 'text-muted-foreground animate-pulse',
-				tooltip: '正在识别当前音频流码率与格式...',
+				tooltip: '正在识别当前音频流真实码率与格式...',
 			}
 	}
 }

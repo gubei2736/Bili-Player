@@ -58,8 +58,11 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 
 	const biliTrack = track?.source === 'bilibili' ? (track as BilibiliTrack) : null
 	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
+	const currentBandwidth = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.bandwidth
 	const isLocal = track?.source === 'local'
-	const badgeInfo = track ? getQualityBadgeInfo(currentQualityId, isLocal) : null
+	const badgeInfo = track
+		? getQualityBadgeInfo(currentQualityId, isLocal, currentBandwidth)
+		: null
 
 	const lyricsData: SplLyricData = useMemo(() => {
 		try {

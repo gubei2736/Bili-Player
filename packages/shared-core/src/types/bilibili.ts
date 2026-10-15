@@ -32,6 +32,8 @@ export interface BilibiliAudioStreamResponse {
 					id: number
 					baseUrl: string
 					backupUrl: string[]
+					bandwidth?: number
+					codecs?: string
 			  }[]
 			| null
 		dolby?: {
@@ -41,6 +43,8 @@ export interface BilibiliAudioStreamResponse {
 						id: number
 						baseUrl: string
 						backupUrl: string[]
+						bandwidth?: number
+						codecs?: string
 				  }[]
 				| null
 		} | null
@@ -50,6 +54,8 @@ export interface BilibiliAudioStreamResponse {
 				id: number
 				baseUrl: string
 				backupUrl: string[]
+				bandwidth?: number
+				codecs?: string
 			} | null
 		} | null
 	}

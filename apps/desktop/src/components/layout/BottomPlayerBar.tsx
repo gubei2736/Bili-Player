@@ -69,8 +69,11 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const biliTrack =
 		currentTrack?.source === 'bilibili' ? (currentTrack as BilibiliTrack) : null
 	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
+	const currentBandwidth = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.bandwidth
 	const isLocal = currentTrack?.source === 'local'
-	const badgeInfo = currentTrack ? getQualityBadgeInfo(currentQualityId, isLocal) : null
+	const badgeInfo = currentTrack
+		? getQualityBadgeInfo(currentQualityId, isLocal, currentBandwidth)
+		: null
 
 	const [splContent, setSplContent] = useState<string>('')
 	const [lyricOffsetSec, setLyricOffsetSec] = useState<number>(0)
