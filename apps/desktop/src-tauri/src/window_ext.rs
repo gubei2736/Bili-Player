@@ -75,3 +75,15 @@ pub fn toggle_lyrics_window(app: AppHandle) -> Result<bool, String> {
 pub fn exit_app(app: AppHandle) {
     app.exit(0);
 }
+
+/// Tauri Command: Append debug log message directly to disk
+#[tauri::command]
+pub fn append_debug_log(message: String) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let log_path = "G:\\Project\\Gemini\\BBPlayer\\debug_multipart.log";
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(file, "{}", message);
+    }
+}
+

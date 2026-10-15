@@ -38,6 +38,7 @@ import {
 } from '../../services/lyricService'
 import { LyricsSettingsModal } from '../modals/LyricsSettingsModal'
 import { VideoPartsModal } from '../modals/VideoPartsModal'
+import { logMultipart } from '../../utils/debugLogger'
 
 export interface BottomPlayerBarProps {
 	onToggleFullscreenLyrics?: () => void
@@ -75,6 +76,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 	// 优先以最新触发的 storeTrack 或真实发声的 engineTrack 为准，彻底解决声音是 P2 但底栏还显示 P1 的不同步问题
 	const currentTrack = useMemo(() => {
+		let chosen: Track | null = null
 		if (
 			engineTrack &&
 			storeTrack &&
@@ -88,15 +90,41 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				eb.bilibiliMetadata.pageIndex !== undefined &&
 				eb.bilibiliMetadata.pageIndex !== sb.bilibiliMetadata.pageIndex
 			) {
-				return engineTrack
+				// 当两者分 P 索引不一致时，优先选择拥有最新时间戳/有效属性的实例
+				const eTime = eb.updatedAt ? new Date(eb.updatedAt).getTime() : 0
+				const sTime = sb.updatedAt ? new Date(sb.updatedAt).getTime() : 0
+				chosen = eTime >= sTime ? engineTrack : storeTrack
 			}
 		}
-		return storeTrack || engineTrack
+		if (!chosen) {
+			chosen = storeTrack || engineTrack
+		}
+		return chosen
 	}, [storeTrack, engineTrack])
+
+	useEffect(() => {
+		if (currentTrack) {
+			logMultipart('BottomPlayerBar', '当前渲染曲目变化', {
+				title: currentTrack.title,
+				uniqueKey: currentTrack.uniqueKey,
+				source: currentTrack.source,
+				bvid: (currentTrack as any)?.bilibiliMetadata?.bvid,
+				pageIndex: (currentTrack as any)?.bilibiliMetadata?.pageIndex,
+				cid: (currentTrack as any)?.bilibiliMetadata?.cid,
+				pagePart: (currentTrack as any)?.bilibiliMetadata?.pagePart,
+				isMultiPage: (currentTrack as any)?.bilibiliMetadata?.isMultiPage,
+			})
+		}
+	}, [currentTrack])
 
 	// 监听 bbplayer:track-updated 事件，确保点击 P2 瞬间底栏立刻刷新
 	useEffect(() => {
 		const handleTrackUpdated = (e: any) => {
+			logMultipart('BottomPlayerBar', '收到 track-updated 全局事件', {
+				detailTitle: e.detail?.title,
+				detailPage: e.detail?.bilibiliMetadata?.pageIndex,
+				detailCid: e.detail?.bilibiliMetadata?.cid,
+			})
 			if (e.detail) {
 				setEngineTrack({ ...e.detail })
 			}
@@ -205,15 +233,28 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
 			if (event.type === 'trackchange') {
 				const active = event.track ?? desktopAudioEngine.getCurrentTrack()
+				logMultipart('BottomPlayerBar', '收到引擎 trackchange 事件', {
+					title: active?.title,
+					pageIndex: (active as any)?.bilibiliMetadata?.pageIndex,
+					cid: (active as any)?.bilibiliMetadata?.cid,
+				})
 				if (active) setEngineTrack({ ...active })
 			}
 			if (event.type === 'play') {
 				setIsPlaying(true)
 				const active = desktopAudioEngine.getCurrentTrack()
+				logMultipart('BottomPlayerBar', '收到引擎 play 事件', {
+					title: active?.title,
+					pageIndex: (active as any)?.bilibiliMetadata?.pageIndex,
+				})
 				if (active) setEngineTrack({ ...active })
 			}
 			if (event.type === 'loadedmetadata') {
 				const active = desktopAudioEngine.getCurrentTrack()
+				logMultipart('BottomPlayerBar', '收到引擎 loadedmetadata 事件', {
+					title: active?.title,
+					pageIndex: (active as any)?.bilibiliMetadata?.pageIndex,
+				})
 				if (active) setEngineTrack({ ...active })
 			}
 			if (event.type === 'pause') setIsPlaying(false)

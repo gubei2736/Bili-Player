@@ -1,4 +1,5 @@
 import type { Track } from '@bbplayer/shared-core'
+import { logMultipart } from '../utils/debugLogger'
 
 export interface AudioEngineContract {
 	loadAndPlay(
@@ -223,6 +224,12 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	 * 立即设置当前激活的音轨并广播 trackchange 事件（在网络请求完成前即可先行更新 UI）
 	 */
 	public setActiveTrack(track: Track): void {
+		logMultipart('AudioEngine', 'setActiveTrack 被调用', {
+			uniqueKey: track.uniqueKey,
+			title: track.title,
+			pageIndex: (track as any)?.bilibiliMetadata?.pageIndex,
+			cid: (track as any)?.bilibiliMetadata?.cid,
+		})
 		this.currentTrack = track
 		this.updateMediaSession(track)
 		this.emit({
@@ -238,6 +245,13 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		proxyStreamUrl: string,
 		loudnessGainDb = 0,
 	): Promise<void> {
+		logMultipart('AudioEngine', 'loadAndPlay 开始执行', {
+			uniqueKey: track.uniqueKey,
+			title: track.title,
+			pageIndex: (track as any)?.bilibiliMetadata?.pageIndex,
+			cid: (track as any)?.bilibiliMetadata?.cid,
+			proxyStreamUrl: proxyStreamUrl.substring(0, 80) + '...',
+		})
 		this.initAudioContext()
 		if (this.audioCtx?.state === 'suspended') {
 			await this.audioCtx.resume()

@@ -8,7 +8,6 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager};
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -25,6 +24,7 @@ pub fn run() {
             window_ext::set_ignore_cursor_events,
             window_ext::toggle_lyrics_window,
             window_ext::toggle_lyrics_lock,
+            window_ext::append_debug_log,
             stream_proxy::get_stream_proxy_port,
             stream_proxy::get_cached_track_path,
             exporter::export_cached_track_to_m4a,

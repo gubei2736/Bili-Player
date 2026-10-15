@@ -13,6 +13,7 @@ import {
 	playTrackWithProxy,
 	syncTrackToQueueStore,
 } from '../../audio/playTrackHelper'
+import { logMultipart } from '../../utils/debugLogger'
 
 export interface VideoPartsModalProps {
 	isOpen: boolean
@@ -59,9 +60,24 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 
 	useEffect(() => {
 		if (!isOpen) return
-		setEngineTrack(desktopAudioEngine.getCurrentTrack())
+		const cur = desktopAudioEngine.getCurrentTrack()
+		setEngineTrack(cur)
+		logMultipart('VideoPartsModal', '选集弹窗被打开', {
+			bvid,
+			title,
+			engineTrackTitle: cur?.title,
+			engineTrackPage: (cur as any)?.bilibiliMetadata?.pageIndex,
+			engineTrackCid: (cur as any)?.bilibiliMetadata?.cid,
+			queueIndex: currentIndex,
+			queueTrackTitle: queueTrack?.title,
+			queueTrackPage: (queueTrack as any)?.bilibiliMetadata?.pageIndex,
+		})
 
 		const handleTrackUpdated = (e: any) => {
+			logMultipart('VideoPartsModal', '接收到 track-updated 事件', {
+				detailTitle: e.detail?.title,
+				detailPage: e.detail?.bilibiliMetadata?.pageIndex,
+			})
 			if (e.detail) {
 				setEngineTrack({ ...e.detail })
 			} else {
@@ -75,7 +91,12 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 				ev.type === 'play' ||
 				ev.type === 'loadedmetadata'
 			) {
-				setEngineTrack(ev.track ?? desktopAudioEngine.getCurrentTrack())
+				const active = ev.track ?? desktopAudioEngine.getCurrentTrack()
+				logMultipart('VideoPartsModal', `音频引擎事件 ${ev.type}`, {
+					activeTitle: active?.title,
+					activePage: (active as any)?.bilibiliMetadata?.pageIndex,
+				})
+				setEngineTrack(active)
 			}
 		})
 
@@ -176,7 +197,23 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 	const activePage = activeBiliTrack?.bilibiliMetadata?.pageIndex ?? null
 
 	const handlePlaySinglePart = async (part: BilibiliVideoPart) => {
+		logMultipart('VideoPartsModal', '用户在分 P 列表中点击曲目', {
+			clickedPage: part.page,
+			clickedCid: part.cid,
+			clickedTitle: part.part,
+			prevActivePage: activePage,
+			prevActiveCid: activeCid,
+		})
+
 		const track = createTrackFromPart(part)
+
+		logMultipart('VideoPartsModal', '生成待播放 Track 对象', {
+			uniqueKey: track.uniqueKey,
+			title: track.title,
+			pageIndex: track.bilibiliMetadata.pageIndex,
+			cid: track.bilibiliMetadata.cid,
+			mainTrackTitle: track.bilibiliMetadata.mainTrackTitle,
+		})
 
 		// 1. 立即同步到 AudioEngine 和 QueueStore（无需等待网络请求）
 		desktopAudioEngine.setActiveTrack(track)
@@ -187,7 +224,11 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 		// 2. 启动该分 P 的音频流加载与播放
 		try {
 			await playTrackWithProxy(track, true)
+			logMultipart('VideoPartsModal', '分 P 播放请求提交成功', {
+				targetPage: part.page,
+			})
 		} catch (err) {
+			logMultipart('VideoPartsModal', '播放分 P 发生异常', String(err))
 			console.error('播放分 P 失败:', err)
 		}
 	}
@@ -269,6 +310,22 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 					</div>
 				</div>
 
+				{/* Real-time Multipart Status Badge */}
+				<div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#00AEEC]/10 border border-[#00AEEC]/20 text-[11px]">
+					<div className="flex items-center gap-1.5 text-[#00AEEC] font-semibold">
+						<span className="w-1.5 h-1.5 rounded-full bg-[#00AEEC] animate-pulse" />
+						<span>当前识别分 P: P{activePage ?? 1}</span>
+						{activeCid && (
+							<span className="text-[10px] text-[#00AEEC]/70 font-mono">
+								(CID: {activeCid})
+							</span>
+						)}
+					</div>
+					<span className="text-muted-foreground truncate max-w-[220px] font-medium text-[10px]">
+						{activeBiliTrack?.title ?? liveTrack?.title ?? '准备播放'}
+					</span>
+				</div>
+
 				{/* Batch Action Buttons */}
 				{parts.length > 1 && (
 					<div className="flex items-center gap-2">
@@ -313,12 +370,15 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 						</div>
 					) : (
 						parts.map((p) => {
-							const isCurrent =
-								activeCid !== null
-									? p.cid === activeCid
-									: activePage !== null
-									? p.page === activePage
-									: false
+							const matchCid =
+								activeCid !== null &&
+								activeCid !== undefined &&
+								String(p.cid) === String(activeCid)
+							const matchPage =
+								activePage !== null &&
+								activePage !== undefined &&
+								Number(p.page) === Number(activePage)
+							const isCurrent = Boolean(matchCid || matchPage)
 
 							return (
 								<div

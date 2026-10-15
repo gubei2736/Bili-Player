@@ -8,6 +8,7 @@ import {
 import { desktopAudioEngine } from './DesktopAudioEngine'
 import { getAudioQualityPreference } from './audioSettings'
 import { invoke } from '@tauri-apps/api/core'
+import { logMultipart } from '../utils/debugLogger'
 
 let currentLoadingTrackKey: string | null = null
 let latestPlayRequestId = 0
@@ -43,8 +44,8 @@ export function syncTrackToQueueStore(
 		if (t.source === 'bilibili') {
 			const bt = t as BilibiliTrack
 			if (bt.bilibiliMetadata.bvid === bvid) {
-				if (cid && bt.bilibiliMetadata.cid === cid) return true
-				if (pageIndex && bt.bilibiliMetadata.pageIndex === pageIndex)
+				if (cid && String(bt.bilibiliMetadata.cid) === String(cid)) return true
+				if (pageIndex && Number(bt.bilibiliMetadata.pageIndex) === Number(pageIndex))
 					return true
 			}
 		}
@@ -84,6 +85,16 @@ export function syncTrackToQueueStore(
 		}
 	}
 
+	logMultipart('syncTrackToQueueStore', '执行队列同步写入', {
+		targetTitle: freshTrack.title,
+		targetPage: freshTrack.bilibiliMetadata.pageIndex,
+		targetCid: freshTrack.bilibiliMetadata.cid,
+		exactIdx,
+		oldCurrentIndex: state.currentIndex,
+		newCurrentIndex: currentIndex,
+		queueLength: queue.length,
+	})
+
 	// 直接调用 Zustand 底层 setState，同时写入 queue, currentIndex 和 currentTrack
 	useQueueStore.setState({
 		queue,
@@ -98,8 +109,18 @@ export function syncTrackToQueueStore(
 }
 
 export async function playTrackWithProxy(inputTrack: Track, forceReplay = false): Promise<void> {
+	logMultipart('playTrackHelper', 'playTrackWithProxy 入参', {
+		uniqueKey: inputTrack.uniqueKey,
+		title: inputTrack.title,
+		forceReplay,
+		bvid: (inputTrack as any)?.bilibiliMetadata?.bvid,
+		pageIndex: (inputTrack as any)?.bilibiliMetadata?.pageIndex,
+		cid: (inputTrack as any)?.bilibiliMetadata?.cid,
+	})
+
 	// 1. 防重保护：如果相同曲目已在加载中，直接返回，避免并发打断与二次重播从 0 秒开始
 	if (!forceReplay && currentLoadingTrackKey === inputTrack.uniqueKey) {
+		logMultipart('playTrackHelper', '防重拦截：相同曲目正在加载中', inputTrack.uniqueKey)
 		return
 	}
 	const currentPlaying = desktopAudioEngine.getCurrentTrack()
@@ -108,6 +129,7 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 		currentPlaying?.uniqueKey === inputTrack.uniqueKey &&
 		desktopAudioEngine.isPlaying()
 	) {
+		logMultipart('playTrackHelper', '防重拦截：相同曲目已在播放中', inputTrack.uniqueKey)
 		return
 	}
 
@@ -142,10 +164,18 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 
 					const isMulti = pages.length > 1
 					// 核心修复：优先匹配显式传入的 cid 或 explicitPageIndex，绝不使用 || 1 短路回退到 P1！
-					const currentPage =
-						(cid !== null && cid !== undefined && pages.find((p) => p.cid === cid)) ||
-						(explicitPageIndex !== undefined && pages.find((p) => p.page === explicitPageIndex)) ||
-						pages[0]!
+					const matchedByCid = cid !== null && cid !== undefined ? pages.find((p) => String(p.cid) === String(cid)) : undefined
+					const matchedByPage = explicitPageIndex !== undefined && explicitPageIndex !== null ? pages.find((p) => Number(p.page) === Number(explicitPageIndex)) : undefined
+					const currentPage = matchedByCid || matchedByPage || pages[0]!
+
+					logMultipart('playTrackHelper', '分 P 列表动态解析匹配结果', {
+						inputCid: cid,
+						explicitPageIndex,
+						matchedByCid: matchedByCid ? { page: matchedByCid.page, cid: matchedByCid.cid, part: matchedByCid.part } : null,
+						matchedByPage: matchedByPage ? { page: matchedByPage.page, cid: matchedByPage.cid, part: matchedByPage.part } : null,
+						selectedPage: currentPage.page,
+						selectedPart: currentPage.part,
+					})
 
 					cid = currentPage.cid
 					const mainTitle = biliTrack.bilibiliMetadata.mainTrackTitle || biliTrack.title
@@ -170,10 +200,18 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				const pages = biliTrack.bilibiliMetadata.pages
 				const isMulti = pages.length > 1 || Boolean(biliTrack.bilibiliMetadata.isMultiPage)
 				// 优先通过 cid 精确命中分 P，其次通过 explicitPageIndex
-				const matchedPage =
-					(cid !== null && cid !== undefined && pages.find((p) => p.cid === cid)) ||
-					(explicitPageIndex !== undefined && pages.find((p) => p.page === explicitPageIndex)) ||
-					pages[0]
+				const matchedByCid = cid !== null && cid !== undefined ? pages.find((p) => String(p.cid) === String(cid)) : undefined
+				const matchedByPage = explicitPageIndex !== undefined && explicitPageIndex !== null ? pages.find((p) => Number(p.page) === Number(explicitPageIndex)) : undefined
+				const matchedPage = matchedByCid || matchedByPage || pages[0]
+
+				logMultipart('playTrackHelper', '已有分 P 缓存匹配结果', {
+					inputCid: cid,
+					explicitPageIndex,
+					matchedByCid: matchedByCid ? { page: matchedByCid.page, cid: matchedByCid.cid, part: matchedByCid.part } : null,
+					matchedByPage: matchedByPage ? { page: matchedByPage.page, cid: matchedByPage.cid, part: matchedByPage.part } : null,
+					selectedPage: matchedPage?.page,
+					selectedPart: matchedPage?.part,
+				})
 
 				if (matchedPage) {
 					cid = matchedPage.cid
@@ -196,6 +234,12 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 
 			// 关键步骤：在请求音频流之前，立即把解析好的分 P 写入 AudioEngine 和 QueueStore！
 			// 彻底杜绝 BottomPlayerBar 用旧的 P1 反向触发播放，0ms 瞬间切换 UI
+			logMultipart('playTrackHelper', '即将同步分 P 到引擎与队列', {
+				title: biliTrack.title,
+				pageIndex: biliTrack.bilibiliMetadata.pageIndex,
+				cid: biliTrack.bilibiliMetadata.cid,
+				uniqueKey: biliTrack.uniqueKey,
+			})
 			desktopAudioEngine.setActiveTrack(biliTrack)
 			syncTrackToQueueStore(biliTrack, originalKey)
 
@@ -271,11 +315,21 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			}
 
 			// 5. 优先切歌出声：第一时间送入音频引擎播放（必须传入具有最新 title 与 pageIndex 的 biliTrack！）
+			logMultipart('playTrackHelper', '即将进入 loadAndPlay', {
+				title: biliTrack.title,
+				pageIndex: biliTrack.bilibiliMetadata.pageIndex,
+				cid: biliTrack.bilibiliMetadata.cid,
+				proxyUrl: proxyUrl.substring(0, 80) + '...',
+			})
 			await desktopAudioEngine.loadAndPlay(biliTrack, proxyUrl, loudnessDeltaDb)
 
 			if (requestId !== latestPlayRequestId) return
 
 			// 6. 播放成功后再次同步包含音质规格的完整 biliTrack 到 Store
+			logMultipart('playTrackHelper', 'loadAndPlay 成功，执行最终同步', {
+				title: biliTrack.title,
+				pageIndex: biliTrack.bilibiliMetadata.pageIndex,
+			})
 			syncTrackToQueueStore(biliTrack, originalKey)
 			useHistoryStore.getState().addRecord(biliTrack)
 		} else {
