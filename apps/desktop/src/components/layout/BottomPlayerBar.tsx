@@ -18,6 +18,7 @@ import {
 	Disc3,
 	X,
 	Trash2,
+	Layers,
 } from 'lucide-react'
 import {
 	useQueueStore,
@@ -34,6 +35,7 @@ import {
 	getStoredLyricOffset,
 } from '../../services/lyricService'
 import { LyricsSettingsModal } from '../modals/LyricsSettingsModal'
+import { VideoPartsModal } from '../modals/VideoPartsModal'
 
 export interface BottomPlayerBarProps {
 	onToggleFullscreenLyrics?: () => void
@@ -79,6 +81,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [lyricOffsetSec, setLyricOffsetSec] = useState<number>(0)
 	const [lyricModalOpen, setLyricModalOpen] = useState(false)
 	const [queueOpen, setQueueOpen] = useState(false)
+	const [partsModalOpen, setPartsModalOpen] = useState(false)
 
 	// Linear Progress Bar drag & hover states
 	const [isDragging, setIsDragging] = useState(false)
@@ -409,13 +412,34 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							</div>
 
 							<div className="overflow-hidden space-y-0.5">
-								<p
-									onClick={onToggleFullscreenLyrics}
-									className="text-xs font-bold truncate hover:text-[#00AEEC] cursor-pointer text-foreground transition-colors"
-									title={currentTrack.title}
-								>
-									{currentTrack.title}
-								</p>
+								<div className="flex items-center gap-1.5 overflow-hidden">
+									<p
+										onClick={onToggleFullscreenLyrics}
+										className="text-xs font-bold truncate hover:text-[#00AEEC] cursor-pointer text-foreground transition-colors"
+										title={
+											biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
+												? `${biliTrack.bilibiliMetadata.mainTrackTitle || currentTrack.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+												: currentTrack.title
+										}
+									>
+										{biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
+											? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+											: currentTrack.title}
+									</p>
+									{biliTrack?.bilibiliMetadata?.isMultiPage && (
+										<button
+											onClick={() => setPartsModalOpen(true)}
+											className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 text-[#00AEEC] border border-[#00AEEC]/30 shrink-0 transition-colors"
+											title="点击查看并切换本视频所有分 P 选集"
+										>
+											<Layers className="w-2.5 h-2.5" />
+											<span>
+												P{biliTrack.bilibiliMetadata.pageIndex || 1}/
+												{biliTrack.bilibiliMetadata.pages?.length || 1}
+											</span>
+										</button>
+									)}
+								</div>
 								<div className="flex items-center gap-2">
 									<p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
 										{currentTrack.artist?.name || '未知歌手'}
@@ -744,6 +768,21 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					}
 				}}
 			/>
+
+			{/* Multi-page Video Parts Selector Modal */}
+			{biliTrack && (
+				<VideoPartsModal
+					isOpen={partsModalOpen}
+					onClose={() => setPartsModalOpen(false)}
+					bvid={biliTrack.bilibiliMetadata.bvid}
+					title={biliTrack.bilibiliMetadata.mainTrackTitle || currentTrack?.title || '视频选集'}
+					coverUrl={currentTrack?.coverUrl}
+					author={currentTrack?.artist?.name}
+					currentCid={biliTrack.bilibiliMetadata.cid}
+					currentPage={biliTrack.bilibiliMetadata.pageIndex || 1}
+					initialParts={biliTrack.bilibiliMetadata.pages}
+				/>
+			)}
 		</footer>
 	)
 }

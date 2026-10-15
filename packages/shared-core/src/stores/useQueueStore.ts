@@ -20,6 +20,7 @@ export interface QueueState {
 	updateTrackStream: (
 		uniqueKey: string,
 		streamUrlData: NonNullable<BilibiliTrack['bilibiliMetadata']['bilibiliStreamUrl']>,
+		extraMetadata?: Partial<BilibiliTrack['bilibiliMetadata']>,
 	) => void
 	next: () => Track | null
 	prev: () => Track | null
@@ -140,7 +141,7 @@ export const useQueueStore = create<QueueState>()(
 				}
 			},
 
-			updateTrackStream: (uniqueKey, streamUrlData) => {
+			updateTrackStream: (uniqueKey, streamUrlData, extraMetadata) => {
 				const { queue } = get()
 				const newQueue = queue.map((t) => {
 					if (t.uniqueKey === uniqueKey && t.source === 'bilibili') {
@@ -149,6 +150,7 @@ export const useQueueStore = create<QueueState>()(
 							...bt,
 							bilibiliMetadata: {
 								...bt.bilibiliMetadata,
+								...(extraMetadata || {}),
 								bilibiliStreamUrl: streamUrlData,
 							},
 						}

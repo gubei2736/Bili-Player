@@ -9,6 +9,7 @@ import {
 	AlertCircle,
 	Loader2,
 	FolderPlus,
+	Layers,
 } from 'lucide-react'
 import {
 	bilibiliApi,
@@ -19,6 +20,7 @@ import {
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
 import { useQueueStore } from '@bbplayer/shared-core'
 import { AddToPlaylistModal } from '../modals/AddToPlaylistModal'
+import { VideoPartsModal } from '../modals/VideoPartsModal'
 
 export interface SearchViewProps {
 	keyword: string
@@ -47,6 +49,12 @@ export const SearchView: React.FC<SearchViewProps> = ({
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(null)
+	const [partsModalVideo, setPartsModalVideo] = useState<{
+		bvid: string
+		title: string
+		coverUrl?: string
+		author?: string
+	} | null>(null)
 	const { setQueue } = useQueueStore()
 
 	const executeSearch = async (kw: string) => {
@@ -215,6 +223,21 @@ export const SearchView: React.FC<SearchViewProps> = ({
 											<button
 												onClick={(e) => {
 													e.stopPropagation()
+													setPartsModalVideo({
+														bvid: item.bvid,
+														title: cleanTitle,
+														coverUrl: cover,
+														author: item.author,
+													})
+												}}
+												title="查看并播放分 P 选集"
+												className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] transition-colors"
+											>
+												<Layers className="w-3.5 h-3.5" />
+											</button>
+											<button
+												onClick={(e) => {
+													e.stopPropagation()
 													setAddToPlaylistTrack(convertToTrack(item, idx + 1000))
 												}}
 												title="添加到我的歌单"
@@ -249,6 +272,18 @@ export const SearchView: React.FC<SearchViewProps> = ({
 				track={addToPlaylistTrack}
 				onClose={() => setAddToPlaylistTrack(null)}
 			/>
+
+			{/* Video Parts Modal */}
+			{partsModalVideo && (
+				<VideoPartsModal
+					isOpen={!!partsModalVideo}
+					onClose={() => setPartsModalVideo(null)}
+					bvid={partsModalVideo.bvid}
+					title={partsModalVideo.title}
+					coverUrl={partsModalVideo.coverUrl}
+					author={partsModalVideo.author}
+				/>
+			)}
 		</div>
 	)
 }

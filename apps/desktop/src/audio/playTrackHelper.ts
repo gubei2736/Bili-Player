@@ -35,14 +35,44 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			const bvid = biliTrack.bilibiliMetadata.bvid
 			let cid = biliTrack.bilibiliMetadata.cid
 
-			// 1.1 If cid is missing, fetch pagelist to resolve first page cid
-			if (!cid) {
+			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID
+			let extraMetadata: Partial<BilibiliTrack['bilibiliMetadata']> = {}
+			if (!biliTrack.bilibiliMetadata.pages || !cid) {
 				const pageListRes = await bilibiliApi.getPageList({ bvid })
 				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
 				if (pageListRes.isOk() && pageListRes.value.length > 0) {
-					cid = pageListRes.value[0]!.cid
+					const pages = pageListRes.value.map((p) => ({
+						cid: p.cid,
+						page: p.page,
+						part: p.part || `第${p.page}部分`,
+						duration: p.duration,
+					}))
+
+					const isMulti = pages.length > 1
+					const targetPageIndex = biliTrack.bilibiliMetadata.pageIndex || 1
+					const currentPage =
+						pages.find((p) => p.page === targetPageIndex || (cid && p.cid === cid)) ||
+						pages[0]!
+
+					cid = currentPage.cid
 					biliTrack.bilibiliMetadata.cid = cid
-				} else {
+					biliTrack.bilibiliMetadata.isMultiPage = isMulti
+					biliTrack.bilibiliMetadata.pageIndex = currentPage.page
+					biliTrack.bilibiliMetadata.pagePart = currentPage.part
+					biliTrack.bilibiliMetadata.pages = pages
+					if (!biliTrack.bilibiliMetadata.mainTrackTitle) {
+						biliTrack.bilibiliMetadata.mainTrackTitle = biliTrack.title
+					}
+
+					extraMetadata = {
+						cid,
+						isMultiPage: isMulti,
+						pageIndex: currentPage.page,
+						pagePart: currentPage.part,
+						pages,
+						mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle,
+					}
+				} else if (!cid) {
 					throw new Error('无法获取该视频的分 P CID 信息')
 				}
 			}
@@ -95,8 +125,8 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			const streamData = streamRes.value
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
 
-			// 实时更新播放队列中的曲目数据，使底栏与全屏歌词瞬间展示当前音频真实规格（320K/Hi-Res/杜比等）
-			useQueueStore.getState().updateTrackStream(biliTrack.uniqueKey, streamData)
+			// 实时更新播放队列中的曲目数据，使底栏与全屏歌词瞬间展示当前音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
+			useQueueStore.getState().updateTrackStream(biliTrack.uniqueKey, streamData, extraMetadata)
 
 			// 3. Query local stream proxy port from Tauri backend
 			let port = 0

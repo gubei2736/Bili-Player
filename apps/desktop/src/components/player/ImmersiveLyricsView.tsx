@@ -257,11 +257,25 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							</div>
 
 							{/* Track info summary */}
-							<div className="mt-6 text-center space-y-1.5 z-10">
-								<h1 className="text-lg md:text-xl font-bold tracking-tight text-white drop-shadow">
-									{track?.title || '未在播放歌曲'}
+							<div className="mt-6 text-center space-y-1.5 z-10 max-w-sm px-4">
+								<h1
+									className="text-lg md:text-xl font-bold tracking-tight text-white drop-shadow truncate"
+									title={
+										biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
+											? `${biliTrack.bilibiliMetadata.mainTrackTitle || track?.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+											: track?.title
+									}
+								>
+									{biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.pagePart
+										? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart}`
+										: (track?.title || '未在播放歌曲')}
 								</h1>
-								<p className="text-xs md:text-sm text-white/70 font-medium">
+								{biliTrack?.bilibiliMetadata?.isMultiPage && biliTrack?.bilibiliMetadata?.mainTrackTitle && (
+									<p className="text-xs text-white/50 truncate" title={biliTrack.bilibiliMetadata.mainTrackTitle}>
+										{biliTrack.bilibiliMetadata.mainTrackTitle}
+									</p>
+								)}
+								<p className="text-xs md:text-sm text-white/70 font-medium truncate">
 									{track?.artist?.name || '未知歌手'}
 								</p>
 								{badgeInfo && (

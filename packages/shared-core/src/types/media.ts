@@ -27,6 +27,13 @@ export interface BaseTrack {
 	updatedAt: Date
 }
 
+export interface BilibiliVideoPart {
+	cid: number
+	page: number
+	part: string
+	duration: number
+}
+
 export interface BilibiliTrack extends BaseTrack {
 	source: 'bilibili'
 	titleHtml?: string // 带有高亮标签的标题
@@ -36,6 +43,9 @@ export interface BilibiliTrack extends BaseTrack {
 		isMultiPage: boolean
 		videoIsValid: boolean
 		mainTrackTitle?: string | null // 如果是分 p 视频，保存该分 p 所在的主视频标题
+		pageIndex?: number // 当前是第几 P (从 1 开始)
+		pagePart?: string // 当前分 P 的副标题 (e.g. "01. 晴天")
+		pages?: BilibiliVideoPart[] // 所有分 P 列表
 		// 运行时产生的数据，在获取流后才会存在
 		bilibiliStreamUrl?: {
 			url: string
