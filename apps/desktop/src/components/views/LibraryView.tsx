@@ -107,7 +107,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 						<h1 className="text-2xl font-bold text-foreground">
 							{currentPlaylist.title}
 						</h1>
-						{currentPlaylist.intro && (
+						{currentPlaylist.intro && currentPlaylist.id !== DEFAULT_FAVORITES_PLAYLIST_ID && (
 							<p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
 								{currentPlaylist.intro}
 							</p>

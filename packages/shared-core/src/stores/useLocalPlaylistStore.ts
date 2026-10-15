@@ -18,7 +18,7 @@ export const DEFAULT_FAVORITES_PLAYLIST_ID = 'local_pl_favorites'
 export const createDefaultFavoritesPlaylist = (): LocalPlaylist => ({
 	id: DEFAULT_FAVORITES_PLAYLIST_ID,
 	title: '我喜欢的音乐',
-	intro: '默认红心歌单，播放栏点击添加至我喜欢的音乐即可快速保存至此',
+	intro: '',
 	coverUrl: '',
 	tracks: [],
 	createdAt: 0,
@@ -193,9 +193,17 @@ export const useLocalPlaylistStore = create<LocalPlaylistState>()(
 				const hasDefault = savedPlaylists.some(
 					(p) => p.id === DEFAULT_FAVORITES_PLAYLIST_ID,
 				)
-				const finalPlaylists = hasDefault
-					? savedPlaylists
-					: [createDefaultFavoritesPlaylist(), ...savedPlaylists]
+				const finalPlaylists = (
+					hasDefault ? savedPlaylists : [createDefaultFavoritesPlaylist(), ...savedPlaylists]
+				).map((p) => {
+					if (
+						p.id === DEFAULT_FAVORITES_PLAYLIST_ID &&
+						(p.intro === '默认红心歌单，播放栏点击添加至我喜欢的音乐即可快速保存至此' || !p.intro)
+					) {
+						return { ...p, intro: '' }
+					}
+					return p
+				})
 
 				return {
 					...currentState,

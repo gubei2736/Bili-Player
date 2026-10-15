@@ -156,19 +156,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 						}}
 						onKeyDown={handleKeyDown}
 						placeholder="搜索 B 站音乐、歌手、BV号..."
-						className="w-full h-8 pl-9 pr-14 text-xs rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus:bg-[#0d121f]/95 border border-white/[0.08] focus:border-primary/50 text-foreground placeholder:text-muted-foreground/70 outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] focus:ring-2 focus:ring-primary/15 transition-all duration-200"
+						className="w-full h-8 pl-9 pr-8 text-xs rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus:bg-[#0d121f]/95 border border-white/[0.08] focus:border-primary/50 text-foreground placeholder:text-muted-foreground/70 outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] focus:ring-2 focus:ring-primary/15 transition-all duration-200"
 					/>
-					{query ? (
+					{query && (
 						<button
 							onClick={() => setQuery('')}
 							className="absolute right-2.5 p-0.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
 						>
 							<X className="w-3 h-3" />
 						</button>
-					) : (
-						<kbd className="absolute right-3 pointer-events-none hidden sm:inline-block text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-muted-foreground/70 border border-white/[0.06]">
-							↵
-						</kbd>
 					)}
 				</div>
 
