@@ -1,0 +1,60 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Bili Player",
+  "version": "0.1.0",
+  "identifier": "com.biliplayer.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Bili Player",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 1020,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": false
+      },
+      {
+        "label": "lyrics",
+        "title": "Bili Player - 桌面歌词",
+        "url": "index.html#lyrics",
+        "width": 800,
+        "height": 140,
+        "resizable": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "sql": {
+      "preload": ["sqlite:bbplayer.db"]
+    }
+  }
+}
