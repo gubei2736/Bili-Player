@@ -166,17 +166,16 @@ export const App: React.FC = () => {
 		}
 	}, [isLoggedIn, userInfo?.mid, syncRemotePlaylists])
 
-	// Auto fetch lyrics dynamically for current track
+	// Auto fetch lyrics dynamically for current track (clean previous song lyrics immediately)
 	useEffect(() => {
 		let cancelled = false
+		setActiveSplContent('')
 		if (currentTrack) {
 			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
 				if (!cancelled) {
 					setActiveSplContent(res?.splContent || '')
 				}
 			})
-		} else {
-			setActiveSplContent('')
 		}
 		return () => {
 			cancelled = true

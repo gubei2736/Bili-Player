@@ -64,6 +64,8 @@ export const DesktopLyricsApp: React.FC = () => {
 				setArtist(payload.artist)
 				if (payload.splContent !== undefined) {
 					setSplContent(payload.splContent || null)
+				} else {
+					setSplContent(null)
 				}
 			} else if (payload.type === 'STATE_SYNC') {
 				setIsPlaying(payload.isPlaying)

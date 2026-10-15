@@ -89,9 +89,11 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [hoverProgress, setHoverProgress] = useState<number | null>(null)
 	const progressBarRef = useRef<HTMLDivElement | null>(null)
 
-	// 1. Auto fetch lyrics & offset on track change
+	// 1. Auto fetch lyrics & offset on track change (clean previous song lyrics immediately)
 	useEffect(() => {
 		let cancelled = false
+		setSplContent('')
+		setCurrentTime(0)
 		if (currentTrack) {
 			setLyricOffsetSec(getStoredLyricOffset(currentTrack.uniqueKey))
 			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
@@ -100,7 +102,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				}
 			})
 		} else {
-			setSplContent('')
 			setLyricOffsetSec(0)
 		}
 		return () => {
@@ -196,6 +197,25 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			onSeek: (time) => desktopAudioEngine.seek(time),
 		})
 	}, [next, prev])
+
+	// 5.1 60fps / 120fps 高频动画帧循环：平滑推进进度条，彻底消除每秒 3-4 次 timeupdate 带来的顿挫感
+	useEffect(() => {
+		if (!isPlaying || isDragging) return
+
+		let animId: number
+		const updateProgress = () => {
+			if (!isDragging) {
+				const cur = desktopAudioEngine.getCurrentTime()
+				setCurrentTime(cur)
+			}
+			animId = requestAnimationFrame(updateProgress)
+		}
+
+		animId = requestAnimationFrame(updateProgress)
+		return () => {
+			if (animId) cancelAnimationFrame(animId)
+		}
+	}, [isPlaying, isDragging])
 
 	// 6. Auto play on currentTrack change
 	useEffect(() => {
@@ -363,7 +383,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					<div className="w-full h-[3px] group-hover/progress:h-[4px] rounded-full bg-white/10 group-hover/progress:bg-white/15 transition-all duration-150 overflow-hidden relative">
 						{/* Played Sky-Blue Progress Line */}
 						<div
-							className="h-full rounded-full transition-all duration-75"
+							className="h-full rounded-full"
 							style={{
 								width: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
 								backgroundColor: '#00AEEC',
@@ -373,7 +393,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 					{/* Pure White Glowing Handle (No wave distortion, perfectly centered) */}
 					<div
-						className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_8px_rgba(0,174,236,0.8),0_2px_4px_rgba(0,0,0,0.5)] border border-white/60 pointer-events-none transition-transform duration-100 group-hover/progress:scale-125"
+						className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_8px_rgba(0,174,236,0.8),0_2px_4px_rgba(0,0,0,0.5)] border border-white/60 pointer-events-none group-hover/progress:scale-125"
 						style={{
 							left: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
 						}}

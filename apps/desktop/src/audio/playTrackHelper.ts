@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 let currentLoadingTrackKey: string | null = null
 let latestPlayRequestId = 0
+let cachedProxyPort: number | null = null
 
 export async function playTrackWithProxy(track: Track, forceReplay = false): Promise<void> {
 	// 1. 防重保护：如果相同曲目已在加载中，直接返回，避免并发打断与二次重播从 0 秒开始
@@ -175,22 +176,20 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			const streamData = streamRes.value
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
 
-			// 实时更新播放队列中的曲目数据，使底栏与全屏歌词瞬间展示当前音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
-			useQueueStore.getState().updateTrackStream(originalKey, streamData, extraMetadata, trackOverrides)
-
-			// 3. Query local stream proxy port from Tauri backend
-			let port = 0
-			try {
-				port = await invoke<number>('get_stream_proxy_port')
-			} catch {
-				// Fallback if running outside Tauri
+			// 3. Query local stream proxy port from Tauri backend (using cached port to save IPC roundtrip)
+			if (cachedProxyPort === null || cachedProxyPort <= 0) {
+				try {
+					cachedProxyPort = await invoke<number>('get_stream_proxy_port')
+				} catch {
+					cachedProxyPort = 0
+				}
 			}
 
 			if (requestId !== latestPlayRequestId) return
 
 			let proxyUrl = streamData.url
-			if (port > 0) {
-				proxyUrl = `http://127.0.0.1:${port}/proxy?url=${encodeURIComponent(
+			if (cachedProxyPort && cachedProxyPort > 0) {
+				proxyUrl = `http://127.0.0.1:${cachedProxyPort}/proxy?url=${encodeURIComponent(
 					streamData.url,
 				)}&bvid=${bvid}&cid=${cid}`
 			}
@@ -201,8 +200,13 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 				loudnessDeltaDb = streamData.volume.target_i - streamData.volume.measured_i
 			}
 
-			// 5. Hand over to Web Audio engine
+			// 5. 优先切歌出声：第一时间送入音频引擎播放，不阻塞在后续数据持久化
 			await desktopAudioEngine.loadAndPlay(track, proxyUrl, loudnessDeltaDb)
+
+			if (requestId !== latestPlayRequestId) return
+
+			// 6. 优先播放之后，再更新识别出的音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
+			useQueueStore.getState().updateTrackStream(originalKey, streamData, extraMetadata, trackOverrides)
 		} else {
 			// Local track fallback
 			const localTrack = track as any

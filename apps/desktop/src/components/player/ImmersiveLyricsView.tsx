@@ -64,15 +64,16 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		? getQualityBadgeInfo(currentQualityId, isLocal, currentBandwidth)
 		: null
 
-	const lyricsData: SplLyricData = useMemo(() => {
+	const lyricsData: SplLyricData | null = useMemo(() => {
+		if (!splContent) return null
 		try {
-			return parseSpl(splContent || DEFAULT_SPL_SAMPLE)
+			return parseSpl(splContent)
 		} catch {
-			return parseSpl(DEFAULT_SPL_SAMPLE)
+			return null
 		}
 	}, [splContent])
 
-	// Subscribe to audio engine timeupdate & Escape key to close
+	// Subscribe to audio engine timeupdate, 60fps RAF loop & Escape key to close
 	useEffect(() => {
 		if (!isOpen) return
 		setCurrentTime(desktopAudioEngine.getCurrentTime())
@@ -81,6 +82,15 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 				setCurrentTime(event.currentTime)
 			}
 		})
+
+		let animId: number
+		const updateLoop = () => {
+			if (desktopAudioEngine.isPlaying()) {
+				setCurrentTime(desktopAudioEngine.getCurrentTime())
+			}
+			animId = requestAnimationFrame(updateLoop)
+		}
+		animId = requestAnimationFrame(updateLoop)
 
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
@@ -91,6 +101,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 
 		return () => {
 			unsubscribe()
+			if (animId) cancelAnimationFrame(animId)
 			window.removeEventListener('keydown', handleKeyDown)
 		}
 	}, [isOpen, onClose])
@@ -99,6 +110,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 
 	// Find active line index
 	const activeIndex = useMemo(() => {
+		if (!lyricsData || !lyricsData.lines || lyricsData.lines.length === 0) return 0
 		const lines = lyricsData.lines
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i]!
@@ -112,7 +124,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 			}
 		}
 		return 0
-	}, [lyricsData.lines, currentTimeMs])
+	}, [lyricsData, currentTimeMs])
 
 	// Auto scroll to active line
 	useEffect(() => {
@@ -296,92 +308,105 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							ref={lyricsContainerRef}
 							className="w-full md:w-7/12 h-full overflow-y-auto no-scrollbar py-28 space-y-8 text-left scroll-smooth"
 						>
-							{lyricsData.lines.map((line, idx) => {
-								const isActive = idx === activeIndex
-								const distance = Math.abs(idx - activeIndex)
-								// 彻底去除高斯模糊 (blur)，仅使用清晰的明度与透明度阶梯保持主次分明与清晰易读
-								const opacity =
-									distance === 0 ? 1 : distance === 1 ? 0.75 : distance === 2 ? 0.55 : 0.35
-
-								return (
-									<div
-										key={idx}
-										onClick={() => {
-											desktopAudioEngine.seek(
-												Math.max(0, line.startTime / 1000 - lyricOffsetSec),
-											)
-										}}
-										ref={(el) => {
-											if (el) lineRefs.current.set(idx, el)
-											else lineRefs.current.delete(idx)
-										}}
-										className="transition-all duration-300 transform origin-left cursor-pointer hover:opacity-100"
-										style={{
-											filter: 'none',
-											opacity,
-											scale: isActive ? 1.05 : 1.0,
-										}}
-									>
-										{/* Main line with syllable highlight */}
-										<p className="text-xl md:text-2xl font-bold tracking-wide leading-relaxed">
-											{line.isDynamic && line.spans && line.spans.length > 0 ? (
-												line.spans.map((span, sIdx) => {
-													let fillPct = 0
-													if (currentTimeMs >= span.endTime) {
-														fillPct = 100
-													} else if (currentTimeMs > span.startTime) {
-														fillPct = Math.min(
-															100,
-															((currentTimeMs - span.startTime) /
-																(span.duration || 1)) *
-																100,
-														)
-													}
-
-													return (
-														<span
-															key={sIdx}
-															className="inline-block transition-all duration-75"
-															style={{
-																background: `linear-gradient(to right, #00AEEC ${fillPct}%, rgba(255, 255, 255, 0.5) ${fillPct}%)`,
-																WebkitBackgroundClip: 'text',
-																WebkitTextFillColor: 'transparent',
-															}}
-														>
-															{span.text}
-														</span>
-													)
-												})
-											) : (
-												<span
-													className={
-														isActive
-															? 'text-primary drop-shadow-[0_2px_12px_rgba(0,174,236,0.6)]'
-															: 'text-white/60'
-													}
-												>
-													{line.content}
-												</span>
-											)}
-										</p>
-
-										{/* Romaji syllable translation */}
-										{line.romaji && (
-											<p className="text-xs text-white/50 font-mono mt-1">
-												{line.romaji}
-											</p>
-										)}
-
-										{/* Bilingual translated line */}
-										{line.translation && (
-											<p className="text-sm text-sky-200/75 mt-1 font-medium">
-												{line.translation}
-											</p>
-										)}
+							{!lyricsData || lyricsData.lines.length === 0 ? (
+								<div className="h-full flex flex-col items-center justify-center text-white/40 space-y-4">
+									<div className="flex items-center gap-4 text-3xl font-serif">
+										<span className="animate-pulse">♪</span>
+										<span className="animate-pulse delay-150">♫</span>
+										<span className="animate-pulse delay-300">♬</span>
 									</div>
-								)
-							})}
+									<p className="text-sm font-medium tracking-wider text-white/50">
+										{splContent === '' ? '正在匹配歌词...' : '暂无歌词或纯音乐'}
+									</p>
 								</div>
+							) : (
+								lyricsData.lines.map((line, idx) => {
+									const isActive = idx === activeIndex
+									const distance = Math.abs(idx - activeIndex)
+									// 彻底去除高斯模糊 (blur)，仅使用清晰的明度与透明度阶梯保持主次分明与清晰易读
+									const opacity =
+										distance === 0 ? 1 : distance === 1 ? 0.75 : distance === 2 ? 0.55 : 0.35
+
+									return (
+										<div
+											key={idx}
+											onClick={() => {
+												desktopAudioEngine.seek(
+													Math.max(0, line.startTime / 1000 - lyricOffsetSec),
+												)
+											}}
+											ref={(el) => {
+												if (el) lineRefs.current.set(idx, el)
+												else lineRefs.current.delete(idx)
+											}}
+											className="transition-all duration-300 transform origin-left cursor-pointer hover:opacity-100"
+											style={{
+												filter: 'none',
+												opacity,
+												scale: isActive ? 1.05 : 1.0,
+											}}
+										>
+											{/* Main line with syllable highlight */}
+											<p className="text-xl md:text-2xl font-bold tracking-wide leading-relaxed">
+												{line.isDynamic && line.spans && line.spans.length > 0 ? (
+													line.spans.map((span, sIdx) => {
+														let fillPct = 0
+														if (currentTimeMs >= span.endTime) {
+															fillPct = 100
+														} else if (currentTimeMs > span.startTime) {
+															fillPct = Math.min(
+																100,
+																((currentTimeMs - span.startTime) /
+																	(span.duration || 1)) *
+																	100,
+															)
+														}
+
+														return (
+															<span
+																key={sIdx}
+																className="inline-block transition-all duration-75"
+																style={{
+																	background: `linear-gradient(to right, #00AEEC ${fillPct}%, rgba(255, 255, 255, 0.5) ${fillPct}%)`,
+																	WebkitBackgroundClip: 'text',
+																	WebkitTextFillColor: 'transparent',
+																}}
+															>
+																{span.text}
+															</span>
+														)
+													})
+												) : (
+													<span
+														className={
+															isActive
+																? 'text-primary drop-shadow-[0_2px_12px_rgba(0,174,236,0.6)]'
+																: 'text-white/60'
+														}
+													>
+														{line.content}
+													</span>
+												)}
+											</p>
+
+											{/* Romaji syllable translation */}
+											{line.romaji && (
+												<p className="text-xs text-white/50 font-mono mt-1">
+													{line.romaji}
+												</p>
+											)}
+
+											{/* Bilingual translated line */}
+											{line.translation && (
+												<p className="text-sm text-sky-200/75 mt-1 font-medium">
+													{line.translation}
+												</p>
+											)}
+										</div>
+									)
+								})
+							)}
+						</div>
 							</div>
 						)}
 					</main>
