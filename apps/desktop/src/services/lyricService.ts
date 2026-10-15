@@ -90,12 +90,12 @@ export function getStoredLyricOffset(trackKey: string): number {
 	}
 }
 
-export function setStoredLyricOffset(trackKey: string, offsetMs: number): void {
+export function setStoredLyricOffset(trackKey: string, offsetSec: number): void {
 	try {
-		localStorage.setItem(LYRIC_OFFSET_PREFIX + trackKey, String(offsetMs))
+		localStorage.setItem(LYRIC_OFFSET_PREFIX + trackKey, String(offsetSec))
 		window.dispatchEvent(
 			new CustomEvent('bbplayer:lyric-offset-change', {
-				detail: { trackKey, offsetMs },
+				detail: { trackKey, offsetSec, offsetMs: offsetSec },
 			}),
 		)
 	} catch {}
@@ -132,7 +132,7 @@ function parseSecondaryLrcMap(lrcStr?: string): Map<number, string> {
 		const match = /^(\[(-?\d{1,3}):(-?\d{1,2})\.(\d{1,6})\])+(.*)$/.exec(trimmed)
 		if (match) {
 			const content = match[match.length - 1].trim()
-			if (!content) continue
+			if (!content || content === '//') continue
 			const timeRegex = /\[(-?\d{1,3}):(-?\d{1,2})\.(\d{1,6})\]/g
 			let tMatch
 			while ((tMatch = timeRegex.exec(match[0])) !== null) {
@@ -298,15 +298,29 @@ export class LyricService {
 		artist: string,
 		needRomaji: boolean,
 		needTrans: boolean,
+		targetDurationSec?: number,
 	): Promise<{ romalrc?: string; tlyric?: string }> {
 		if (!needRomaji && !needTrans) return {}
 		try {
 			const nSearch = await neteaseApi.search({
 				keywords: `${title} ${artist}`.trim(),
-				limit: 3,
+				limit: 5,
 			})
 			if (nSearch.isOk() && nSearch.value.length > 0) {
-				const nLyricRes = await neteaseApi.getLyrics(nSearch.value[0]!.remoteId as number)
+				const candidates = nSearch.value
+				// 优先挑选时长相差 <= 15 秒的同版本曲目
+				const matched =
+					(targetDurationSec &&
+						targetDurationSec > 0 &&
+						candidates.find(
+							(c) =>
+								c.duration && Math.abs(c.duration - targetDurationSec) <= 15,
+						)) ||
+					candidates[0]!
+
+				const nLyricRes = await neteaseApi.getLyrics(
+					matched.remoteId as number,
+				)
 				if (nLyricRes.isOk()) {
 					const nParsed = neteaseApi.parseLyrics(nLyricRes.value)
 					return {
@@ -384,6 +398,7 @@ export class LyricService {
 								bestMatch.artist,
 								showRoma,
 								showTrans && !trans,
+								bestMatch.duration || track.duration,
 							)
 							if (complement.romalrc) romalrc = complement.romalrc
 							if (!trans && complement.tlyric) trans = complement.tlyric
@@ -572,6 +587,7 @@ export class LyricService {
 								candidate.artist,
 								showRoma,
 								showTrans && !trans,
+								candidate.duration,
 							)
 							if (complement.romalrc) romalrc = complement.romalrc
 							if (!trans && complement.tlyric) trans = complement.tlyric

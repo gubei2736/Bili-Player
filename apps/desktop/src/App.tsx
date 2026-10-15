@@ -507,10 +507,50 @@ export const App: React.FC = () => {
 	}, [handleGlobalShortcutAction])
 
 	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window (with Offset applied)
+	// 5. Throttled IPC Lyrics Synchronization to Desktop Floating Lyrics Window (with Offset & Initial Handshake)
 	const currentTrackRef = useRef<Track | null>(currentTrack)
+	const activeSplContentRef = useRef<string>(activeSplContent)
 	useEffect(() => {
 		currentTrackRef.current = currentTrack
-	}, [currentTrack])
+		activeSplContentRef.current = activeSplContent
+	}, [currentTrack, activeSplContent])
+
+	const broadcastFullLyricsState = useCallback(() => {
+		const activeTrack =
+			desktopAudioEngine.getCurrentTrack() || currentTrackRef.current
+		if (!activeTrack) return
+
+		const bili =
+			activeTrack.source === 'bilibili' ? (activeTrack as any) : null
+		const displayTitle =
+			bili?.bilibiliMetadata?.isMultiPage &&
+			(bili.bilibiliMetadata.pagePart || bili.bilibiliMetadata.pageIndex)
+				? `[P${bili.bilibiliMetadata.pageIndex || 1}] ${
+						bili.bilibiliMetadata.pagePart || activeTrack.title
+				  }`
+				: activeTrack.title
+
+		const offsetSec = getStoredLyricOffset(activeTrack.uniqueKey)
+		const now = Date.now()
+
+		emit('lyrics-sync', {
+			type: 'TRACK_CHANGE',
+			title: displayTitle,
+			artist: activeTrack.artist?.name || '未知歌手',
+			durationMs: (activeTrack.duration || 0) * 1000,
+			splContent: activeSplContentRef.current || undefined,
+		}).catch(() => {})
+
+		emit('lyrics-sync', {
+			type: 'STATE_SYNC',
+			isPlaying: desktopAudioEngine.isPlaying(),
+			currentTimeMs: Math.max(
+				0,
+				(desktopAudioEngine.getCurrentTime() + offsetSec) * 1000,
+			),
+			timestamp: now,
+		}).catch(() => {})
+	}, [])
 
 	useEffect(() => {
 		let lastSentMs = 0
@@ -518,11 +558,18 @@ export const App: React.FC = () => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
 			const now = Date.now()
 			const isPlaying = desktopAudioEngine.isPlaying()
-			if (isPlaying !== lastPlayState || now - lastSentMs > 200) {
+			if (
+				event.type === 'trackchange' ||
+				isPlaying !== lastPlayState ||
+				now - lastSentMs > 200
+			) {
 				lastSentMs = now
 				lastPlayState = isPlaying
-				const activeTrack = currentTrackRef.current
-				const offsetSec = activeTrack ? getStoredLyricOffset(activeTrack.uniqueKey) : 0
+				const activeTrack =
+					desktopAudioEngine.getCurrentTrack() || currentTrackRef.current
+				const offsetSec = activeTrack
+					? getStoredLyricOffset(activeTrack.uniqueKey)
+					: 0
 				emit('lyrics-sync', {
 					type: 'STATE_SYNC',
 					isPlaying,
@@ -531,27 +578,40 @@ export const App: React.FC = () => {
 				}).catch(() => {})
 			}
 		})
-		return unsubscribe
-	}, [])
+
+		// 当桌面歌词窗口被中途打开或主动请求同步时，立即补发全量状态
+		let unlistenInitSync: (() => void) | undefined
+		listen('lyrics-request-initial-sync', () => {
+			broadcastFullLyricsState()
+		})
+			.then((fn) => {
+				unlistenInitSync = fn
+			})
+			.catch(() => {})
+
+		// 当用户在设置抽屉中微调了歌词时间偏移量，立即同步给桌面歌词
+		const handleOffsetImmediate = () => {
+			broadcastFullLyricsState()
+		}
+		window.addEventListener(
+			'bbplayer:lyric-offset-change',
+			handleOffsetImmediate,
+		)
+
+		return () => {
+			unsubscribe()
+			if (unlistenInitSync) unlistenInitSync()
+			window.removeEventListener(
+				'bbplayer:lyric-offset-change',
+				handleOffsetImmediate,
+			)
+		}
+	}, [broadcastFullLyricsState])
 
 	// Sync Track Info AND SPL Lyrics content to Desktop Floating Lyrics Window
 	useEffect(() => {
-		if (currentTrack) {
-			const bili = currentTrack.source === 'bilibili' ? (currentTrack as any) : null
-			const displayTitle =
-				bili?.bilibiliMetadata?.isMultiPage && (bili.bilibiliMetadata.pagePart || bili.bilibiliMetadata.pageIndex)
-					? `[P${bili.bilibiliMetadata.pageIndex || 1}] ${bili.bilibiliMetadata.pagePart || currentTrack.title}`
-					: currentTrack.title
-
-			emit('lyrics-sync', {
-				type: 'TRACK_CHANGE',
-				title: displayTitle,
-				artist: currentTrack.artist?.name || '未知歌手',
-				durationMs: (currentTrack.duration || 0) * 1000,
-				splContent: activeSplContent || undefined,
-			}).catch(() => {})
-		}
-	}, [currentTrack, activeSplContent])
+		broadcastFullLyricsState()
+	}, [currentTrack, activeSplContent, broadcastFullLyricsState])
 
 	const handleSearch = (query: string) => {
 		if (!query.trim()) return

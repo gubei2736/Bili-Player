@@ -15,11 +15,14 @@ import {
 	ListMusic,
 	FileText,
 	Monitor,
+	Lock,
 	Disc3,
 	X,
 	Trash2,
 	Layers,
 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import {
 	useQueueStore,
 	useCurrentTrack,
@@ -68,6 +71,36 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [loudnessEnabled, setLoudnessEnabled] = useState(() =>
 		desktopAudioEngine.isLoudnessNormalizationEnabled(),
 	)
+
+	// 桌面歌词窗口显隐与穿透锁定状态实时同步
+	const [lyricsVisible, setLyricsVisible] = useState(false)
+	const [lyricsLocked, setLyricsLocked] = useState(false)
+
+	useEffect(() => {
+		let unlistenVis: (() => void) | undefined
+		let unlistenLock: (() => void) | undefined
+
+		listen<boolean>('lyrics-visibility-change', (event) => {
+			setLyricsVisible(Boolean(event.payload))
+		})
+			.then((fn) => {
+				unlistenVis = fn
+			})
+			.catch(() => {})
+
+		listen<boolean>('lyrics-lock-change', (event) => {
+			setLyricsLocked(Boolean(event.payload))
+		})
+			.then((fn) => {
+				unlistenLock = fn
+			})
+			.catch(() => {})
+
+		return () => {
+			if (unlistenVis) unlistenVis()
+			if (unlistenLock) unlistenLock()
+		}
+	}, [])
 
 	const storeTrack = useCurrentTrack()
 	const [engineTrack, setEngineTrack] = useState<Track | null>(() =>
@@ -393,9 +426,21 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			onToggleLyricsWindow()
 		} else {
 			try {
-				const { invoke } = await import('@tauri-apps/api/core')
-				await invoke('toggle_lyrics')
-			} catch {}
+				const visible = await invoke<boolean>('toggle_lyrics_window')
+				setLyricsVisible(visible)
+			} catch (err) {
+				console.warn('Failed to toggle lyrics window:', err)
+			}
+		}
+	}
+
+	const handleRightClickDesktopLyrics = async (e: React.MouseEvent) => {
+		e.preventDefault()
+		try {
+			const locked = await invoke<boolean>('toggle_lyrics_lock')
+			setLyricsLocked(locked)
+		} catch (err) {
+			console.warn('Failed to toggle lyrics lock:', err)
 		}
 	}
 
@@ -803,19 +848,26 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					{/* Desktop Floating Lyrics Window Toggle */}
 					<button
 						onClick={handleToggleDesktopLyrics}
-						onContextMenu={async (e) => {
-							e.preventDefault()
-							try {
-								const { invoke } = await import('@tauri-apps/api/core')
-								await invoke('toggle_lyrics_lock')
-							} catch (err) {
-								console.warn('Failed to toggle lyrics lock:', err)
-							}
-						}}
-						title="桌面歌词 (左键显示/隐藏，右键锁定/解锁穿透)"
-						className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] transition-colors"
+						onContextMenu={handleRightClickDesktopLyrics}
+						title={
+							lyricsLocked
+								? '桌面歌词已锁定穿透 · 左键显示/隐藏，右键点击解锁 (Ctrl+Alt+L)'
+								: lyricsVisible
+								? '桌面歌词已开启 · 左键隐藏 (Ctrl+Alt+D)，右键锁定穿透 (Ctrl+Alt+L)'
+								: '桌面歌词 · 左键开启 (Ctrl+Alt+D)，右键锁定穿透 (Ctrl+Alt+L)'
+						}
+						className={`relative p-1.5 rounded-lg transition-all ${
+							lyricsVisible
+								? 'bg-[#00AEEC]/15 text-[#00AEEC] border border-[#00AEEC]/30 shadow-sm'
+								: 'hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] border border-transparent'
+						}`}
 					>
 						<Monitor className="w-4 h-4" />
+						{lyricsLocked && (
+							<span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-black flex items-center justify-center shadow ring-1 ring-black">
+								<Lock className="w-2 h-2 stroke-[3]" />
+							</span>
+						)}
 					</button>
 
 					{/* Fullscreen Lyrics Toggle */}
