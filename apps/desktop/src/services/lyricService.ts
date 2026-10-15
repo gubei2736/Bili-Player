@@ -313,7 +313,47 @@ export class LyricService {
 				: ''
 		const searchKeyword = `${queryTitle} ${queryArtist}`.trim()
 
-		// Try Netease First (Rich SPL/YRC Syllable lyrics with translation & romaji)
+		// 1. Try QQ Music First (根据用户偏好，优先匹配 QQ 音乐歌词库)
+		try {
+			const qqSearchRes = await qqMusicApi.search(searchKeyword, 5)
+			if (qqSearchRes.isOk() && qqSearchRes.value.length > 0) {
+				const bestMatch = qqSearchRes.value[0]!
+				const lyricRes = await qqMusicApi.getLyrics(bestMatch.remoteId as string)
+				if (lyricRes.isOk()) {
+					const parsedData = qqMusicApi.parseLyrics(lyricRes.value)
+					if (parsedData.lrc) {
+						this.rawCache.set(trackKey, {
+							lrc: parsedData.lrc,
+							tlyric: parsedData.tlyric,
+							romalrc: undefined,
+							source: 'qqmusic',
+							title: bestMatch.title,
+							artist: bestMatch.artist,
+						})
+
+						const splText = mergeLyricsToSpl(
+							parsedData.lrc,
+							parsedData.tlyric,
+							undefined,
+							options,
+						)
+
+						return {
+							trackKey,
+							splContent: splText,
+							source: 'qqmusic',
+							title: bestMatch.title,
+							artist: bestMatch.artist,
+							offsetMs,
+						}
+					}
+				}
+			}
+		} catch (err) {
+			console.warn('QQ Music lyric fetch skipped:', err)
+		}
+
+		// 2. Fallback to Netease
 		try {
 			const neteaseSearchRes = await neteaseApi.search({
 				keywords: searchKeyword,
@@ -356,71 +396,33 @@ export class LyricService {
 			console.warn('Netease lyric fetch skipped:', err)
 		}
 
-		// Fallback to QQ Music
-		try {
-			const qqSearchRes = await qqMusicApi.search(searchKeyword, 5)
-			if (qqSearchRes.isOk() && qqSearchRes.value.length > 0) {
-				const bestMatch = qqSearchRes.value[0]!
-				const lyricRes = await qqMusicApi.getLyrics(bestMatch.remoteId as string)
-				if (lyricRes.isOk()) {
-					const parsedData = qqMusicApi.parseLyrics(lyricRes.value)
-					if (parsedData.lrc) {
-						this.rawCache.set(trackKey, {
-							lrc: parsedData.lrc,
-							tlyric: parsedData.tlyric,
-							romalrc: undefined,
-							source: 'qqmusic',
-							title: bestMatch.title,
-							artist: bestMatch.artist,
-						})
-
-						const splText = mergeLyricsToSpl(
-							parsedData.lrc,
-							parsedData.tlyric,
-							undefined,
-							options,
-						)
-
-						return {
-							trackKey,
-							splContent: splText,
-							source: 'qqmusic',
-							title: bestMatch.title,
-							artist: bestMatch.artist,
-							offsetMs,
-						}
-					}
-				}
-			}
-		} catch (err) {
-			console.warn('QQ Music lyric fetch skipped:', err)
-		}
-
 		return null
 	}
 
-	// 2. Manual Candidate Search
+	private candidateLyricsCache = new Map<string, Promise<string | null>>()
+
+	// 预加载候选歌曲歌词，用户在列表中查看候选时后台已拉取完毕，点击“采用”瞬间 0ms 秒采用
+	prefetchCandidates(candidates: LyricSearchCandidate[], trackKey?: string): void {
+		candidates.slice(0, 5).forEach((cand) => {
+			const cacheKey = `${cand.source}_${cand.id}`
+			if (!this.candidateLyricsCache.has(cacheKey)) {
+				const promise = this.doFetchCandidateLyrics(cand, undefined, trackKey)
+				this.candidateLyricsCache.set(cacheKey, promise)
+			}
+		})
+	}
+
+	// 2. Manual Candidate Search (优先展示 QQ 音乐的候选结果)
 	async searchCandidates(keyword: string): Promise<LyricSearchCandidate[]> {
 		const candidates: LyricSearchCandidate[] = []
 		if (!keyword.trim()) return candidates
 
-		const [nRes, qRes] = await Promise.allSettled([
-			neteaseApi.search({ keywords: keyword, limit: 5 }),
-			qqMusicApi.search(keyword, 5),
+		const [qRes, nRes] = await Promise.allSettled([
+			qqMusicApi.search(keyword, 8),
+			neteaseApi.search({ keywords: keyword, limit: 6 }),
 		])
 
-		if (nRes.status === 'fulfilled' && nRes.value.isOk()) {
-			for (const item of nRes.value.value) {
-				candidates.push({
-					source: 'netease',
-					id: item.remoteId,
-					title: item.title,
-					artist: item.artist,
-					duration: item.duration,
-				})
-			}
-		}
-
+		// QQ 音乐候选排在最前
 		if (qRes.status === 'fulfilled' && qRes.value.isOk()) {
 			for (const item of qRes.value.value) {
 				candidates.push({
@@ -433,43 +435,46 @@ export class LyricService {
 			}
 		}
 
+		// 网易云音乐候选作为补充排在后面
+		if (nRes.status === 'fulfilled' && nRes.value.isOk()) {
+			for (const item of nRes.value.value) {
+				candidates.push({
+					source: 'netease',
+					id: item.remoteId,
+					title: item.title,
+					artist: item.artist,
+					duration: item.duration,
+				})
+			}
+		}
+
 		return candidates
 	}
 
-	// 3. Fetch candidate's lyrics with translation and romaji options
+	// 3. Fetch candidate's lyrics with translation and romaji options (优先读取预加载缓存)
 	async fetchCandidateLyrics(
 		candidate: LyricSearchCandidate,
 		options?: { showTranslation?: boolean; showRomaji?: boolean },
 		trackKey?: string,
 	): Promise<string | null> {
-		if (candidate.source === 'netease') {
+		const cacheKey = `${candidate.source}_${candidate.id}`
+		if (this.candidateLyricsCache.has(cacheKey)) {
 			try {
-				const res = await neteaseApi.getLyrics(Number(candidate.id))
-				if (res.isOk()) {
-					const parsedData = neteaseApi.parseLyrics(res.value)
-					if (parsedData.lrc) {
-						if (trackKey) {
-							this.rawCache.set(trackKey, {
-								lrc: parsedData.lrc,
-								tlyric: parsedData.tlyric,
-								romalrc: parsedData.romalrc,
-								source: 'netease',
-								title: candidate.title,
-								artist: candidate.artist,
-							})
-						}
-						return mergeLyricsToSpl(
-							parsedData.lrc,
-							parsedData.tlyric,
-							parsedData.romalrc,
-							options,
-						)
-					}
-				}
-			} catch (e) {
-				console.error('Fetch netease lyrics error:', e)
-			}
-		} else if (candidate.source === 'qqmusic') {
+				const cached = await this.candidateLyricsCache.get(cacheKey)!
+				if (cached) return cached
+			} catch {}
+		}
+		const promise = this.doFetchCandidateLyrics(candidate, options, trackKey)
+		this.candidateLyricsCache.set(cacheKey, promise)
+		return promise
+	}
+
+	private async doFetchCandidateLyrics(
+		candidate: LyricSearchCandidate,
+		options?: { showTranslation?: boolean; showRomaji?: boolean },
+		trackKey?: string,
+	): Promise<string | null> {
+		if (candidate.source === 'qqmusic') {
 			try {
 				const res = await qqMusicApi.getLyrics(String(candidate.id))
 				if (res.isOk()) {
@@ -495,6 +500,33 @@ export class LyricService {
 				}
 			} catch (e) {
 				console.error('Fetch qqmusic lyrics error:', e)
+			}
+		} else if (candidate.source === 'netease') {
+			try {
+				const res = await neteaseApi.getLyrics(Number(candidate.id))
+				if (res.isOk()) {
+					const parsedData = neteaseApi.parseLyrics(res.value)
+					if (parsedData.lrc) {
+						if (trackKey) {
+							this.rawCache.set(trackKey, {
+								lrc: parsedData.lrc,
+								tlyric: parsedData.tlyric,
+								romalrc: parsedData.romalrc,
+								source: 'netease',
+								title: candidate.title,
+								artist: candidate.artist,
+							})
+						}
+						return mergeLyricsToSpl(
+							parsedData.lrc,
+							parsedData.tlyric,
+							parsedData.romalrc,
+							options,
+						)
+					}
+				}
+			} catch (e) {
+				console.error('Fetch netease lyrics error:', e)
 			}
 		}
 		return null

@@ -68,6 +68,8 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		try {
 			const results = await lyricService.searchCandidates(kw.trim())
 			setCandidates(results)
+			// 立即在后台并行预加载候选歌词，用户点击时直接命中内存，瞬间完成采用！
+			lyricService.prefetchCandidates(results, track.uniqueKey)
 		} catch (err) {
 			console.warn('Search lyrics error:', err)
 		} finally {

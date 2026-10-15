@@ -12,6 +12,7 @@ import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import {
 	playTrackWithProxy,
 	syncTrackToQueueStore,
+	prefetchPartStream,
 } from '../../audio/playTrackHelper'
 import { logMultipart } from '../../utils/debugLogger'
 
@@ -149,6 +150,15 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 			isCancelled = true
 		}
 	}, [isOpen, bvid, initialParts])
+
+	// 自动预取当前选集弹窗中的前 6 首分 P，用户点击任何一首都 0ms 瞬间秒播出声
+	useEffect(() => {
+		if (isOpen && bvid && parts.length > 0) {
+			parts.slice(0, 6).forEach((p) => {
+				if (p.cid) prefetchPartStream(bvid, p.cid)
+			})
+		}
+	}, [isOpen, bvid, parts.length])
 
 	if (!isOpen) return null
 

@@ -10,6 +10,37 @@ import { getAudioQualityPreference } from './audioSettings'
 import { invoke } from '@tauri-apps/api/core'
 import { logMultipart } from '../utils/debugLogger'
 
+interface CachedStreamInfo {
+	streamData: any
+	expireAt: number
+}
+const streamCache = new Map<string, CachedStreamInfo>()
+
+/**
+ * 后台静默预加载分 P 音频流缓存，使点击该分 P 时实现 0ms 秒播
+ */
+export function prefetchPartStream(bvid: string, cid: number): void {
+	const cacheKey = `${bvid}_${cid}`
+	if (streamCache.has(cacheKey)) return
+	bilibiliApi
+		.getAudioStream({
+			bvid,
+			cid,
+			audioQuality: 30280,
+			enableDolby: false,
+			enableHiRes: false,
+		})
+		.then((res) => {
+			if (res.isOk()) {
+				streamCache.set(cacheKey, {
+					streamData: res.value,
+					expireAt: Date.now() + 30 * 60 * 1000,
+				})
+				logMultipart('playTrackHelper', '分 P 音频流预热成功', { bvid, cid })
+			}
+		})
+}
+
 let currentLoadingTrackKey: string | null = null
 let latestPlayRequestId = 0
 let cachedProxyPort: number | null = null
@@ -272,22 +303,41 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				preferDolbyFirst = false
 			}
 
-			const streamRes = await bilibiliApi.getAudioStream({
-				bvid,
-				cid: cid!,
-				audioQuality,
-				enableDolby,
-				enableHiRes,
-				preferDolbyFirst,
-			})
+			const cacheKey = `${bvid}_${cid}`
+			let streamData: any = null
+			const cached = streamCache.get(cacheKey)
 
-			if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
+			if (cached && cached.expireAt > Date.now()) {
+				streamData = cached.streamData
+				logMultipart('playTrackHelper', '命中内存音频流缓存，0ms 秒切进入播放', {
+					bvid,
+					cid,
+					pageIndex: biliTrack.bilibiliMetadata.pageIndex,
+				})
+			} else {
+				logMultipart('playTrackHelper', '开始请求音频流', { bvid, cid })
+				const streamRes = await bilibiliApi.getAudioStream({
+					bvid,
+					cid: cid!,
+					audioQuality,
+					enableDolby,
+					enableHiRes,
+					preferDolbyFirst,
+				})
 
-			if (streamRes.isErr()) {
-				throw new Error(`获取 B 站音频流失败: ${streamRes.error.message}`)
+				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
+
+				if (streamRes.isErr()) {
+					throw new Error(`获取 B 站音频流失败: ${streamRes.error.message}`)
+				}
+
+				streamData = streamRes.value
+				streamCache.set(cacheKey, {
+					streamData,
+					expireAt: Date.now() + 30 * 60 * 1000,
+				})
 			}
 
-			const streamData = streamRes.value
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
 
 			// 3. Query local stream proxy port from Tauri backend (使用模块全局静态缓存)
@@ -332,6 +382,15 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			})
 			syncTrackToQueueStore(biliTrack, originalKey)
 			useHistoryStore.getState().addRecord(biliTrack)
+
+			// 7. 预加载相邻分 P 流：如果是多 P 视频，后台静默预热下一 P，彻底消除切歌等待
+			if (biliTrack.bilibiliMetadata.pages && biliTrack.bilibiliMetadata.pages.length > 1) {
+				const curPage = biliTrack.bilibiliMetadata.pageIndex || 1
+				const nextPart = biliTrack.bilibiliMetadata.pages.find((p) => Number(p.page) === Number(curPage + 1))
+				if (nextPart && nextPart.cid) {
+					prefetchPartStream(bvid, nextPart.cid)
+				}
+			}
 		} else {
 			// Local track fallback
 			const localTrack = inputTrack as any

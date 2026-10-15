@@ -298,14 +298,18 @@ export class BilibiliApi {
 		BilibiliApiError
 	> {
 		const { bvid, cid, audioQuality, enableDolby, enableHiRes, preferDolbyFirst } = params
-		// 4048 = 16 (DASH) + 64 (HDR) + 128 (4K) + 256 (Dolby) + 512 (8K) + 1024 (AV1) + 2048 (Dolby Vision)
-		const fnval = '4048'
+		// 纯音频极速模式：16 (DASH) + 256 (Dolby Audio)
+		// 严禁请求 64(HDR) + 128(4K) + 512(8K) + 1024(AV1) + fourk: '1'，大幅减小 B 站服务器转码与响应耗时
+		let fnvalNum = 16
+		if (enableDolby) {
+			fnvalNum |= 256
+		}
+		const fnval = String(fnvalNum)
 		const wbiParams = getWbiEncodedParams({
 			bvid,
 			cid: String(cid),
 			fnval,
 			fnver: '0',
-			fourk: '1',
 			qlt: String(audioQuality),
 			voice_balance: '1',
 		})
