@@ -43,17 +43,32 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 	const handleClose = async () => {
 		try {
 			const action = localStorage.getItem('bbplayer_close_action') || 'tray'
-			const { getCurrentWindow } = await import('@tauri-apps/api/window')
-			const win = getCurrentWindow()
-			if (action === 'tray') {
-				await win.hide()
+			if (action === 'exit') {
+				const { invoke } = await import('@tauri-apps/api/core')
+				await invoke('exit_app')
 			} else {
-				await win.close()
+				const { getCurrentWindow } = await import('@tauri-apps/api/window')
+				const win = getCurrentWindow()
+				await win.hide()
 			}
 		} catch {
 			window.close()
 		}
 	}
+
+	useEffect(() => {
+		let unlisten: (() => void) | undefined
+		import('@tauri-apps/api/event').then(({ listen }) => {
+			listen('request-window-close', () => {
+				handleClose()
+			}).then((un) => {
+				unlisten = un
+			})
+		})
+		return () => {
+			unlisten?.()
+		}
+	}, [])
 
 	const handleTogglePin = async () => {
 		try {

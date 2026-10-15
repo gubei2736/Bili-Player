@@ -5,7 +5,8 @@ import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { getStoredLyricOffset } from '../../services/lyricService'
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
-import { useSkinStore, type Track } from '@bbplayer/shared-core'
+import { useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
+import { getQualityBadgeInfo } from '../../audio/audioSettings'
 
 export interface ImmersiveLyricsViewProps {
 	isOpen: boolean
@@ -54,6 +55,11 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 			window.removeEventListener('bbplayer:lyric-offset-change', handleOffsetChange)
 		}
 	}, [track?.uniqueKey])
+
+	const biliTrack = track?.source === 'bilibili' ? (track as BilibiliTrack) : null
+	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
+	const isLocal = track?.source === 'local'
+	const badgeInfo = track ? getQualityBadgeInfo(currentQualityId, isLocal) : null
 
 	const lyricsData: SplLyricData = useMemo(() => {
 		try {
@@ -248,13 +254,23 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							</div>
 
 							{/* Track info summary */}
-							<div className="mt-6 text-center space-y-1 z-10">
+							<div className="mt-6 text-center space-y-1.5 z-10">
 								<h1 className="text-lg md:text-xl font-bold tracking-tight text-white drop-shadow">
 									{track?.title || '未在播放歌曲'}
 								</h1>
 								<p className="text-xs md:text-sm text-white/70 font-medium">
 									{track?.artist?.name || '未知歌手'}
 								</p>
+								{badgeInfo && (
+									<div className="pt-1 flex items-center justify-center">
+										<span
+											className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-medium border shadow-sm ${badgeInfo.bg} ${badgeInfo.border} ${badgeInfo.color}`}
+											title={badgeInfo.tooltip}
+										>
+											{badgeInfo.text}
+										</span>
+									</div>
+								)}
 							</div>
 						</div>
 

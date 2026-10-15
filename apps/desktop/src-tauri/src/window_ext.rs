@@ -57,3 +57,9 @@ pub fn toggle_lyrics_window(app: AppHandle) -> Result<bool, String> {
         Err("Lyrics window not found".to_string())
     }
 }
+
+/// Tauri Command: Completely exit the application and clean up tray icon
+#[tauri::command]
+pub fn exit_app(app: AppHandle) {
+    app.exit(0);
+}

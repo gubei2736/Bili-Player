@@ -32,12 +32,23 @@ export function setAudioQualityPreference(pref: AudioQualityPreference): void {
 	window.dispatchEvent(new CustomEvent('bbplayer:audio-quality-change', { detail: pref }))
 }
 
-export function getQualityBadgeInfo(qualityId?: number): {
+export function getQualityBadgeInfo(qualityId?: number, isLocal = false): {
 	text: string
 	bg: string
 	border: string
 	color: string
+	tooltip: string
 } {
+	if (isLocal) {
+		return {
+			text: '本地音频',
+			bg: 'bg-emerald-500/20',
+			border: 'border-emerald-400/30',
+			color: 'text-emerald-300',
+			tooltip: '本地文件音频',
+		}
+	}
+
 	switch (qualityId) {
 		case 30251:
 			return {
@@ -45,6 +56,7 @@ export function getQualityBadgeInfo(qualityId?: number): {
 				bg: 'bg-amber-500/20',
 				border: 'border-amber-400/30',
 				color: 'text-amber-300',
+				tooltip: 'FLAC 无损音轨 (最高 96kHz/24bit)',
 			}
 		case 30250:
 			return {
@@ -52,34 +64,39 @@ export function getQualityBadgeInfo(qualityId?: number): {
 				bg: 'bg-purple-500/20',
 				border: 'border-purple-400/30',
 				color: 'text-purple-300',
+				tooltip: 'Dolby Atmos (E-AC-3 JOC, 最高 768kbps)',
 			}
 		case 30280:
 			return {
-				text: '常规 AAC · 320K',
+				text: '320Kbps AAC',
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',
+				tooltip: '320Kbps 极高品质常规 AAC',
 			}
 		case 30232:
 			return {
-				text: '常规 AAC · 132K',
-				bg: 'bg-emerald-500/20',
-				border: 'border-emerald-400/30',
-				color: 'text-emerald-300',
+				text: '132Kbps AAC',
+				bg: 'bg-teal-500/20',
+				border: 'border-teal-400/30',
+				color: 'text-teal-300',
+				tooltip: '132Kbps 较高品质常规 AAC',
 			}
 		case 30216:
 			return {
-				text: '常规 AAC · 64K',
+				text: '64Kbps AAC',
 				bg: 'bg-zinc-500/20',
 				border: 'border-zinc-400/30',
 				color: 'text-zinc-300',
+				tooltip: '64Kbps 普通品质常规 AAC',
 			}
 		default:
 			return {
-				text: '常规 AAC',
-				bg: 'bg-sky-500/20',
-				border: 'border-sky-400/30',
-				color: 'text-sky-300',
+				text: '识别音质中...',
+				bg: 'bg-white/10',
+				border: 'border-white/15',
+				color: 'text-muted-foreground animate-pulse',
+				tooltip: '正在识别当前音频流码率与格式...',
 			}
 	}
 }

@@ -6,7 +6,7 @@ pub mod window_ext;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -21,6 +21,7 @@ pub fn run() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            window_ext::exit_app,
             window_ext::set_ignore_cursor_events,
             window_ext::toggle_lyrics_window,
             stream_proxy::get_stream_proxy_port,
@@ -33,10 +34,18 @@ pub fn run() {
         ])
         .setup(|app| {
             eprintln!("[BBPlayer] setup closure invoked");
-            // 1. Apply native window effects to main window
+            // 1. Apply native window effects to main window & handle close requests
             if let Some(main_win) = app.get_webview_window("main") {
                 eprintln!("[BBPlayer] main window found, setting up window effects");
                 window_ext::setup_window_effects(&main_win);
+
+                let app_handle_for_close = app.handle().clone();
+                main_win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = app_handle_for_close.emit("request-window-close", ());
+                    }
+                });
             } else {
                 eprintln!("[BBPlayer] WARNING: main window NOT found in app.get_webview_window(\"main\")!");
             }

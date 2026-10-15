@@ -1,4 +1,10 @@
-import { bilibiliApi, useHistoryStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
+import {
+	bilibiliApi,
+	useHistoryStore,
+	useQueueStore,
+	type Track,
+	type BilibiliTrack,
+} from '@bbplayer/shared-core'
 import { desktopAudioEngine } from './DesktopAudioEngine'
 import { getAudioQualityPreference } from './audioSettings'
 import { invoke } from '@tauri-apps/api/core'
@@ -88,6 +94,9 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 
 			const streamData = streamRes.value
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
+
+			// 实时更新播放队列中的曲目数据，使底栏与全屏歌词瞬间展示当前音频真实规格（320K/Hi-Res/杜比等）
+			useQueueStore.getState().updateTrackStream(biliTrack.uniqueKey, streamData)
 
 			// 3. Query local stream proxy port from Tauri backend
 			let port = 0

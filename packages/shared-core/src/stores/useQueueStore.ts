@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-import type { Track } from '../types/media'
+import type { Track, BilibiliTrack } from '../types/media'
 import { getDefaultStateStorage } from './storage'
 
 export type PlayMode = 'sequential' | 'shuffle' | 'repeat_one' | 'repeat_all'
@@ -17,6 +17,10 @@ export interface QueueState {
 	removeTrack: (index: number) => void
 	clearQueue: () => void
 	setCurrentIndex: (index: number) => void
+	updateTrackStream: (
+		uniqueKey: string,
+		streamUrlData: NonNullable<BilibiliTrack['bilibiliMetadata']['bilibiliStreamUrl']>,
+	) => void
 	next: () => Track | null
 	prev: () => Track | null
 	setPlayMode: (mode: PlayMode) => void
@@ -134,6 +138,24 @@ export const useQueueStore = create<QueueState>()(
 				if (index >= 0 && index < queue.length) {
 					set({ currentIndex: index })
 				}
+			},
+
+			updateTrackStream: (uniqueKey, streamUrlData) => {
+				const { queue } = get()
+				const newQueue = queue.map((t) => {
+					if (t.uniqueKey === uniqueKey && t.source === 'bilibili') {
+						const bt = t as BilibiliTrack
+						return {
+							...bt,
+							bilibiliMetadata: {
+								...bt.bilibiliMetadata,
+								bilibiliStreamUrl: streamUrlData,
+							},
+						}
+					}
+					return t
+				})
+				set({ queue: newQueue })
 			},
 
 			next: () => {

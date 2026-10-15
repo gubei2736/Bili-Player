@@ -69,7 +69,8 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const biliTrack =
 		currentTrack?.source === 'bilibili' ? (currentTrack as BilibiliTrack) : null
 	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
-	const badgeInfo = currentTrack ? getQualityBadgeInfo(currentQualityId) : null
+	const isLocal = currentTrack?.source === 'local'
+	const badgeInfo = currentTrack ? getQualityBadgeInfo(currentQualityId, isLocal) : null
 
 	const [splContent, setSplContent] = useState<string>('')
 	const [lyricOffsetSec, setLyricOffsetSec] = useState<number>(0)
@@ -419,7 +420,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 									{badgeInfo && (
 										<span
 											className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold border shrink-0 leading-tight ${badgeInfo.bg} ${badgeInfo.border} ${badgeInfo.color}`}
-											title={`当前音质规格: ${currentQualityId || '默认'}`}
+											title={badgeInfo.tooltip}
 										>
 											{badgeInfo.text}
 										</span>
