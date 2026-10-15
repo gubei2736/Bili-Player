@@ -13,6 +13,90 @@ let currentLoadingTrackKey: string | null = null
 let latestPlayRequestId = 0
 let cachedProxyPort: number | null = null
 
+/**
+ * 强一致同步器：直接在 apps/desktop 侧通过 useQueueStore.setState 强制将目标分 P 写入当前播放位置
+ * 彻底解决 updateTrackStream 匹配不到 key 或并发更新滞后的问题
+ */
+export function syncTrackToQueueStore(
+	updatedTrack: BilibiliTrack,
+	originalKey?: string,
+): void {
+	const state = useQueueStore.getState()
+	const queue = [...state.queue]
+	let currentIndex = state.currentIndex
+	const bvid = updatedTrack.bilibiliMetadata.bvid
+	const cid = updatedTrack.bilibiliMetadata.cid
+	const pageIndex = updatedTrack.bilibiliMetadata.pageIndex
+
+	// 深拷贝一份全新的对象引用，确保 React / Zustand 100% 触发重渲染
+	const freshTrack: BilibiliTrack = {
+		...updatedTrack,
+		bilibiliMetadata: {
+			...updatedTrack.bilibiliMetadata,
+		},
+	}
+
+	// 1. 优先检查队列里是否已经有完全对应这一 P 的曲目 (例如“播放全部分 P”展开后的列表)
+	const exactIdx = queue.findIndex((t) => {
+		if (t.uniqueKey === freshTrack.uniqueKey) return true
+		if (originalKey && t.uniqueKey === originalKey) return true
+		if (t.source === 'bilibili') {
+			const bt = t as BilibiliTrack
+			if (bt.bilibiliMetadata.bvid === bvid) {
+				if (cid && bt.bilibiliMetadata.cid === cid) return true
+				if (pageIndex && bt.bilibiliMetadata.pageIndex === pageIndex)
+					return true
+			}
+		}
+		return false
+	})
+
+	if (exactIdx !== -1) {
+		// 如果队列中同时存在多首同 bvid 的歌（比如已展开 134 首），直接把指针移到对应的 exactIdx (即目标分 P)！
+		queue[exactIdx] = freshTrack
+		currentIndex = exactIdx
+	} else if (
+		currentIndex >= 0 &&
+		currentIndex < queue.length &&
+		queue[currentIndex]?.source === 'bilibili' &&
+		(queue[currentIndex] as BilibiliTrack).bilibiliMetadata.bvid === bvid
+	) {
+		// 2. 如果当前正在播的就是同一个 bvid（单条目模式，从 P1 切到 P4），原地把 queue[currentIndex] 替换为目标分 P
+		queue[currentIndex] = freshTrack
+	} else {
+		// 3. 查找队列里是否有同 bvid 的条目
+		const sameBvidIdx = queue.findIndex(
+			(t) =>
+				t.source === 'bilibili' &&
+				(t as BilibiliTrack).bilibiliMetadata.bvid === bvid,
+		)
+		if (sameBvidIdx !== -1) {
+			queue[sameBvidIdx] = freshTrack
+			currentIndex = sameBvidIdx
+		} else {
+			// 4. 队列中完全没有这首歌（比如直接从搜索页打开分 P 弹窗点播），直接插入并设为当前播放
+			const insertIdx =
+				currentIndex >= 0 && currentIndex < queue.length
+					? currentIndex + 1
+					: queue.length
+			queue.splice(insertIdx, 0, freshTrack)
+			currentIndex = insertIdx
+		}
+	}
+
+	// 直接调用 Zustand 底层 setState，同时写入 queue, currentIndex 和 currentTrack
+	useQueueStore.setState({
+		queue,
+		currentIndex,
+		currentTrack: freshTrack,
+	})
+
+	// 同步派发全局 DOM 事件，通知所有组件立即刷新
+	window.dispatchEvent(
+		new CustomEvent('bbplayer:track-updated', { detail: freshTrack }),
+	)
+}
+
 export async function playTrackWithProxy(inputTrack: Track, forceReplay = false): Promise<void> {
 	// 1. 防重保护：如果相同曲目已在加载中，直接返回，避免并发打断与二次重播从 0 秒开始
 	if (!forceReplay && currentLoadingTrackKey === inputTrack.uniqueKey) {
@@ -45,9 +129,6 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			const explicitPageIndex = biliTrack.bilibiliMetadata.pageIndex
 
 			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID
-			let extraMetadata: Partial<BilibiliTrack['bilibiliMetadata']> = {}
-			let trackOverrides: { title?: string; duration?: number; uniqueKey?: string } | undefined
-
 			if (!biliTrack.bilibiliMetadata.pages || biliTrack.bilibiliMetadata.pages.length === 0 || !cid) {
 				const pageListRes = await bilibiliApi.getPageList({ bvid })
 				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
@@ -82,21 +163,6 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 					biliTrack.duration = newDuration
 					biliTrack.uniqueKey = newKey
 					currentLoadingTrackKey = newKey
-
-					extraMetadata = {
-						bvid,
-						cid,
-						isMultiPage: isMulti,
-						pageIndex: currentPage.page,
-						pagePart: currentPage.part,
-						pages,
-						mainTrackTitle: mainTitle,
-					}
-					trackOverrides = {
-						title: newTitle,
-						duration: newDuration,
-						uniqueKey: newKey,
-					}
 				} else if (!cid) {
 					throw new Error('无法获取该视频的分 P CID 信息')
 				}
@@ -126,22 +192,12 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 						currentLoadingTrackKey = biliTrack.uniqueKey
 					}
 				}
-
-				extraMetadata = {
-					bvid,
-					cid,
-					isMultiPage: isMulti,
-					pageIndex: biliTrack.bilibiliMetadata.pageIndex,
-					pagePart: biliTrack.bilibiliMetadata.pagePart,
-					pages: biliTrack.bilibiliMetadata.pages,
-					mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle || inputTrack.title,
-				}
-				trackOverrides = {
-					title: biliTrack.title,
-					duration: biliTrack.duration,
-					uniqueKey: biliTrack.uniqueKey,
-				}
 			}
+
+			// 关键步骤：在请求音频流之前，立即把解析好的分 P 写入 AudioEngine 和 QueueStore！
+			// 彻底杜绝 BottomPlayerBar 用旧的 P1 反向触发播放，0ms 瞬间切换 UI
+			desktopAudioEngine.setActiveTrack(biliTrack)
+			syncTrackToQueueStore(biliTrack, originalKey)
 
 			// 2. Fetch Audio Stream URL from Bilibili based on quality preference
 			const qualityPref = getAudioQualityPreference()
@@ -219,17 +275,13 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 
 			if (requestId !== latestPlayRequestId) return
 
-			// 6. 优先播放之后，再更新识别出的音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
-			useQueueStore.getState().updateTrackStream(originalKey, streamData, extraMetadata, trackOverrides)
-
-			// 7. 广播全局切歌/音轨更新事件，通知所有 UI 组件（底栏、歌词、选集弹窗）同步更新
-			window.dispatchEvent(
-				new CustomEvent('bbplayer:track-updated', { detail: biliTrack }),
-			)
+			// 6. 播放成功后再次同步包含音质规格的完整 biliTrack 到 Store
+			syncTrackToQueueStore(biliTrack, originalKey)
 			useHistoryStore.getState().addRecord(biliTrack)
 		} else {
 			// Local track fallback
 			const localTrack = inputTrack as any
+			desktopAudioEngine.setActiveTrack(inputTrack)
 			await desktopAudioEngine.loadAndPlay(
 				inputTrack,
 				localTrack.localMetadata?.localPath || '',

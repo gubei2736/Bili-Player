@@ -203,6 +203,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	// 4. Audio Engine event subscription
 	useEffect(() => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
+			if (event.type === 'trackchange') {
+				const active = event.track ?? desktopAudioEngine.getCurrentTrack()
+				if (active) setEngineTrack({ ...active })
+			}
 			if (event.type === 'play') {
 				setIsPlaying(true)
 				const active = desktopAudioEngine.getCurrentTrack()
@@ -227,6 +231,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					desktopAudioEngine.play().catch((err) =>
 						console.error('Failed to replay track on repeat_one:', err),
 					)
+				} else {
+					playTrackWithProxy(nextTrack, true).catch((err) =>
+						console.error('Failed to play next track on ended:', err),
+					)
 				}
 			}
 		})
@@ -234,13 +242,31 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		return unsubscribe
 	}, [next])
 
+	const handlePrevTrack = () => {
+		const prevTrack = prev()
+		if (prevTrack) {
+			playTrackWithProxy(prevTrack, true).catch((err) =>
+				console.error('Failed to play prev track:', err),
+			)
+		}
+	}
+
+	const handleNextTrack = () => {
+		const nextTrack = next()
+		if (nextTrack) {
+			playTrackWithProxy(nextTrack, true).catch((err) =>
+				console.error('Failed to play next track:', err),
+			)
+		}
+	}
+
 	// 5. Media Session handlers
 	useEffect(() => {
 		desktopAudioEngine.setupMediaSessionHandlers({
 			onPlay: () => desktopAudioEngine.play(),
 			onPause: () => desktopAudioEngine.pause(),
-			onNext: () => next(),
-			onPrev: () => prev(),
+			onNext: () => handleNextTrack(),
+			onPrev: () => handlePrevTrack(),
 			onSeek: (time) => desktopAudioEngine.seek(time),
 		})
 	}, [next, prev])
@@ -264,17 +290,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		}
 	}, [isPlaying, isDragging])
 
-	// 6. Auto play on currentTrack change
-	useEffect(() => {
-		if (
-			currentTrack &&
-			currentTrack.uniqueKey !== desktopAudioEngine.getCurrentTrack()?.uniqueKey
-		) {
-			playTrackWithProxy(currentTrack).catch((err) =>
-				console.error('Failed to auto play track:', err),
-			)
-		}
-	}, [currentTrack?.uniqueKey])
 
 	const togglePlayPause = async () => {
 		if (isPlaying) {
@@ -618,7 +633,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 						{/* Previous Track */}
 						<button
-							onClick={prev}
+							onClick={handlePrevTrack}
 							title="上一曲"
 							className="p-1.5 rounded-full hover:bg-white/10 text-foreground/85 hover:text-white transition-all active:scale-90"
 						>
@@ -640,7 +655,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 						{/* Next Track */}
 						<button
-							onClick={next}
+							onClick={handleNextTrack}
 							title="下一曲"
 							className="p-1.5 rounded-full hover:bg-white/10 text-foreground/85 hover:text-white transition-all active:scale-90"
 						>

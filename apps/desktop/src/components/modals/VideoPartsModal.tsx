@@ -4,13 +4,15 @@ import { X, Layers, Play, Plus, Loader2, Music2 } from 'lucide-react'
 import {
 	bilibiliApi,
 	useQueueStore,
-	useCurrentTrack,
 	type Track,
 	type BilibiliTrack,
 	type BilibiliVideoPart,
 } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
-import { playTrackWithProxy } from '../../audio/playTrackHelper'
+import {
+	playTrackWithProxy,
+	syncTrackToQueueStore,
+} from '../../audio/playTrackHelper'
 
 export interface VideoPartsModalProps {
 	isOpen: boolean
@@ -38,35 +40,42 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 	title,
 	coverUrl,
 	author,
-	currentCid,
-	currentPage,
 	initialParts,
 }) => {
 	const [parts, setParts] = useState<BilibiliVideoPart[]>(initialParts || [])
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+
+	// 直接读取音频引擎当前正在播放的 Track，保证 100% 实时准确
 	const [engineTrack, setEngineTrack] = useState<Track | null>(() =>
 		desktopAudioEngine.getCurrentTrack(),
 	)
 
-	const { addTrack, setQueue, playOrReplacePartTrack } = useQueueStore()
-	const queueCurrentTrack = useCurrentTrack()
+	const { queue, currentIndex, addTrack, setQueue } = useQueueStore()
+	const queueTrack =
+		currentIndex >= 0 && currentIndex < queue.length
+			? queue[currentIndex]
+			: null
 
-	// 监听音频引擎与全局切歌事件，确保弹窗打开与切歌时 100% 拿到真实正在发声的分 P
 	useEffect(() => {
 		if (!isOpen) return
 		setEngineTrack(desktopAudioEngine.getCurrentTrack())
 
 		const handleTrackUpdated = (e: any) => {
 			if (e.detail) {
-				setEngineTrack(e.detail)
+				setEngineTrack({ ...e.detail })
 			} else {
 				setEngineTrack(desktopAudioEngine.getCurrentTrack())
 			}
 		}
+
 		const unsubscribe = desktopAudioEngine.subscribe((ev) => {
-			if (ev.type === 'play' || ev.type === 'loadedmetadata') {
-				setEngineTrack(desktopAudioEngine.getCurrentTrack())
+			if (
+				ev.type === 'trackchange' ||
+				ev.type === 'play' ||
+				ev.type === 'loadedmetadata'
+			) {
+				setEngineTrack(ev.track ?? desktopAudioEngine.getCurrentTrack())
 			}
 		})
 
@@ -154,33 +163,28 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 		}
 	}
 
-	// 优先以真实正在发声的 engineTrack 或响应式 queueCurrentTrack 为准
-	const candidateTrack = engineTrack || queueCurrentTrack
+	// 只信任真实正在播放的 engineTrack 或队列当前激活的 queueTrack，绝不使用外部静态传入的 currentPage=1 兜底！
+	const liveTrack = engineTrack || queueTrack
 	const activeBiliTrack =
-		candidateTrack &&
-		candidateTrack.source === 'bilibili' &&
-		(candidateTrack as BilibiliTrack).bilibiliMetadata.bvid === bvid
-			? (candidateTrack as BilibiliTrack)
+		liveTrack &&
+		liveTrack.source === 'bilibili' &&
+		(liveTrack as BilibiliTrack).bilibiliMetadata.bvid === bvid
+			? (liveTrack as BilibiliTrack)
 			: null
 
-	const activeCid = activeBiliTrack
-		? activeBiliTrack.bilibiliMetadata.cid
-		: currentCid ?? null
-	const activePage = activeBiliTrack
-		? activeBiliTrack.bilibiliMetadata.pageIndex
-		: currentPage ?? null
+	const activeCid = activeBiliTrack?.bilibiliMetadata?.cid ?? null
+	const activePage = activeBiliTrack?.bilibiliMetadata?.pageIndex ?? null
 
 	const handlePlaySinglePart = async (part: BilibiliVideoPart) => {
 		const track = createTrackFromPart(part)
 
-		// 1. 原子更新队列中的当前曲目为选中的分 P (如 P2)
-		playOrReplacePartTrack(track)
-		window.dispatchEvent(
-			new CustomEvent('bbplayer:track-updated', { detail: track }),
-		)
+		// 1. 立即同步到 AudioEngine 和 QueueStore（无需等待网络请求）
+		desktopAudioEngine.setActiveTrack(track)
+		syncTrackToQueueStore(track)
+		setEngineTrack(track)
 		onClose()
 
-		// 2. 立即触发音频流加载与播放
+		// 2. 启动该分 P 的音频流加载与播放
 		try {
 			await playTrackWithProxy(track, true)
 		} catch (err) {
@@ -192,6 +196,7 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 		if (parts.length === 0) return
 		const allTracks = parts.map((p) => createTrackFromPart(p))
 		setQueue(allTracks, 0)
+		desktopAudioEngine.setActiveTrack(allTracks[0]!)
 		window.dispatchEvent(
 			new CustomEvent('bbplayer:track-updated', { detail: allTracks[0] }),
 		)
@@ -226,7 +231,9 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 								视频分 P 选集
 							</h3>
 							<p className="text-[11px] text-muted-foreground">
-								{loading ? '正在识别分 P 数据...' : `共检测到 ${parts.length} 个分 P 章节`}
+								{loading
+									? '正在识别分 P 数据...'
+									: `共检测到 ${parts.length} 个分 P 章节`}
 							</p>
 						</div>
 					</div>
@@ -250,7 +257,10 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 						/>
 					)}
 					<div className="flex-1 min-w-0">
-						<p className="font-semibold text-foreground truncate text-xs" title={title}>
+						<p
+							className="font-semibold text-foreground truncate text-xs"
+							title={title}
+						>
 							{title}
 						</p>
 						<p className="text-[11px] text-muted-foreground truncate">
@@ -303,11 +313,12 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 						</div>
 					) : (
 						parts.map((p) => {
-							// 严格高亮匹配：如果有 activeCid，只认 cid 相等；只有没有 activeCid 时才比对 page
 							const isCurrent =
-								activeCid !== null && activeCid !== undefined
+								activeCid !== null
 									? p.cid === activeCid
-									: activePage !== null && activePage !== undefined && p.page === activePage
+									: activePage !== null
+									? p.page === activePage
+									: false
 
 							return (
 								<div

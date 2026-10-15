@@ -18,9 +18,17 @@ export interface AudioEngineContract {
 }
 
 export type PlaybackListener = (event: {
-	type: 'timeupdate' | 'play' | 'pause' | 'ended' | 'error' | 'loadedmetadata'
+	type:
+		| 'timeupdate'
+		| 'play'
+		| 'pause'
+		| 'ended'
+		| 'error'
+		| 'loadedmetadata'
+		| 'trackchange'
 	currentTime: number
 	duration: number
+	track?: Track | null
 }) => void
 
 export class DesktopAudioEngine implements AudioEngineContract {
@@ -92,6 +100,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				type: 'play',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
+				track: this.currentTrack,
 			})
 		})
 
@@ -103,6 +112,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				type: 'pause',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
+				track: this.currentTrack,
 			})
 		})
 
@@ -122,6 +132,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				type: 'timeupdate',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
+				track: this.currentTrack,
 			})
 		})
 
@@ -130,6 +141,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				type: 'ended',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
+				track: this.currentTrack,
 			})
 		})
 
@@ -138,6 +150,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				type: 'loadedmetadata',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
+				track: this.currentTrack,
 			})
 		})
 
@@ -146,6 +159,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				type: 'error',
 				currentTime: this.getCurrentTime(),
 				duration: this.getDuration(),
+				track: this.currentTrack,
 			})
 		})
 	}
@@ -205,6 +219,20 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		}
 	}
 
+	/**
+	 * 立即设置当前激活的音轨并广播 trackchange 事件（在网络请求完成前即可先行更新 UI）
+	 */
+	public setActiveTrack(track: Track): void {
+		this.currentTrack = track
+		this.updateMediaSession(track)
+		this.emit({
+			type: 'trackchange',
+			currentTime: this.getCurrentTime(),
+			duration: track.duration || this.getDuration(),
+			track,
+		})
+	}
+
 	public async loadAndPlay(
 		track: Track,
 		proxyStreamUrl: string,
@@ -220,6 +248,14 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 		this.currentTrack = track
 		this.currentLoudnessGainDb = loudnessGainDb
+
+		// 立即广播 trackchange，确保底栏和分 P 列表 100% 同步到最新 track (如 P4)
+		this.emit({
+			type: 'trackchange',
+			currentTime: 0,
+			duration: track.duration || this.getDuration(),
+			track,
+		})
 
 		// 只有在音频源真正改变时才重新为 audio.src 赋值，防止重复从 0 秒重播
 		if (!isSameTrack || !isSameSrc) {
