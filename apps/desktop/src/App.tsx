@@ -24,6 +24,7 @@ import { CollectionsView } from './components/views/CollectionsView'
 import { LibraryView } from './components/views/LibraryView'
 import { AudioQualitySettingsCard } from './components/views/AudioQualitySettingsCard'
 import { initDesktopDatabase } from './db/desktopDb'
+import { loginQrService } from './services/loginQrService'
 import {
 	useQueueStore,
 	useSkinStore,
@@ -194,6 +195,10 @@ export const App: React.FC = () => {
 		initDesktopDatabase()
 			.then(() => setDbReady(true))
 			.catch((e) => console.warn('Database initialization note:', e))
+
+		if (!useAuthStore.getState().isLoggedIn) {
+			loginQrService.getOrFetch().catch(() => {})
+		}
 	}, [])
 
 	// 2. Initialize active theme skin colors & font colors

@@ -12,6 +12,7 @@ import {
 	Sparkles,
 } from 'lucide-react'
 import { useAuthStore, useSkinStore } from '@bbplayer/shared-core'
+import { loginQrService } from '../../services/loginQrService'
 
 export type NavTab =
 	| 'explore'
@@ -187,6 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					/* 自定义背景下：按钮为纯透明/微透光玻璃质感，完全融入自定义背景，去除彩虹渐变和深黑底 */
 					<button
 						onClick={onOpenLoginModal}
+						onMouseEnter={() => loginQrService.getOrFetch()}
 						style={customTextColor ? { color: customTextColor } : undefined}
 						className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white/[0.08] hover:bg-white/[0.16] border border-white/20 hover:border-white/35 backdrop-blur-sm text-xs font-medium text-white transition-all active:scale-[0.98] shadow-sm"
 					>
@@ -197,6 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					/* 默认背景下：柔和素雅的科技微光边框，去除刺眼的霓虹彩虹色 */
 					<button
 						onClick={onOpenLoginModal}
+						onMouseEnter={() => loginQrService.getOrFetch()}
 						style={customTextColor ? { color: customTextColor } : undefined}
 						className="group relative w-full overflow-hidden rounded-xl p-[1px] transition-all duration-300 hover:shadow-md hover:shadow-primary/15 active:scale-[0.98]"
 					>

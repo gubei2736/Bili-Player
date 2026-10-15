@@ -463,11 +463,11 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 									</span>
 								)}
 							</div>
-						) : (
+						) : currentTrack ? (
 							<span className="text-[11px] text-muted-foreground/60 tracking-wider">
-								{currentTrack ? '♪ 沉浸聆听中 · 点击查看全屏歌词' : 'BBPlayer 音乐播放器'}
+								♪ 沉浸聆听中 · 点击查看全屏歌词
 							</span>
-						)}
+						) : null}
 					</div>
 
 					{/* Playback Controls (Line 2) - Roomy, centered, 100% full circle */}

@@ -208,9 +208,27 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 					</header>
 
 					{/* Main Stage: Left Cover Halo + Right Dynamic Lyrics */}
-					<main className="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-between px-8 md:px-16 py-6 overflow-hidden gap-12">
-						{/* Left: Album Cover & Audio Halo */}
-						<div className="w-full md:w-5/12 flex flex-col items-center justify-center relative">
+					<main className="relative z-10 flex-1 flex items-center justify-center px-8 md:px-16 py-6 overflow-hidden">
+						{!track ? (
+							/* 处于等候播放歌曲时：界面仅显示四个纯净优雅的音符符号 */
+							<div className="flex items-center justify-center gap-8 sm:gap-14 text-white/40 select-none">
+								<span className="text-4xl sm:text-5xl font-serif drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]">
+									♪
+								</span>
+								<span className="text-4xl sm:text-5xl font-serif drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]">
+									♫
+								</span>
+								<span className="text-4xl sm:text-5xl font-serif drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]">
+									♩
+								</span>
+								<span className="text-4xl sm:text-5xl font-serif drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]">
+									♬
+								</span>
+							</div>
+						) : (
+							<div className="w-full h-full flex flex-col md:flex-row items-center justify-between gap-12">
+								{/* Left: Album Cover & Audio Halo */}
+								<div className="w-full md:w-5/12 flex flex-col items-center justify-center relative">
 							<div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
 								<canvas
 									ref={haloCanvasRef}
@@ -330,7 +348,9 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 									</div>
 								)
 							})}
-						</div>
+								</div>
+							</div>
+						)}
 					</main>
 				</motion.div>
 			)}

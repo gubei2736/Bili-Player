@@ -7,6 +7,8 @@ import {
 	BilibiliQrCodeLoginStatus,
 } from '@bbplayer/shared-core'
 
+import { loginQrService } from '../../services/loginQrService'
+
 export interface LoginModalProps {
 	isOpen: boolean
 	onClose: () => void
@@ -25,33 +27,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 	onCloseRef.current = onClose
 	const isPollingRef = useRef(false)
 
-	const loadQrCode = useCallback(async () => {
+	const loadQrCode = useCallback(async (forceRefresh = false) => {
+		if (!forceRefresh) {
+			const cached = loginQrService.getValidCached()
+			if (cached) {
+				setQrcodeKey(cached.qrcodeKey)
+				setQrDataUrl(cached.dataUrl)
+				setStatusText('请使用哔哩哔哩移动端扫码登录')
+				setIsLoading(false)
+				return
+			}
+		}
+
 		setIsLoading(true)
 		setIsSuccess(false)
 		setQrcodeKey('')
 		setStatusText('正在生成二维码...')
-		const result = await bilibiliApi.getLoginQrCode()
+
+		if (forceRefresh) {
+			loginQrService.clearCache()
+		}
+
+		const res = await loginQrService.fetchNewQrCode()
 		setIsLoading(false)
-		if (result.isOk() && result.value.qrcode_key && result.value.url) {
-			setQrcodeKey(result.value.qrcode_key)
+
+		if (res && res.qrcodeKey && res.dataUrl) {
+			setQrcodeKey(res.qrcodeKey)
+			setQrDataUrl(res.dataUrl)
 			setStatusText('请使用哔哩哔哩移动端扫码登录')
-			try {
-				const dataUri = await QRCode.toDataURL(result.value.url, {
-					margin: 1,
-					width: 200,
-					color: {
-						dark: '#000000',
-						light: '#ffffff',
-					},
-				})
-				setQrDataUrl(dataUri)
-			} catch {
-				setQrDataUrl(
-					`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-						result.value.url,
-					)}`,
-				)
-			}
 		} else {
 			setStatusText('获取二维码失败，请点击刷新重试')
 		}
@@ -59,7 +62,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
 	useEffect(() => {
 		if (isOpen) {
-			loadQrCode()
+			loadQrCode(false)
 		} else {
 			setQrcodeKey('')
 			setIsSuccess(false)
@@ -162,7 +165,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
 				{!isSuccess && (
 					<button
-						onClick={loadQrCode}
+						onClick={() => loadQrCode(true)}
 						disabled={isLoading}
 						className="mt-3 flex items-center gap-1.5 text-xs text-primary hover:underline"
 					>

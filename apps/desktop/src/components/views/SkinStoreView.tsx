@@ -282,8 +282,8 @@ export const SkinStoreView: React.FC = () => {
 								<span>上传本地图片</span>
 							</button>
 
-							{/* UI 字体颜色选项（紧凑设计） */}
-							<div className="flex-1 flex items-center justify-between gap-1.5 min-w-[240px] h-8 px-2.5 rounded-lg bg-white/5 border border-white/10">
+							{/* UI 字体颜色选项（缩短至紧凑规格） */}
+							<div className="w-fit max-w-[260px] flex items-center justify-between gap-2.5 h-8 px-2.5 rounded-lg bg-white/5 border border-white/10">
 								<div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
 									<Type className="w-3 h-3 text-[#00AEEC]" />
 									<span className="text-[10px] font-medium text-foreground">
