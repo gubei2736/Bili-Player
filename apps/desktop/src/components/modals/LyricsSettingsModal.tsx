@@ -54,7 +54,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 			setSearchKeyword(fullTitle)
 			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
-			handleSearch(fullTitle)
+			// 保留输入框关键词填充，由用户按需手动触发搜索
 		}
 	}, [isOpen, track])
 
@@ -76,12 +76,17 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const handleApplyCandidate = async (candidate: LyricSearchCandidate) => {
 		setLoadingCandidateId(candidate.id)
 		try {
-			const spl = await lyricService.fetchCandidateLyrics(candidate, {
-				showTranslation: includeTranslation,
-				showRomaji: includeRomaji,
-			})
+			const spl = await lyricService.fetchCandidateLyrics(
+				candidate,
+				{
+					showTranslation: includeTranslation,
+					showRomaji: includeRomaji,
+				},
+				track.uniqueKey,
+			)
 			if (spl) {
 				setStoredCustomLyric(track.uniqueKey, spl)
+				setCustomText(spl)
 				onLyricsUpdated?.(spl)
 				setSuccessMsg(`已成功应用【${candidate.title}】的歌词！`)
 				setTimeout(() => setSuccessMsg(null), 2000)
@@ -96,26 +101,32 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const handleToggleTranslation = async (enabled: boolean) => {
 		setIncludeTranslation(enabled)
 		setLyricOptionTranslation(enabled)
-		await handleRefreshCurrentLyrics({ showTranslation: enabled, showRomaji: includeRomaji })
+		await handleApplyOptions({ showTranslation: enabled, showRomaji: includeRomaji })
 	}
 
 	const handleToggleRomaji = async (enabled: boolean) => {
 		setIncludeRomaji(enabled)
 		setLyricOptionRomaji(enabled)
-		await handleRefreshCurrentLyrics({ showTranslation: includeTranslation, showRomaji: enabled })
+		await handleApplyOptions({ showTranslation: includeTranslation, showRomaji: enabled })
 	}
 
-	const handleRefreshCurrentLyrics = async (opts: {
+	const handleApplyOptions = async (opts: {
 		showTranslation: boolean
 		showRomaji: boolean
 	}) => {
 		if (!track) return
 		try {
-			const res = await lyricService.fetchLyricForTrack(track, true, opts)
-			if (res && res.splContent) {
-				setStoredCustomLyric(track.uniqueKey, res.splContent)
-				setCustomText(res.splContent)
-				onLyricsUpdated?.(res.splContent)
+			// 1. 优先内存中毫秒级重算，避免重新请求网络
+			let spl = lyricService.reapplyOptions(track.uniqueKey, opts)
+			if (!spl) {
+				// 2. 兜底回源重新获取并解析
+				const res = await lyricService.fetchLyricForTrack(track, true, opts)
+				spl = res?.splContent || null
+			}
+			if (spl) {
+				setStoredCustomLyric(track.uniqueKey, spl)
+				setCustomText(spl)
+				onLyricsUpdated?.(spl)
 				setSuccessMsg(
 					`歌词已更新：${opts.showTranslation ? '已开启' : '已关闭'}翻译，${opts.showRomaji ? '已开启' : '已关闭'}罗马音`,
 				)
@@ -294,7 +305,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 									</div>
 								) : candidates.length === 0 ? (
 									<div className="py-16 text-center text-xs text-muted-foreground">
-										未找到匹配歌词，可尝试修改关键词或点击上方“粘贴 LRC/SPL”自定义
+										输入关键词后点击“搜索”或回车检索歌词库，也可点击上方“粘贴 LRC/SPL”自定义
 									</div>
 								) : (
 									candidates.map((item) => (

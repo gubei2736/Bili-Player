@@ -123,9 +123,50 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 		}
 	}
 
+	const queueCurrentTrack = useQueueStore((s) =>
+		s.currentIndex >= 0 && s.currentIndex < s.queue.length
+			? s.queue[s.currentIndex]
+			: null,
+	)
+	const activeBiliTrack =
+		queueCurrentTrack &&
+		queueCurrentTrack.source === 'bilibili' &&
+		(queueCurrentTrack as BilibiliTrack).bilibiliMetadata.bvid === bvid
+			? (queueCurrentTrack as BilibiliTrack)
+			: null
+
+	const effectiveCid = activeBiliTrack ? activeBiliTrack.bilibiliMetadata.cid : currentCid
+	const effectivePage = activeBiliTrack
+		? activeBiliTrack.bilibiliMetadata.pageIndex
+		: currentPage
+
 	const handlePlaySinglePart = async (part: BilibiliVideoPart) => {
 		const track = createTrackFromPart(part)
-		addTrack(track, true)
+		const { queue, currentIndex } = useQueueStore.getState()
+
+		// 1. Check if this exact part is already in queue
+		const existingIdx = queue.findIndex((t) => t.uniqueKey === track.uniqueKey)
+		if (existingIdx !== -1) {
+			useQueueStore.getState().setCurrentIndex(existingIdx)
+		} else {
+			// If currently playing track is another part of this same video, replace it in-place
+			const currentT = currentIndex >= 0 ? queue[currentIndex] : null
+			const isSameBvid =
+				currentT &&
+				currentT.source === 'bilibili' &&
+				(currentT as BilibiliTrack).bilibiliMetadata.bvid === bvid
+
+			if (isSameBvid && currentIndex >= 0) {
+				const newQueue = [...queue]
+				newQueue[currentIndex] = track
+				useQueueStore.setState({ queue: newQueue })
+			} else {
+				addTrack(track, true)
+				const targetIdx = currentIndex >= 0 ? currentIndex + 1 : 0
+				useQueueStore.getState().setCurrentIndex(targetIdx)
+			}
+		}
+
 		try {
 			await playTrackWithProxy(track, true)
 		} catch (err) {
@@ -246,8 +287,8 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 					) : (
 						parts.map((p) => {
 							const isCurrent =
-								(currentCid && p.cid === currentCid) ||
-								(currentPage && p.page === currentPage)
+								(effectiveCid && p.cid === effectiveCid) ||
+								(effectivePage && p.page === effectivePage)
 
 							return (
 								<div

@@ -73,7 +73,7 @@ export class NeteaseApi {
 				// Fallback 到标准明文歌词接口，避免 eapi 二进制加密被破坏导致解密失败
 				return ResultAsync.fromPromise(
 					this.http
-						.fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=1&kv=1&tv=-1`, {
+						.fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=1&kv=1&tv=-1&rv=-1`, {
 							headers: {
 								Referer: 'https://music.163.com/',
 								'User-Agent':

@@ -52,9 +52,9 @@ export function setLyricOptionTranslation(enabled: boolean): void {
 export function getLyricOptionRomaji(): boolean {
 	try {
 		const val = localStorage.getItem(LYRIC_OPT_ROMA_KEY)
-		return val !== null ? val === 'true' : true
+		return val !== null ? val === 'true' : false
 	} catch {
-		return true
+		return false
 	}
 }
 
@@ -157,6 +157,15 @@ function findClosestInMap(
 	return bestVal
 }
 
+export interface RawLyricEntry {
+	lrc: string
+	tlyric?: string
+	romalrc?: string
+	source: 'netease' | 'qqmusic' | 'custom'
+	title: string
+	artist: string
+}
+
 export function mergeLyricsToSpl(
 	mainLrc: string,
 	tlyric?: string,
@@ -166,23 +175,69 @@ export function mergeLyricsToSpl(
 	const showTrans = options?.showTranslation ?? getLyricOptionTranslation()
 	const showRoma = options?.showRomaji ?? getLyricOptionRomaji()
 
-	const transMap = showTrans && tlyric ? parseSecondaryLrcMap(tlyric) : null
-	const romaMap = showRoma && romalrc ? parseSecondaryLrcMap(romalrc) : null
-
-	if ((!transMap || transMap.size === 0) && (!romaMap || romaMap.size === 0)) {
-		return mainLrc
-	}
-
-	// Clean out existing [tr] and [ro] lines to avoid duplication
-	const lines = mainLrc
-		.split(/\r?\n/)
-		.filter((line) => !/^\[(tr|trans|ro|roma|romaji)\]/i.test(line.trim()))
-
-	const resultLines: string[] = []
+	// 1. If mainLrc already contains [tr] or [ro] tags, extract them to support instantaneous toggle on cached/custom lyrics
+	const embeddedTransMap = new Map<number, string>()
+	const embeddedRomaMap = new Map<number, string>()
+	const rawLines = mainLrc.split(/\r?\n/)
+	const cleanedBaseLines: string[] = []
+	let lastTimeMs: number | null = null
 	const timeRegex = /\[(-?\d{1,3}):(-?\d{1,2})\.(\d{1,6})\]/
 
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i]
+	for (const rawLine of rawLines) {
+		const trimmed = rawLine.trim()
+		if (!trimmed) {
+			cleanedBaseLines.push(rawLine)
+			continue
+		}
+		if (/^\[(ro|roma|romaji)\]/i.test(trimmed)) {
+			if (lastTimeMs !== null) {
+				embeddedRomaMap.set(
+					lastTimeMs,
+					trimmed.replace(/^\[(ro|roma|romaji)\]\s*/i, ''),
+				)
+			}
+			continue
+		}
+		if (/^\[(tr|trans)\]/i.test(trimmed)) {
+			if (lastTimeMs !== null) {
+				embeddedTransMap.set(
+					lastTimeMs,
+					trimmed.replace(/^\[(tr|trans)\]\s*/i, ''),
+				)
+			}
+			continue
+		}
+
+		cleanedBaseLines.push(rawLine)
+		const match = timeRegex.exec(trimmed)
+		if (match) {
+			lastTimeMs = parseTimeTag(match[0])
+		}
+	}
+
+	const transMap = tlyric
+		? parseSecondaryLrcMap(tlyric)
+		: embeddedTransMap.size > 0
+			? embeddedTransMap
+			: null
+	const romaMap = romalrc
+		? parseSecondaryLrcMap(romalrc)
+		: embeddedRomaMap.size > 0
+			? embeddedRomaMap
+			: null
+
+	// If neither translation nor romaji should be shown, return stripped base lyrics
+	if (
+		(!showTrans || !transMap || transMap.size === 0) &&
+		(!showRoma || !romaMap || romaMap.size === 0)
+	) {
+		return cleanedBaseLines.join('\n')
+	}
+
+	const resultLines: string[] = []
+
+	for (let i = 0; i < cleanedBaseLines.length; i++) {
+		const line = cleanedBaseLines[i]
 		const trimmed = line.trim()
 		resultLines.push(line)
 		if (!trimmed) continue
@@ -192,13 +247,13 @@ export function mergeLyricsToSpl(
 		const match = timeRegex.exec(trimmed)
 		if (match) {
 			const timeMs = parseTimeTag(match[0])
-			if (romaMap) {
+			if (showRoma && romaMap) {
 				const romaText = findClosestInMap(timeMs, romaMap)
 				if (romaText) {
 					resultLines.push(`[ro]${romaText}`)
 				}
 			}
-			if (transMap) {
+			if (showTrans && transMap) {
 				const transText = findClosestInMap(timeMs, transMap)
 				if (transText) {
 					resultLines.push(`[tr]${transText}`)
@@ -211,6 +266,24 @@ export function mergeLyricsToSpl(
 }
 
 export class LyricService {
+	private rawCache = new Map<string, RawLyricEntry>()
+
+	// Reapply display options in memory without network request
+	reapplyOptions(
+		trackKey: string,
+		options: { showTranslation?: boolean; showRomaji?: boolean },
+	): string | null {
+		const entry = this.rawCache.get(trackKey)
+		if (entry) {
+			return mergeLyricsToSpl(entry.lrc, entry.tlyric, entry.romalrc, options)
+		}
+		const custom = getStoredCustomLyric(trackKey)
+		if (custom) {
+			return mergeLyricsToSpl(custom, undefined, undefined, options)
+		}
+		return null
+	}
+
 	// 1. Auto fetch & match lyrics from multi-sources
 	async fetchLyricForTrack(
 		track: Track,
@@ -251,6 +324,15 @@ export class LyricService {
 				if (lyricRes.isOk()) {
 					const parsedData = neteaseApi.parseLyrics(lyricRes.value)
 					if (parsedData.lrc) {
+						this.rawCache.set(trackKey, {
+							lrc: parsedData.lrc,
+							tlyric: parsedData.tlyric,
+							romalrc: parsedData.romalrc,
+							source: 'netease',
+							title: bestMatch.title,
+							artist: bestMatch.artist,
+						})
+
 						const splText = mergeLyricsToSpl(
 							parsedData.lrc,
 							parsedData.tlyric,
@@ -282,6 +364,15 @@ export class LyricService {
 				if (lyricRes.isOk()) {
 					const parsedData = qqMusicApi.parseLyrics(lyricRes.value)
 					if (parsedData.lrc) {
+						this.rawCache.set(trackKey, {
+							lrc: parsedData.lrc,
+							tlyric: parsedData.tlyric,
+							romalrc: undefined,
+							source: 'qqmusic',
+							title: bestMatch.title,
+							artist: bestMatch.artist,
+						})
+
 						const splText = mergeLyricsToSpl(
 							parsedData.lrc,
 							parsedData.tlyric,
@@ -348,6 +439,7 @@ export class LyricService {
 	async fetchCandidateLyrics(
 		candidate: LyricSearchCandidate,
 		options?: { showTranslation?: boolean; showRomaji?: boolean },
+		trackKey?: string,
 	): Promise<string | null> {
 		if (candidate.source === 'netease') {
 			try {
@@ -355,6 +447,16 @@ export class LyricService {
 				if (res.isOk()) {
 					const parsedData = neteaseApi.parseLyrics(res.value)
 					if (parsedData.lrc) {
+						if (trackKey) {
+							this.rawCache.set(trackKey, {
+								lrc: parsedData.lrc,
+								tlyric: parsedData.tlyric,
+								romalrc: parsedData.romalrc,
+								source: 'netease',
+								title: candidate.title,
+								artist: candidate.artist,
+							})
+						}
 						return mergeLyricsToSpl(
 							parsedData.lrc,
 							parsedData.tlyric,
@@ -372,6 +474,16 @@ export class LyricService {
 				if (res.isOk()) {
 					const parsedData = qqMusicApi.parseLyrics(res.value)
 					if (parsedData.lrc) {
+						if (trackKey) {
+							this.rawCache.set(trackKey, {
+								lrc: parsedData.lrc,
+								tlyric: parsedData.tlyric,
+								romalrc: undefined,
+								source: 'qqmusic',
+								title: candidate.title,
+								artist: candidate.artist,
+							})
+						}
 						return mergeLyricsToSpl(
 							parsedData.lrc,
 							parsedData.tlyric,

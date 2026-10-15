@@ -485,6 +485,11 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 								<span className="font-semibold text-foreground/90 group-hover:text-[#00AEEC] transition-colors truncate">
 									{currentLine.content}
 								</span>
+								{currentLine.romaji && (
+									<span className="text-[10px] text-muted-foreground/60 hidden md:inline font-mono truncate">
+										{currentLine.romaji}
+									</span>
+								)}
 								{currentLine.translation && (
 									<span className="text-[11px] text-muted-foreground/80 hidden sm:inline group-hover:text-sky-300 transition-colors truncate">
 										{currentLine.translation}
@@ -656,7 +661,16 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					{/* Desktop Floating Lyrics Window Toggle */}
 					<button
 						onClick={handleToggleDesktopLyrics}
-						title="切换桌面悬浮歌词小窗"
+						onContextMenu={async (e) => {
+							e.preventDefault()
+							try {
+								const { invoke } = await import('@tauri-apps/api/core')
+								await invoke('toggle_lyrics_lock')
+							} catch (err) {
+								console.warn('Failed to toggle lyrics lock:', err)
+							}
+						}}
+						title="桌面歌词 (左键显示/隐藏，右键锁定/解锁穿透)"
 						className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] transition-colors"
 					>
 						<Monitor className="w-4 h-4" />

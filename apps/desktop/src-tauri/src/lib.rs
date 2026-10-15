@@ -24,6 +24,7 @@ pub fn run() {
             window_ext::exit_app,
             window_ext::set_ignore_cursor_events,
             window_ext::toggle_lyrics_window,
+            window_ext::toggle_lyrics_lock,
             stream_proxy::get_stream_proxy_port,
             stream_proxy::get_cached_track_path,
             exporter::export_cached_track_to_m4a,
@@ -57,8 +58,9 @@ pub fn run() {
             // 3. Setup System Tray Menu
             let toggle_main = MenuItem::with_id(app, "toggle_main", "显示/隐藏主窗口", true, None::<&str>)?;
             let toggle_lyrics = MenuItem::with_id(app, "toggle_lyrics", "显示/隐藏桌面歌词", true, None::<&str>)?;
+            let toggle_lock = MenuItem::with_id(app, "toggle_lock", "锁定/解锁桌面歌词 (Ctrl+Alt+L)", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出 Bili Player", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle_main, &toggle_lyrics, &quit_item])?;
+            let menu = Menu::with_items(app, &[&toggle_main, &toggle_lyrics, &toggle_lock, &quit_item])?;
 
             if let Some(icon) = app.default_window_icon() {
                 let _tray = TrayIconBuilder::new()
@@ -82,6 +84,9 @@ pub fn run() {
                         }
                         "toggle_lyrics" => {
                             let _ = window_ext::toggle_lyrics_window(app.clone());
+                        }
+                        "toggle_lock" => {
+                            let _ = window_ext::toggle_lyrics_lock(app.clone());
                         }
                         _ => {}
                     })

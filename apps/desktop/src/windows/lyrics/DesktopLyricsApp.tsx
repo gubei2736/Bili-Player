@@ -28,12 +28,13 @@ export type LyricsSyncEvent =
 
 export const DesktopLyricsApp: React.FC = () => {
 	const [isLocked, setIsLocked] = useState(false)
+	const [showLockToast, setShowLockToast] = useState(false)
 	const [isPlaying, setIsPlaying] = useState(false)
 	const [currentTimeMs, setCurrentTimeMs] = useState(0)
-	const [title, setTitle] = useState('BBPlayer 桌面歌词')
-	const [artist, setArtist] = useState('欢迎使用')
+	const [title, setTitle] = useState('Bili Player 桌面歌词')
+	const [artist, setArtist] = useState('沉浸音乐体验')
 	const [splContent, setSplContent] = useState<string | null>(null)
-	const [fontSize, setFontSize] = useState(22)
+	const [fontSize, setFontSize] = useState(24)
 	const [primaryColor, setPrimaryColor] = useState('#00AEEC')
 
 	// Parse SPL lyrics when content changes
@@ -45,6 +46,14 @@ export const DesktopLyricsApp: React.FC = () => {
 			return null
 		}
 	}, [splContent])
+
+	// Auto-dismiss lock toast after 3 seconds
+	useEffect(() => {
+		if (showLockToast) {
+			const timer = setTimeout(() => setShowLockToast(false), 3000)
+			return () => clearTimeout(timer)
+		}
+	}, [showLockToast])
 
 	// IPC Event Listener from Main Window & Global Shortcuts
 	useEffect(() => {
@@ -67,7 +76,11 @@ export const DesktopLyricsApp: React.FC = () => {
 		})
 
 		const unlistenLockPromise = listen<boolean>('lyrics-lock-change', (event) => {
-			setIsLocked( Boolean(event.payload) )
+			const locked = Boolean(event.payload)
+			setIsLocked(locked)
+			if (locked) {
+				setShowLockToast(true)
+			}
 		})
 
 		return () => {
@@ -97,6 +110,9 @@ export const DesktopLyricsApp: React.FC = () => {
 		try {
 			await invoke('set_ignore_cursor_events', { ignore: nextLocked })
 			setIsLocked(nextLocked)
+			if (nextLocked) {
+				setShowLockToast(true)
+			}
 		} catch (err) {
 			console.error('Failed to toggle lock mouse:', err)
 		}
@@ -114,10 +130,24 @@ export const DesktopLyricsApp: React.FC = () => {
 		<div
 			className={`w-screen h-screen flex flex-col justify-center items-center px-6 relative select-none rounded-2xl transition-all duration-300 group ${
 				isLocked
-					? 'bg-transparent'
-					: 'bg-black/55 hover:bg-black/75 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
+					? 'bg-transparent border-transparent shadow-none'
+					: 'bg-black/60 hover:bg-black/75 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
 			}`}
+			style={{
+				background: isLocked ? 'transparent' : undefined,
+				boxShadow: isLocked ? 'none' : undefined,
+				borderColor: isLocked ? 'transparent' : undefined,
+				backdropFilter: isLocked ? 'none' : undefined,
+			}}
 		>
+			{/* Lock Notification Toast */}
+			{showLockToast && (
+				<div className="absolute top-2 px-3.5 py-1.5 rounded-full bg-black/85 border border-white/20 text-white/95 text-xs flex items-center gap-2 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 pointer-events-none z-50">
+					<Lock className="w-3.5 h-3.5 text-[#00AEEC]" />
+					<span>已锁定穿透 · 按 <strong>Ctrl+Alt+L</strong>、底栏右键或托盘菜单解锁</span>
+				</div>
+			)}
+
 			{/* Top drag & control bar (hidden when mouse locked) */}
 			{!isLocked && (
 				<div
@@ -153,10 +183,10 @@ export const DesktopLyricsApp: React.FC = () => {
 						{/* Romaji subline if available */}
 						{activeLine.romaji && (
 							<p
-								className="text-[12px] md:text-[13px] text-white/80 font-mono tracking-wider truncate max-w-full"
+								className="text-[12px] md:text-[13px] text-white/90 font-mono tracking-wider truncate max-w-full"
 								style={{
-									textShadow:
-										'0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.85)',
+									filter:
+										'drop-shadow(0 1px 2px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.9))',
 								}}
 							>
 								{activeLine.romaji}
@@ -168,8 +198,8 @@ export const DesktopLyricsApp: React.FC = () => {
 							className="font-black tracking-wide leading-tight transition-all max-w-full truncate px-2"
 							style={{
 								fontSize: `${fontSize}px`,
-								textShadow:
-									'0 2px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,1)',
+								filter:
+									'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,1))',
 							}}
 						>
 							{activeLine.isDynamic &&
@@ -193,7 +223,7 @@ export const DesktopLyricsApp: React.FC = () => {
 											key={idx}
 											className="inline-block transition-all duration-75"
 											style={{
-												background: `linear-gradient(to right, ${primaryColor} ${fillPct}%, rgba(255, 255, 255, 0.85) ${fillPct}%)`,
+												background: `linear-gradient(to right, ${primaryColor} ${fillPct}%, rgba(255, 255, 255, 0.92) ${fillPct}%)`,
 												WebkitBackgroundClip: 'text',
 												WebkitTextFillColor: 'transparent',
 											}}
@@ -205,7 +235,7 @@ export const DesktopLyricsApp: React.FC = () => {
 							) : (
 								<span
 									style={{ color: primaryColor }}
-									className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.7)]"
+									className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.8)]"
 								>
 									{activeLine.content}
 								</span>
@@ -215,10 +245,10 @@ export const DesktopLyricsApp: React.FC = () => {
 						{/* Chinese Translation line */}
 						{activeLine.translation && (
 							<p
-								className="text-xs md:text-sm text-sky-200/95 font-medium tracking-wide truncate max-w-full pt-0.5"
+								className="text-xs md:text-sm text-sky-200 font-medium tracking-wide truncate max-w-full pt-0.5"
 								style={{
-									textShadow:
-										'0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.85)',
+									filter:
+										'drop-shadow(0 1px 3px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.85))',
 								}}
 							>
 								{activeLine.translation}
@@ -231,16 +261,16 @@ export const DesktopLyricsApp: React.FC = () => {
 							className="font-bold text-white tracking-wide"
 							style={{
 								fontSize: `${fontSize}px`,
-								textShadow:
-									'0 2px 8px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.85)',
+								filter:
+									'drop-shadow(0 2px 6px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.85))',
 							}}
 						>
 							{title}
 						</p>
 						<p
-							className="text-xs text-white/70 font-medium tracking-wider"
+							className="text-xs text-white/80 font-medium tracking-wider"
 							style={{
-								textShadow: '0 1px 4px rgba(0,0,0,0.9)',
+								filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))',
 							}}
 						>
 							{artist}
