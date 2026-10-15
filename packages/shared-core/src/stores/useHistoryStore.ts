@@ -27,6 +27,22 @@ export interface HistoryState {
 	getStats: () => HistoryStats
 }
 
+function deduplicateRecords(records: PlayHistoryItem[]): PlayHistoryItem[] {
+	const seen = new Set<string>()
+	const result: PlayHistoryItem[] = []
+	for (const r of records) {
+		const key =
+			r.track.source === 'bilibili' && (r.track as any).bilibiliMetadata?.bvid
+				? `bili_${(r.track as any).bilibiliMetadata.bvid}_${(r.track as any).bilibiliMetadata.cid || (r.track as any).bilibiliMetadata.pageIndex || 1}`
+				: r.track.uniqueKey
+		if (!seen.has(key)) {
+			seen.add(key)
+			result.push(r)
+		}
+	}
+	return result
+}
+
 export const useHistoryStore = create<HistoryState>()(
 	persist(
 		(set, get) => ({
@@ -43,13 +59,11 @@ export const useHistoryStore = create<HistoryState>()(
 				}
 
 				set((state) => {
-					// 过滤掉 10 秒内同一首歌的重复记录，并将最新记录置顶
-					const filtered = state.records.filter(
-						(r) => !(r.track.uniqueKey === track.uniqueKey && now - r.playedAt < 10000),
-					)
+					// 严格去重：同一首歌只保留最新播放记录，并将最新收听置顶
+					const deduplicated = deduplicateRecords([newRecord, ...state.records])
 					// 最多保留 500 条收听记录
 					return {
-						records: [newRecord, ...filtered].slice(0, 500),
+						records: deduplicated.slice(0, 500),
 					}
 				})
 			},
@@ -118,6 +132,16 @@ export const useHistoryStore = create<HistoryState>()(
 		{
 			name: 'bbplayer_play_history',
 			storage: createJSONStorage(() => getDefaultStateStorage()),
+			merge: (persistedState: any, currentState: HistoryState) => {
+				const records = Array.isArray(persistedState?.records)
+					? deduplicateRecords(persistedState.records).slice(0, 500)
+					: currentState.records
+				return {
+					...currentState,
+					...persistedState,
+					records,
+				}
+			},
 		},
 	),
 )

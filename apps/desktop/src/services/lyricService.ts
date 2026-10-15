@@ -285,6 +285,36 @@ export class LyricService {
 		return null
 	}
 
+	/**
+	 * 当使用 QQ 音乐作为主歌词源时，由于 QQ 音乐官方不提供罗马音(romalrc)且部分曲目缺少翻译，
+	 * 该方法负责从网易云音乐静默查询同一首歌的罗马音与翻译，与 QQ 音乐原文进行精准时间轴融合。
+	 */
+	private async fetchComplementaryNeteaseData(
+		title: string,
+		artist: string,
+		needRomaji: boolean,
+		needTrans: boolean,
+	): Promise<{ romalrc?: string; tlyric?: string }> {
+		if (!needRomaji && !needTrans) return {}
+		try {
+			const nSearch = await neteaseApi.search({
+				keywords: `${title} ${artist}`.trim(),
+				limit: 3,
+			})
+			if (nSearch.isOk() && nSearch.value.length > 0) {
+				const nLyricRes = await neteaseApi.getLyrics(nSearch.value[0]!.remoteId as number)
+				if (nLyricRes.isOk()) {
+					const nParsed = neteaseApi.parseLyrics(nLyricRes.value)
+					return {
+						romalrc: needRomaji ? nParsed.romalrc : undefined,
+						tlyric: needTrans ? nParsed.tlyric : undefined,
+					}
+				}
+			}
+		} catch {}
+		return {}
+	}
+
 	// 1. Auto fetch & match lyrics from multi-sources
 	async fetchLyricForTrack(
 		track: Track,
@@ -322,10 +352,28 @@ export class LyricService {
 				if (lyricRes.isOk()) {
 					const parsedData = qqMusicApi.parseLyrics(lyricRes.value)
 					if (parsedData.lrc) {
+						let trans = parsedData.tlyric
+						let romalrc: string | undefined = undefined
+
+						const showRoma = options?.showRomaji ?? getLyricOptionRomaji()
+						const showTrans = options?.showTranslation ?? getLyricOptionTranslation()
+
+						// 若用户需要罗马音，或者 QQ 音乐没有自带翻译，自动从网易云补全
+						if (showRoma || (showTrans && !trans)) {
+							const complement = await this.fetchComplementaryNeteaseData(
+								bestMatch.title,
+								bestMatch.artist,
+								showRoma,
+								showTrans && !trans,
+							)
+							if (complement.romalrc) romalrc = complement.romalrc
+							if (!trans && complement.tlyric) trans = complement.tlyric
+						}
+
 						this.rawCache.set(trackKey, {
 							lrc: parsedData.lrc,
-							tlyric: parsedData.tlyric,
-							romalrc: undefined,
+							tlyric: trans,
+							romalrc,
 							source: 'qqmusic',
 							title: bestMatch.title,
 							artist: bestMatch.artist,
@@ -333,8 +381,8 @@ export class LyricService {
 
 						const splText = mergeLyricsToSpl(
 							parsedData.lrc,
-							parsedData.tlyric,
-							undefined,
+							trans,
+							romalrc,
 							options,
 						)
 
@@ -480,11 +528,29 @@ export class LyricService {
 				if (res.isOk()) {
 					const parsedData = qqMusicApi.parseLyrics(res.value)
 					if (parsedData.lrc) {
+						let trans = parsedData.tlyric
+						let romalrc: string | undefined = undefined
+
+						const showRoma = options?.showRomaji ?? getLyricOptionRomaji()
+						const showTrans = options?.showTranslation ?? getLyricOptionTranslation()
+
+						// 若用户需要罗马音，或者 QQ 音乐没有自带翻译，自动从网易云补全
+						if (showRoma || (showTrans && !trans)) {
+							const complement = await this.fetchComplementaryNeteaseData(
+								candidate.title,
+								candidate.artist,
+								showRoma,
+								showTrans && !trans,
+							)
+							if (complement.romalrc) romalrc = complement.romalrc
+							if (!trans && complement.tlyric) trans = complement.tlyric
+						}
+
 						if (trackKey) {
 							this.rawCache.set(trackKey, {
 								lrc: parsedData.lrc,
-								tlyric: parsedData.tlyric,
-								romalrc: undefined,
+								tlyric: trans,
+								romalrc,
 								source: 'qqmusic',
 								title: candidate.title,
 								artist: candidate.artist,
@@ -492,8 +558,8 @@ export class LyricService {
 						}
 						return mergeLyricsToSpl(
 							parsedData.lrc,
-							parsedData.tlyric,
-							undefined,
+							trans,
+							romalrc,
 							options,
 						)
 					}
