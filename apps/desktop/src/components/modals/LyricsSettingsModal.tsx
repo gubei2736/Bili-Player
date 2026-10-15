@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import {
 	X,
@@ -8,6 +8,7 @@ import {
 	RotateCcw,
 	Loader2,
 	Save,
+	Languages,
 } from 'lucide-react'
 import type { Track } from '@bbplayer/shared-core'
 import {
@@ -16,6 +17,10 @@ import {
 	setStoredLyricOffset,
 	getStoredCustomLyric,
 	setStoredCustomLyric,
+	getLyricOptionTranslation,
+	setLyricOptionTranslation,
+	getLyricOptionRomaji,
+	setLyricOptionRomaji,
 	type LyricSearchCandidate,
 } from '../../services/lyricService'
 
@@ -40,6 +45,8 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [offsetSec, setOffsetSec] = useState(0)
 	const [loadingCandidateId, setLoadingCandidateId] = useState<string | number | null>(null)
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
+	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
+	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
 
 	useEffect(() => {
 		if (isOpen && track) {
@@ -69,7 +76,10 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const handleApplyCandidate = async (candidate: LyricSearchCandidate) => {
 		setLoadingCandidateId(candidate.id)
 		try {
-			const spl = await lyricService.fetchCandidateLyrics(candidate)
+			const spl = await lyricService.fetchCandidateLyrics(candidate, {
+				showTranslation: includeTranslation,
+				showRomaji: includeRomaji,
+			})
 			if (spl) {
 				setStoredCustomLyric(track.uniqueKey, spl)
 				onLyricsUpdated?.(spl)
@@ -80,6 +90,39 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 			console.error('Failed to apply lyrics:', err)
 		} finally {
 			setLoadingCandidateId(null)
+		}
+	}
+
+	const handleToggleTranslation = async (enabled: boolean) => {
+		setIncludeTranslation(enabled)
+		setLyricOptionTranslation(enabled)
+		await handleRefreshCurrentLyrics({ showTranslation: enabled, showRomaji: includeRomaji })
+	}
+
+	const handleToggleRomaji = async (enabled: boolean) => {
+		setIncludeRomaji(enabled)
+		setLyricOptionRomaji(enabled)
+		await handleRefreshCurrentLyrics({ showTranslation: includeTranslation, showRomaji: enabled })
+	}
+
+	const handleRefreshCurrentLyrics = async (opts: {
+		showTranslation: boolean
+		showRomaji: boolean
+	}) => {
+		if (!track) return
+		try {
+			const res = await lyricService.fetchLyricForTrack(track, true, opts)
+			if (res && res.splContent) {
+				setStoredCustomLyric(track.uniqueKey, res.splContent)
+				setCustomText(res.splContent)
+				onLyricsUpdated?.(res.splContent)
+				setSuccessMsg(
+					`歌词已更新：${opts.showTranslation ? '已开启' : '已关闭'}翻译，${opts.showRomaji ? '已开启' : '已关闭'}罗马音`,
+				)
+				setTimeout(() => setSuccessMsg(null), 2500)
+			}
+		} catch (err) {
+			console.error('Refresh lyrics with new options failed:', err)
 		}
 	}
 
@@ -178,6 +221,35 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 						>
 							时间微调 ({offsetSec >= 0 ? `+${offsetSec}` : offsetSec}s)
 						</button>
+					</div>
+
+					{/* Multi-language & Romaji Toggle Bar */}
+					<div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
+						<div className="flex items-center gap-1.5 text-muted-foreground font-medium text-[11px]">
+							<Languages className="w-3.5 h-3.5 text-[#00AEEC]" />
+							<span>歌词呈现选项：</span>
+						</div>
+						<div className="flex items-center gap-4">
+							<label className="flex items-center gap-1.5 cursor-pointer text-foreground hover:text-[#00AEEC] transition-colors select-none">
+								<input
+									type="checkbox"
+									checked={includeTranslation}
+									onChange={(e) => handleToggleTranslation(e.target.checked)}
+									className="w-3.5 h-3.5 rounded border-white/20 text-[#00AEEC] focus:ring-0 cursor-pointer accent-[#00AEEC]"
+								/>
+								<span className="text-[11px] font-medium">翻译歌词</span>
+							</label>
+
+							<label className="flex items-center gap-1.5 cursor-pointer text-foreground hover:text-[#00AEEC] transition-colors select-none">
+								<input
+									type="checkbox"
+									checked={includeRomaji}
+									onChange={(e) => handleToggleRomaji(e.target.checked)}
+									className="w-3.5 h-3.5 rounded border-white/20 text-[#00AEEC] focus:ring-0 cursor-pointer accent-[#00AEEC]"
+								/>
+								<span className="text-[11px] font-medium">罗马音 / 注音</span>
+							</label>
+						</div>
 					</div>
 
 					{/* Success Notification */}

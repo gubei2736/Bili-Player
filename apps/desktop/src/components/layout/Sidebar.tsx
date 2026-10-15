@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
 	Compass,
 	Library,
@@ -10,9 +11,11 @@ import {
 	LogIn,
 	LogOut,
 	Sparkles,
+	AlertCircle,
 } from 'lucide-react'
-import { useAuthStore, useSkinStore } from '@bbplayer/shared-core'
+import { useAuthStore, useSkinStore, useQueueStore } from '@bbplayer/shared-core'
 import { loginQrService } from '../../services/loginQrService'
+import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 
 export type NavTab =
 	| 'explore'
@@ -38,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	const { isLoggedIn, userInfo, logout } = useAuthStore()
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
 	const customTextColor = useSkinStore((s) => s.customTextColor)
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
 	const discoverGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
 		{ id: 'explore', label: '发现音乐', icon: <Compass className="w-4 h-4" /> },
@@ -162,23 +166,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 									referrerPolicy="no-referrer"
 									className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/40"
 								/>
-								<span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b0f17]" />
 							</div>
 							<div className="overflow-hidden">
 								<p
 									className="text-xs font-bold truncate text-foreground"
 									style={customTextColor ? { color: customTextColor } : undefined}
+									title={userInfo.name}
 								>
 									{userInfo.name}
-								</p>
-								<p className="text-[10px] text-emerald-400/90 font-medium truncate">
-									Bilibili 已连接
 								</p>
 							</div>
 						</div>
 						<button
-							onClick={logout}
-							title="退出登录"
+							onClick={() => setShowLogoutConfirm(true)}
+							title="退出当前账号"
 							className="p-1.5 rounded-lg hover:bg-rose-500/20 text-muted-foreground hover:text-rose-400 transition-colors flex-shrink-0"
 						>
 							<LogOut className="w-3.5 h-3.5" />
@@ -212,6 +213,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					</button>
 				)}
 			</div>
+
+			{/* Logout Confirmation Dialog Modal */}
+			{showLogoutConfirm &&
+				createPortal(
+					<div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+						<div className="w-full max-w-sm rounded-2xl bg-[#0e131f]/95 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col p-5 space-y-4 text-xs">
+							<div className="flex items-center gap-3">
+								<div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 flex-shrink-0">
+									<AlertCircle className="w-5 h-5" />
+								</div>
+								<div>
+									<h3 className="font-bold text-sm text-foreground">确认退出账号？</h3>
+									<p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+										退出登录后将清空当前播放队列并停止播放。
+									</p>
+								</div>
+							</div>
+
+							<div className="flex items-center justify-end gap-2 pt-1">
+								<button
+									onClick={() => setShowLogoutConfirm(false)}
+									className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-foreground font-medium transition-colors"
+								>
+									取消
+								</button>
+								<button
+									onClick={() => {
+										logout()
+										useQueueStore.getState().clearQueue()
+										desktopAudioEngine.stop()
+										setShowLogoutConfirm(false)
+									}}
+									className="px-3.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-medium transition-colors shadow-md shadow-rose-500/20 active:scale-95"
+								>
+									确认退出
+								</button>
+							</div>
+						</div>
+					</div>,
+					document.body,
+				)}
 		</aside>
 	)
 }

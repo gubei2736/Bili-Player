@@ -118,11 +118,36 @@ export function parseSpl(lrcContent: string): SplLyricData {
 			return s
 		})
 
+		let translation: string | undefined = undefined
+		let romaji: string | undefined = undefined
+		const cleanTranslations: string[] = []
+
+		for (const t of translations) {
+			const trimmed = t.trim()
+			if (!trimmed) continue
+			if (/^\[(tr|trans)\]/i.test(trimmed)) {
+				translation = trimmed.replace(/^\[(tr|trans)\]\s*/i, '')
+				cleanTranslations.push(translation)
+			} else if (/^\[(ro|roma|romaji)\]/i.test(trimmed)) {
+				romaji = trimmed.replace(/^\[(ro|roma|romaji)\]\s*/i, '')
+				cleanTranslations.push(romaji)
+			} else {
+				if (!translation) {
+					translation = trimmed
+				} else if (!romaji) {
+					romaji = trimmed
+				}
+				cleanTranslations.push(trimmed)
+			}
+		}
+
 		finalLines.push({
 			startTime,
 			endTime: endTime,
 			content: mainContent,
-			translations,
+			translation,
+			romaji,
+			translations: cleanTranslations,
 			isDynamic,
 			spans: fixedSpans,
 		})

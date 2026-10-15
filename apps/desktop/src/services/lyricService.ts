@@ -4,7 +4,13 @@ import {
 	type Track,
 	type BilibiliTrack,
 } from '@bbplayer/shared-core'
-import { parseYrc, parseSpl, parseAndMergeLyrics, type SplLyricData } from '@bbplayer/splash'
+import {
+	parseYrc,
+	parseSpl,
+	parseAndMergeLyrics,
+	parseTimeTag,
+	type SplLyricData,
+} from '@bbplayer/splash'
 
 export interface UnifiedLyricResult {
 	trackKey: string
@@ -25,6 +31,38 @@ export interface LyricSearchCandidate {
 
 const LYRIC_STORAGE_PREFIX = 'bbplayer_spl_lyric_'
 const LYRIC_OFFSET_PREFIX = 'bbplayer_lyric_offset_'
+const LYRIC_OPT_TRANS_KEY = 'bbplayer_lyric_opt_translation'
+const LYRIC_OPT_ROMA_KEY = 'bbplayer_lyric_opt_romaji'
+
+export function getLyricOptionTranslation(): boolean {
+	try {
+		const val = localStorage.getItem(LYRIC_OPT_TRANS_KEY)
+		return val !== null ? val === 'true' : true
+	} catch {
+		return true
+	}
+}
+
+export function setLyricOptionTranslation(enabled: boolean): void {
+	try {
+		localStorage.setItem(LYRIC_OPT_TRANS_KEY, String(enabled))
+	} catch {}
+}
+
+export function getLyricOptionRomaji(): boolean {
+	try {
+		const val = localStorage.getItem(LYRIC_OPT_ROMA_KEY)
+		return val !== null ? val === 'true' : true
+	} catch {
+		return true
+	}
+}
+
+export function setLyricOptionRomaji(enabled: boolean): void {
+	try {
+		localStorage.setItem(LYRIC_OPT_ROMA_KEY, String(enabled))
+	} catch {}
+}
 
 export function cleanTrackTitle(title: string): string {
 	return title
@@ -77,14 +115,113 @@ export function setStoredCustomLyric(trackKey: string, splContent: string): void
 	} catch {}
 }
 
+function parseSecondaryLrcMap(lrcStr?: string): Map<number, string> {
+	const map = new Map<number, string>()
+	if (!lrcStr) return map
+	const lines = lrcStr.split(/\r?\n/)
+	for (const line of lines) {
+		const trimmed = line.trim()
+		if (!trimmed) continue
+		if (/^\[[a-zA-Z]+:.*\]$/.test(trimmed)) continue
+
+		const match = /^(\[(-?\d{1,3}):(-?\d{1,2})\.(\d{1,6})\])+(.*)$/.exec(trimmed)
+		if (match) {
+			const content = match[match.length - 1].trim()
+			if (!content) continue
+			const timeRegex = /\[(-?\d{1,3}):(-?\d{1,2})\.(\d{1,6})\]/g
+			let tMatch
+			while ((tMatch = timeRegex.exec(match[0])) !== null) {
+				const ms = parseTimeTag(tMatch[0])
+				map.set(ms, content)
+			}
+		}
+	}
+	return map
+}
+
+function findClosestInMap(
+	timeMs: number,
+	map: Map<number, string>,
+	toleranceMs = 400,
+): string | undefined {
+	if (map.has(timeMs)) return map.get(timeMs)
+	let bestDiff = Infinity
+	let bestVal: string | undefined = undefined
+	for (const [t, val] of map.entries()) {
+		const diff = Math.abs(t - timeMs)
+		if (diff <= toleranceMs && diff < bestDiff) {
+			bestDiff = diff
+			bestVal = val
+		}
+	}
+	return bestVal
+}
+
+export function mergeLyricsToSpl(
+	mainLrc: string,
+	tlyric?: string,
+	romalrc?: string,
+	options?: { showTranslation?: boolean; showRomaji?: boolean },
+): string {
+	const showTrans = options?.showTranslation ?? getLyricOptionTranslation()
+	const showRoma = options?.showRomaji ?? getLyricOptionRomaji()
+
+	const transMap = showTrans && tlyric ? parseSecondaryLrcMap(tlyric) : null
+	const romaMap = showRoma && romalrc ? parseSecondaryLrcMap(romalrc) : null
+
+	if ((!transMap || transMap.size === 0) && (!romaMap || romaMap.size === 0)) {
+		return mainLrc
+	}
+
+	// Clean out existing [tr] and [ro] lines to avoid duplication
+	const lines = mainLrc
+		.split(/\r?\n/)
+		.filter((line) => !/^\[(tr|trans|ro|roma|romaji)\]/i.test(line.trim()))
+
+	const resultLines: string[] = []
+	const timeRegex = /\[(-?\d{1,3}):(-?\d{1,2})\.(\d{1,6})\]/
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+		const trimmed = line.trim()
+		resultLines.push(line)
+		if (!trimmed) continue
+
+		if (/^\[[a-zA-Z]+:.*\]$/.test(trimmed)) continue
+
+		const match = timeRegex.exec(trimmed)
+		if (match) {
+			const timeMs = parseTimeTag(match[0])
+			if (romaMap) {
+				const romaText = findClosestInMap(timeMs, romaMap)
+				if (romaText) {
+					resultLines.push(`[ro]${romaText}`)
+				}
+			}
+			if (transMap) {
+				const transText = findClosestInMap(timeMs, transMap)
+				if (transText) {
+					resultLines.push(`[tr]${transText}`)
+				}
+			}
+		}
+	}
+
+	return resultLines.join('\n')
+}
+
 export class LyricService {
 	// 1. Auto fetch & match lyrics from multi-sources
-	async fetchLyricForTrack(track: Track): Promise<UnifiedLyricResult | null> {
+	async fetchLyricForTrack(
+		track: Track,
+		forceFresh = false,
+		options?: { showTranslation?: boolean; showRomaji?: boolean },
+	): Promise<UnifiedLyricResult | null> {
 		const trackKey = track.uniqueKey
 		const customLyric = getStoredCustomLyric(trackKey)
 		const offsetMs = getStoredLyricOffset(trackKey)
 
-		if (customLyric) {
+		if (!forceFresh && customLyric) {
 			return {
 				trackKey,
 				splContent: customLyric,
@@ -102,7 +239,7 @@ export class LyricService {
 				: ''
 		const searchKeyword = `${queryTitle} ${queryArtist}`.trim()
 
-		// Try Netease First (Rich SPL/YRC Syllable lyrics)
+		// Try Netease First (Rich SPL/YRC Syllable lyrics with translation & romaji)
 		try {
 			const neteaseSearchRes = await neteaseApi.search({
 				keywords: searchKeyword,
@@ -112,26 +249,14 @@ export class LyricService {
 				const bestMatch = neteaseSearchRes.value[0]!
 				const lyricRes = await neteaseApi.getLyrics(bestMatch.remoteId as number)
 				if (lyricRes.isOk()) {
-					const data = lyricRes.value
-					let splText = ''
-					if (data.yrc?.lyric) {
-						splText = parseYrc(data.yrc.lyric)
-					} else if (data.lrc?.lyric) {
-						splText = data.lrc.lyric
-					}
-
-					if (splText) {
-						// Merge translation if exists
-						if (data.tlyric?.lyric || data.romalrc?.lyric) {
-							try {
-								const mergedLines = parseAndMergeLyrics({
-									lrc: splText,
-									tlyric: data.tlyric?.lyric,
-									romalrc: data.romalrc?.lyric,
-								})
-								// If parsed successfully, re-serialize or return
-							} catch {}
-						}
+					const parsedData = neteaseApi.parseLyrics(lyricRes.value)
+					if (parsedData.lrc) {
+						const splText = mergeLyricsToSpl(
+							parsedData.lrc,
+							parsedData.tlyric,
+							parsedData.romalrc,
+							options,
+						)
 
 						return {
 							trackKey,
@@ -155,11 +280,18 @@ export class LyricService {
 				const bestMatch = qqSearchRes.value[0]!
 				const lyricRes = await qqMusicApi.getLyrics(bestMatch.remoteId as string)
 				if (lyricRes.isOk()) {
-					const text = lyricRes.value.lyric || ''
-					if (text) {
+					const parsedData = qqMusicApi.parseLyrics(lyricRes.value)
+					if (parsedData.lrc) {
+						const splText = mergeLyricsToSpl(
+							parsedData.lrc,
+							parsedData.tlyric,
+							undefined,
+							options,
+						)
+
 						return {
 							trackKey,
-							splContent: text,
+							splContent: splText,
 							source: 'qqmusic',
 							title: bestMatch.title,
 							artist: bestMatch.artist,
@@ -212,24 +344,24 @@ export class LyricService {
 		return candidates
 	}
 
-	// 3. Fetch candidate's lyrics
-	async fetchCandidateLyrics(candidate: LyricSearchCandidate): Promise<string | null> {
+	// 3. Fetch candidate's lyrics with translation and romaji options
+	async fetchCandidateLyrics(
+		candidate: LyricSearchCandidate,
+		options?: { showTranslation?: boolean; showRomaji?: boolean },
+	): Promise<string | null> {
 		if (candidate.source === 'netease') {
 			try {
 				const res = await neteaseApi.getLyrics(Number(candidate.id))
 				if (res.isOk()) {
-					const data = res.value
-					if (data.yrc?.lyric) {
-						try {
-							const parsed = parseYrc(data.yrc.lyric)
-							if (parsed && parsed.trim().length > 0) {
-								return parsed
-							}
-						} catch (parseErr) {
-							console.warn('parseYrc failed, falling back to standard lrc:', parseErr)
-						}
+					const parsedData = neteaseApi.parseLyrics(res.value)
+					if (parsedData.lrc) {
+						return mergeLyricsToSpl(
+							parsedData.lrc,
+							parsedData.tlyric,
+							parsedData.romalrc,
+							options,
+						)
 					}
-					return data.lrc?.lyric || data.yrc?.lyric || null
 				}
 			} catch (e) {
 				console.error('Fetch netease lyrics error:', e)
@@ -238,7 +370,15 @@ export class LyricService {
 			try {
 				const res = await qqMusicApi.getLyrics(String(candidate.id))
 				if (res.isOk()) {
-					return res.value.lyric || null
+					const parsedData = qqMusicApi.parseLyrics(res.value)
+					if (parsedData.lrc) {
+						return mergeLyricsToSpl(
+							parsedData.lrc,
+							parsedData.tlyric,
+							undefined,
+							options,
+						)
+					}
 				}
 			} catch (e) {
 				console.error('Fetch qqmusic lyrics error:', e)

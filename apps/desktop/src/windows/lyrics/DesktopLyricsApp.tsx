@@ -115,30 +115,30 @@ export const DesktopLyricsApp: React.FC = () => {
 			className={`w-screen h-screen flex flex-col justify-center items-center px-6 relative select-none rounded-2xl transition-all duration-300 group ${
 				isLocked
 					? 'bg-transparent'
-					: 'bg-black/50 hover:bg-black/70 border border-white/10 backdrop-blur-md shadow-2xl'
+					: 'bg-black/55 hover:bg-black/75 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
 			}`}
 		>
 			{/* Top drag & control bar (hidden when mouse locked) */}
 			{!isLocked && (
 				<div
 					data-tauri-drag-region
-					className="absolute top-0 left-0 right-0 h-7 flex items-center justify-between px-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-t-2xl cursor-move text-white/80"
+					className="absolute top-2 left-3 right-3 h-8 flex items-center justify-between px-3.5 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 backdrop-blur-md rounded-xl cursor-move text-white/90 shadow-sm"
 				>
-					<span className="text-[11px] font-medium tracking-wide truncate max-w-[75%]">
-						{title} - {artist}
+					<span className="text-[11px] font-medium tracking-wide truncate max-w-[70%]">
+						{title} · <span className="text-white/60">{artist}</span>
 					</span>
-					<div className="flex items-center gap-1.5">
+					<div className="flex items-center gap-1.5 flex-shrink-0">
 						<button
 							onClick={toggleLock}
 							title="锁定/穿透鼠标 (Ctrl+Alt+L 解锁)"
-							className="p-1 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+							className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
 						>
 							<Lock className="w-3.5 h-3.5" />
 						</button>
 						<button
 							onClick={handleClose}
 							title="关闭桌面歌词"
-							className="p-1 rounded hover:bg-red-500/80 text-white/70 hover:text-white transition-colors"
+							className="p-1 rounded-lg hover:bg-rose-500/80 text-white/70 hover:text-white transition-colors"
 						>
 							<X className="w-3.5 h-3.5" />
 						</button>
@@ -146,13 +146,31 @@ export const DesktopLyricsApp: React.FC = () => {
 				</div>
 			)}
 
-			{/* Center: Syllable Lyric Text */}
-			<div className="text-center space-y-1 pointer-events-none w-full max-w-2xl px-4">
+			{/* Center: Syllable Lyric Text & Multi-language Lines */}
+			<div className="text-center space-y-1.5 pointer-events-none w-full max-w-3xl px-4 flex flex-col items-center justify-center">
 				{activeLine ? (
 					<>
+						{/* Romaji subline if available */}
+						{activeLine.romaji && (
+							<p
+								className="text-[12px] md:text-[13px] text-white/80 font-mono tracking-wider truncate max-w-full"
+								style={{
+									textShadow:
+										'0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.85)',
+								}}
+							>
+								{activeLine.romaji}
+							</p>
+						)}
+
+						{/* Main lyric line with syllable karaoke dynamic highlight */}
 						<p
-							className="font-bold tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] leading-tight transition-all"
-							style={{ fontSize: `${fontSize}px` }}
+							className="font-black tracking-wide leading-tight transition-all max-w-full truncate px-2"
+							style={{
+								fontSize: `${fontSize}px`,
+								textShadow:
+									'0 2px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,1)',
+							}}
 						>
 							{activeLine.isDynamic &&
 							activeLine.spans &&
@@ -175,7 +193,7 @@ export const DesktopLyricsApp: React.FC = () => {
 											key={idx}
 											className="inline-block transition-all duration-75"
 											style={{
-												background: `linear-gradient(to right, ${primaryColor} ${fillPct}%, rgba(255, 255, 255, 0.7) ${fillPct}%)`,
+												background: `linear-gradient(to right, ${primaryColor} ${fillPct}%, rgba(255, 255, 255, 0.85) ${fillPct}%)`,
 												WebkitBackgroundClip: 'text',
 												WebkitTextFillColor: 'transparent',
 											}}
@@ -187,29 +205,46 @@ export const DesktopLyricsApp: React.FC = () => {
 							) : (
 								<span
 									style={{ color: primaryColor }}
-									className="drop-shadow-[0_2px_8px_rgba(0,174,236,0.6)]"
+									className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.7)]"
 								>
 									{activeLine.content}
 								</span>
 							)}
 						</p>
 
-						{/* Translation or subline */}
+						{/* Chinese Translation line */}
 						{activeLine.translation && (
-							<p className="text-xs text-white/75 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] truncate">
+							<p
+								className="text-xs md:text-sm text-sky-200/95 font-medium tracking-wide truncate max-w-full pt-0.5"
+								style={{
+									textShadow:
+										'0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.85)',
+								}}
+							>
 								{activeLine.translation}
 							</p>
 						)}
 					</>
 				) : (
-					<div className="space-y-0.5">
+					<div className="space-y-1">
 						<p
-							className="font-bold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
-							style={{ fontSize: `${fontSize}px` }}
+							className="font-bold text-white tracking-wide"
+							style={{
+								fontSize: `${fontSize}px`,
+								textShadow:
+									'0 2px 8px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.85)',
+							}}
 						>
 							{title}
 						</p>
-						<p className="text-xs text-white/60 font-medium">{artist}</p>
+						<p
+							className="text-xs text-white/70 font-medium tracking-wider"
+							style={{
+								textShadow: '0 1px 4px rgba(0,0,0,0.9)',
+							}}
+						>
+							{artist}
+						</p>
 					</div>
 				)}
 			</div>

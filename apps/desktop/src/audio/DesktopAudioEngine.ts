@@ -281,6 +281,13 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		this.audio.pause()
 	}
 
+	public stop(): void {
+		this.audio.pause()
+		this.audio.currentTime = 0
+		this.audio.removeAttribute('src')
+		this.currentTrack = null
+	}
+
 	public seek(timeInSeconds: number): void {
 		if (isFinite(timeInSeconds)) {
 			this.audio.currentTime = Math.max(0, timeInSeconds)
