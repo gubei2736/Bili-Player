@@ -48,34 +48,60 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
 	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
-
-	useEffect(() => {
-		if (isOpen && track) {
-			const fullTitle = track.title.trim()
-			setSearchKeyword(cleanTrackTitle(fullTitle) || fullTitle)
-			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
-			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
-			setCandidates([])
-			setIsSearching(false)
-		}
-	}, [isOpen, track?.uniqueKey])
-
-	if (!isOpen || !track) return null
+	const [hasSearched, setHasSearched] = useState(false)
 
 	const handleSearch = async (kw: string) => {
 		if (!kw.trim()) return
 		setIsSearching(true)
+		setHasSearched(true)
 		try {
 			const results = await lyricService.searchCandidates(kw.trim())
 			setCandidates(results)
 			// 立即在后台并行预加载候选歌词，用户点击时直接命中内存，瞬间完成采用！
-			lyricService.prefetchCandidates(results, track.uniqueKey)
+			if (track) {
+				lyricService.prefetchCandidates(results, track.uniqueKey)
+			}
 		} catch (err) {
 			console.warn('Search lyrics error:', err)
 		} finally {
 			setIsSearching(false)
 		}
 	}
+
+	useEffect(() => {
+		if (isOpen && track) {
+			const bili = track.source === 'bilibili' ? (track as any) : null
+			// 优先使用当前分 P 标题，避免分 P 视频直接显示总合集标题
+			const rawTitle =
+				bili?.bilibiliMetadata?.isMultiPage && bili?.bilibiliMetadata?.pagePart
+					? bili.bilibiliMetadata.pagePart
+					: track.title
+
+			let kw = cleanTrackTitle(rawTitle) || rawTitle
+
+			// 若分 P 标题自身未包含歌手名字，且主标题包含歌手名（如 "陶喆 录音室作品"），智能补齐歌手名
+			if (bili?.bilibiliMetadata?.mainTrackTitle) {
+				const mainClean = cleanTrackTitle(bili.bilibiliMetadata.mainTrackTitle)
+				const possibleArtist = mainClean.split(/[\s·-]+/)[0]
+				if (possibleArtist && !kw.includes(possibleArtist) && possibleArtist.length >= 2) {
+					kw = `${kw} ${possibleArtist}`.trim()
+				}
+			}
+
+			setSearchKeyword(kw)
+			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
+			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
+			setCandidates([])
+			setIsSearching(false)
+			setHasSearched(false)
+
+			if (kw) {
+				handleSearch(kw)
+			}
+		}
+	}, [isOpen, track?.uniqueKey])
+
+	if (!isOpen || !track) return null
 
 	const handleApplyCandidate = async (candidate: LyricSearchCandidate) => {
 		setLoadingCandidateId(candidate.id)
@@ -191,8 +217,10 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								<h3 className="text-sm font-bold text-foreground">
 									歌词管理与微调
 								</h3>
-								<p className="text-[11px] text-muted-foreground truncate max-w-[260px] sm:max-w-xs mt-0.5" title={track.title}>
-									{track.title}
+								<p className="text-[11px] text-muted-foreground truncate max-w-[260px] sm:max-w-xs mt-0.5" title={track.source === 'bilibili' && (track as any)?.bilibiliMetadata?.isMultiPage && (track as any)?.bilibiliMetadata?.pagePart ? `[P${(track as any).bilibiliMetadata.pageIndex || 1}] ${(track as any).bilibiliMetadata.pagePart}` : track.title}>
+									{track.source === 'bilibili' && (track as any)?.bilibiliMetadata?.isMultiPage && (track as any)?.bilibiliMetadata?.pagePart
+										? `[P${(track as any).bilibiliMetadata.pageIndex || 1}] ${(track as any).bilibiliMetadata.pagePart}`
+										: track.title}
 								</p>
 							</div>
 						</div>
@@ -305,7 +333,10 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								{isSearching ? (
 									<div className="py-16 text-center space-y-2 text-xs text-muted-foreground">
 										<Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
-										<p>正在检索网易云与 QQ 音乐歌词库...</p>
+									</div>
+								) : hasSearched && candidates.length === 0 ? (
+									<div className="py-16 text-center text-xs text-muted-foreground">
+										未找到匹配歌词，可尝试修改关键词或点击上方“粘贴 LRC/SPL”自定义
 									</div>
 								) : candidates.length === 0 ? (
 									<div className="py-16 text-center text-xs text-muted-foreground">

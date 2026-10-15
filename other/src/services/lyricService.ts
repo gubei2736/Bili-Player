@@ -71,9 +71,13 @@ export function cleanTrackTitle(title: string): string {
 		.replace(/（.*?）/g, '')
 		.replace(/\(.*?\)/g, '')
 		.replace(/《(.*?)》/g, '$1')
-		.replace(/4K|1080P|60帧|无损音质|官方MV|完整版|高音质/gi, '')
+		.replace(
+			/4K|1080P|720P|60帧|无损音质|超高音质|最高音质|官方MV|完整版|高音质|附MV|纯享版|现场版|合集|合辑|无损|全曲|自制MV|自制/gi,
+			'',
+		)
 		.replace(/^(\d{1,3}[\s._-]+|P\d+[\s._-]+)/i, '')
 		.replace(/[-_]/g, ' ')
+		.replace(/\s+/g, ' ')
 		.trim()
 }
 
@@ -336,11 +340,26 @@ export class LyricService {
 			}
 		}
 
-		const queryTitle = cleanTrackTitle(track.title) || track.title
-		const queryArtist =
+		let queryTitle = cleanTrackTitle(track.title) || track.title
+		let queryArtist =
 			track.artist?.name && track.artist.name !== '未知UP主' && track.artist.name !== '未知歌手'
 				? track.artist.name
 				: ''
+
+		if (track.source === 'bilibili') {
+			const bili = track as BilibiliTrack
+			if (bili.bilibiliMetadata?.isMultiPage && bili.bilibiliMetadata?.pagePart) {
+				queryTitle = cleanTrackTitle(bili.bilibiliMetadata.pagePart) || bili.bilibiliMetadata.pagePart
+			}
+			if (bili.bilibiliMetadata?.mainTrackTitle) {
+				const mainClean = cleanTrackTitle(bili.bilibiliMetadata.mainTrackTitle)
+				const possibleArtist = mainClean.split(/[\s·-]+/)[0]
+				if (possibleArtist && !queryTitle.includes(possibleArtist) && possibleArtist.length >= 2) {
+					queryArtist = possibleArtist
+				}
+			}
+		}
+
 		const searchKeyword = `${queryTitle} ${queryArtist}`.trim()
 
 		// 1. Try QQ Music First (根据用户偏好，优先匹配 QQ 音乐歌词库)
@@ -460,14 +479,26 @@ export class LyricService {
 		})
 	}
 
-	// 2. Manual Candidate Search (优先展示 QQ 音乐的候选结果)
+	// 2. Manual Candidate Search (优先展示 QQ 音乐的候选结果，并添加超时保护)
 	async searchCandidates(keyword: string): Promise<LyricSearchCandidate[]> {
 		const candidates: LyricSearchCandidate[] = []
-		if (!keyword.trim()) return candidates
+		const cleanKw = keyword.trim()
+		if (!cleanKw) return candidates
+
+		// 1. QQ 音乐搜索（主源，毫秒级响应）
+		const qqSearchPromise = qqMusicApi.search(cleanKw, 8)
+
+		// 2. 网易云搜索（增加 3.5s 超时保护，避免因网络波动或不可达导致 UI 陷入无响应假死）
+		const neteaseSearchPromise = Promise.race([
+			neteaseApi.search({ keywords: cleanKw, limit: 6 }),
+			new Promise<never>((_, reject) =>
+				setTimeout(() => reject(new Error('Netease search timeout')), 3500),
+			),
+		])
 
 		const [qRes, nRes] = await Promise.allSettled([
-			qqMusicApi.search(keyword, 8),
-			neteaseApi.search({ keywords: keyword, limit: 6 }),
+			qqSearchPromise,
+			neteaseSearchPromise,
 		])
 
 		// QQ 音乐候选排在最前

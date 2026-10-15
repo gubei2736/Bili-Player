@@ -29,8 +29,8 @@ export class QQMusicApi {
 
 		const body = {
 			comm: {
-				ct: '19',
-				cv: '1859',
+				ct: '26',
+				cv: '0',
 				uin: '0',
 			},
 			req: {
