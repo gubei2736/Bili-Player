@@ -1,0 +1,228 @@
+import {
+	bilibiliApi,
+	useHistoryStore,
+	useQueueStore,
+	type Track,
+	type BilibiliTrack,
+} from '@bbplayer/shared-core'
+import { desktopAudioEngine } from './DesktopAudioEngine'
+import { getAudioQualityPreference } from './audioSettings'
+import { invoke } from '@tauri-apps/api/core'
+
+let currentLoadingTrackKey: string | null = null
+let latestPlayRequestId = 0
+let cachedProxyPort: number | null = null
+
+export async function playTrackWithProxy(track: Track, forceReplay = false): Promise<void> {
+	// 1. 防重保护：如果相同曲目已在加载中，直接返回，避免并发打断与二次重播从 0 秒开始
+	if (!forceReplay && currentLoadingTrackKey === track.uniqueKey) {
+		return
+	}
+	const currentPlaying = desktopAudioEngine.getCurrentTrack()
+	if (
+		!forceReplay &&
+		currentPlaying?.uniqueKey === track.uniqueKey &&
+		desktopAudioEngine.isPlaying()
+	) {
+		return
+	}
+
+	const originalKey = track.uniqueKey
+	currentLoadingTrackKey = track.uniqueKey
+	const requestId = ++latestPlayRequestId
+
+	try {
+		if (track.source === 'bilibili') {
+			const biliTrack = track as BilibiliTrack
+			const bvid = biliTrack.bilibiliMetadata.bvid
+			let cid = biliTrack.bilibiliMetadata.cid
+
+			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID
+			let extraMetadata: Partial<BilibiliTrack['bilibiliMetadata']> = {}
+			let trackOverrides: { title?: string; duration?: number; uniqueKey?: string } | undefined
+
+			if (!biliTrack.bilibiliMetadata.pages || !cid) {
+				const pageListRes = await bilibiliApi.getPageList({ bvid })
+				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
+				if (pageListRes.isOk() && pageListRes.value.length > 0) {
+					const pages = pageListRes.value.map((p) => ({
+						cid: p.cid,
+						page: p.page,
+						part: p.part || `第${p.page}部分`,
+						duration: p.duration,
+					}))
+
+					const isMulti = pages.length > 1
+					const targetPageIndex = biliTrack.bilibiliMetadata.pageIndex || 1
+					const currentPage =
+						(targetPageIndex && pages.find((p) => p.page === targetPageIndex)) ||
+						(cid && pages.find((p) => p.cid === cid)) ||
+						pages[0]!
+
+					cid = currentPage.cid
+					biliTrack.bilibiliMetadata.cid = cid
+					biliTrack.bilibiliMetadata.isMultiPage = isMulti
+					biliTrack.bilibiliMetadata.pageIndex = currentPage.page
+					biliTrack.bilibiliMetadata.pagePart = currentPage.part
+					biliTrack.bilibiliMetadata.pages = pages
+					if (!biliTrack.bilibiliMetadata.mainTrackTitle) {
+						biliTrack.bilibiliMetadata.mainTrackTitle = biliTrack.title
+					}
+
+					if (isMulti && currentPage.part) {
+						biliTrack.title = currentPage.part
+						if (currentPage.duration) {
+							biliTrack.duration = currentPage.duration
+						}
+						const newKey = `bilibili_${bvid}_${currentPage.page}`
+						biliTrack.uniqueKey = newKey
+						currentLoadingTrackKey = newKey
+						trackOverrides = {
+							title: biliTrack.title,
+							duration: biliTrack.duration,
+							uniqueKey: newKey,
+						}
+					}
+
+					extraMetadata = {
+						bvid,
+						cid,
+						isMultiPage: isMulti,
+						pageIndex: currentPage.page,
+						pagePart: currentPage.part,
+						pages,
+						mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle,
+					}
+				} else if (!cid) {
+					throw new Error('无法获取该视频的分 P CID 信息')
+				}
+			} else {
+				if (biliTrack.bilibiliMetadata.isMultiPage && biliTrack.bilibiliMetadata.pages) {
+					const targetIdx = biliTrack.bilibiliMetadata.pageIndex || 1
+					const matchedPage =
+						(targetIdx && biliTrack.bilibiliMetadata.pages.find((p) => p.page === targetIdx)) ||
+						(cid && biliTrack.bilibiliMetadata.pages.find((p) => p.cid === cid))
+					if (matchedPage) {
+						cid = matchedPage.cid
+						biliTrack.bilibiliMetadata.cid = cid
+						biliTrack.bilibiliMetadata.pageIndex = matchedPage.page
+						biliTrack.bilibiliMetadata.pagePart = matchedPage.part
+						if (matchedPage.part) {
+							biliTrack.title = matchedPage.part
+						}
+					}
+				}
+				extraMetadata = {
+					bvid,
+					cid,
+					isMultiPage: biliTrack.bilibiliMetadata.isMultiPage,
+					pageIndex: biliTrack.bilibiliMetadata.pageIndex,
+					pagePart: biliTrack.bilibiliMetadata.pagePart,
+					pages: biliTrack.bilibiliMetadata.pages,
+					mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle,
+				}
+				trackOverrides = {
+					title: biliTrack.title,
+					duration: biliTrack.duration,
+					uniqueKey: biliTrack.uniqueKey,
+				}
+			}
+
+			// 2. Fetch Audio Stream URL from Bilibili based on quality preference
+			const qualityPref = getAudioQualityPreference()
+			let audioQuality = 30280
+			let enableHiRes = false
+			let enableDolby = false
+			let preferDolbyFirst = false
+
+			if (qualityPref === 'auto_highest' || (qualityPref as any) === 'auto_hires') {
+				audioQuality = 30280
+				enableHiRes = true
+				enableDolby = true
+				preferDolbyFirst = false // 智能优先选择账号权限下最高档位清晰度：Hi-Res > 杜比 > 常规 AAC
+			} else if (qualityPref === 'hires_lossless') {
+				audioQuality = 30280
+				enableHiRes = true
+				enableDolby = false
+				preferDolbyFirst = false
+			} else if (qualityPref === 'dolby_atmos') {
+				audioQuality = 30280
+				enableHiRes = false
+				enableDolby = true
+				preferDolbyFirst = true
+			} else if (qualityPref === 'standard_aac') {
+				audioQuality = 30280
+				enableHiRes = false
+				enableDolby = false
+				preferDolbyFirst = false
+			}
+
+			const streamRes = await bilibiliApi.getAudioStream({
+				bvid,
+				cid,
+				audioQuality,
+				enableDolby,
+				enableHiRes,
+				preferDolbyFirst,
+			})
+
+			// 如果在等待网络响应期间用户切换到了另一首歌，直接放弃旧请求
+			if (requestId !== latestPlayRequestId) return
+
+			if (streamRes.isErr()) {
+				throw new Error(`获取 B 站音频流失败: ${streamRes.error.message}`)
+			}
+
+			const streamData = streamRes.value
+			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
+
+			// 3. Query local stream proxy port from Tauri backend (using cached port to save IPC roundtrip)
+			if (cachedProxyPort === null || cachedProxyPort <= 0) {
+				try {
+					cachedProxyPort = await invoke<number>('get_stream_proxy_port')
+				} catch {
+					cachedProxyPort = 0
+				}
+			}
+
+			if (requestId !== latestPlayRequestId) return
+
+			let proxyUrl = streamData.url
+			if (cachedProxyPort && cachedProxyPort > 0) {
+				proxyUrl = `http://127.0.0.1:${cachedProxyPort}/proxy?url=${encodeURIComponent(
+					streamData.url,
+				)}&bvid=${bvid}&cid=${cid}`
+			}
+
+			// 4. Calculate loudness normalization gain (dB)
+			let loudnessDeltaDb = 0
+			if (streamData.volume) {
+				loudnessDeltaDb = streamData.volume.target_i - streamData.volume.measured_i
+			}
+
+			// 5. 优先切歌出声：第一时间送入音频引擎播放，不阻塞在后续数据持久化
+			await desktopAudioEngine.loadAndPlay(track, proxyUrl, loudnessDeltaDb)
+
+			if (requestId !== latestPlayRequestId) return
+
+			// 6. 优先播放之后，再更新识别出的音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
+			useQueueStore.getState().updateTrackStream(originalKey, streamData, extraMetadata, trackOverrides)
+		} else {
+			// Local track fallback
+			const localTrack = track as any
+			await desktopAudioEngine.loadAndPlay(
+				track,
+				localTrack.localMetadata?.localPath || '',
+			)
+		}
+
+		// 6. 成功启动播放后记录到收听历史
+		if (requestId === latestPlayRequestId) {
+			useHistoryStore.getState().addRecord(track)
+		}
+	} finally {
+		if (currentLoadingTrackKey === track.uniqueKey || (track.source === 'bilibili' && currentLoadingTrackKey === originalKey)) {
+			currentLoadingTrackKey = null
+		}
+	}
+}
