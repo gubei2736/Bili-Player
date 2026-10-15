@@ -5,9 +5,11 @@ import {
 	bilibiliApi,
 	useQueueStore,
 	useCurrentTrack,
+	type Track,
 	type BilibiliTrack,
 	type BilibiliVideoPart,
 } from '@bbplayer/shared-core'
+import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import { playTrackWithProxy } from '../../audio/playTrackHelper'
 
 export interface VideoPartsModalProps {
@@ -43,7 +45,37 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 	const [parts, setParts] = useState<BilibiliVideoPart[]>(initialParts || [])
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const { addTrack, setQueue } = useQueueStore()
+	const [engineTrack, setEngineTrack] = useState<Track | null>(() =>
+		desktopAudioEngine.getCurrentTrack(),
+	)
+
+	const { addTrack, setQueue, playOrReplacePartTrack } = useQueueStore()
+	const queueCurrentTrack = useCurrentTrack()
+
+	// 监听音频引擎与全局切歌事件，确保弹窗打开与切歌时 100% 拿到真实正在发声的分 P
+	useEffect(() => {
+		if (!isOpen) return
+		setEngineTrack(desktopAudioEngine.getCurrentTrack())
+
+		const handleTrackUpdated = (e: any) => {
+			if (e.detail) {
+				setEngineTrack(e.detail)
+			} else {
+				setEngineTrack(desktopAudioEngine.getCurrentTrack())
+			}
+		}
+		const unsubscribe = desktopAudioEngine.subscribe((ev) => {
+			if (ev.type === 'play' || ev.type === 'loadedmetadata') {
+				setEngineTrack(desktopAudioEngine.getCurrentTrack())
+			}
+		})
+
+		window.addEventListener('bbplayer:track-updated', handleTrackUpdated)
+		return () => {
+			unsubscribe()
+			window.removeEventListener('bbplayer:track-updated', handleTrackUpdated)
+		}
+	}, [isOpen])
 
 	const loadParts = async (cancelledCheck?: () => boolean) => {
 		setLoading(true)
@@ -116,69 +148,60 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 				videoIsValid: true,
 				mainTrackTitle: title,
 				pageIndex: part.page,
-				pagePart: part.part,
+				pagePart: partTitle,
 				pages: parts,
 			},
 		}
 	}
 
-	const queueCurrentTrack = useCurrentTrack()
+	// 优先以真实正在发声的 engineTrack 或响应式 queueCurrentTrack 为准
+	const candidateTrack = engineTrack || queueCurrentTrack
 	const activeBiliTrack =
-		queueCurrentTrack &&
-		queueCurrentTrack.source === 'bilibili' &&
-		(queueCurrentTrack as BilibiliTrack).bilibiliMetadata.bvid === bvid
-			? (queueCurrentTrack as BilibiliTrack)
+		candidateTrack &&
+		candidateTrack.source === 'bilibili' &&
+		(candidateTrack as BilibiliTrack).bilibiliMetadata.bvid === bvid
+			? (candidateTrack as BilibiliTrack)
 			: null
 
-	// 优先以当前正在播放的音轨元数据为准，避免被外部旧 props 污染
-	const activeCid = activeBiliTrack?.bilibiliMetadata?.cid ?? currentCid ?? null
-	const activePage = activeBiliTrack?.bilibiliMetadata?.pageIndex ?? currentPage ?? null
+	const activeCid = activeBiliTrack
+		? activeBiliTrack.bilibiliMetadata.cid
+		: currentCid ?? null
+	const activePage = activeBiliTrack
+		? activeBiliTrack.bilibiliMetadata.pageIndex
+		: currentPage ?? null
 
 	const handlePlaySinglePart = async (part: BilibiliVideoPart) => {
 		const track = createTrackFromPart(part)
-		const { queue, currentIndex } = useQueueStore.getState()
 
-		// 1. Check if this exact part is already in queue
-		const existingIdx = queue.findIndex((t) => t.uniqueKey === track.uniqueKey)
-		if (existingIdx !== -1) {
-			useQueueStore.getState().setCurrentIndex(existingIdx)
-		} else {
-			// If currently playing track is another part of this same video, replace it in-place
-			const currentT = currentIndex >= 0 ? queue[currentIndex] : null
-			const isSameBvid =
-				currentT &&
-				currentT.source === 'bilibili' &&
-				(currentT as BilibiliTrack).bilibiliMetadata.bvid === bvid
+		// 1. 原子更新队列中的当前曲目为选中的分 P (如 P2)
+		playOrReplacePartTrack(track)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:track-updated', { detail: track }),
+		)
+		onClose()
 
-			if (isSameBvid && currentIndex >= 0) {
-				const newQueue = [...queue]
-				newQueue[currentIndex] = track
-				useQueueStore.setState({ queue: newQueue })
-			} else {
-				addTrack(track, true)
-				const targetIdx = currentIndex >= 0 ? currentIndex + 1 : 0
-				useQueueStore.getState().setCurrentIndex(targetIdx)
-			}
-		}
-
+		// 2. 立即触发音频流加载与播放
 		try {
 			await playTrackWithProxy(track, true)
 		} catch (err) {
 			console.error('播放分 P 失败:', err)
 		}
-		onClose()
 	}
 
 	const handlePlayAllParts = async () => {
 		if (parts.length === 0) return
 		const allTracks = parts.map((p) => createTrackFromPart(p))
 		setQueue(allTracks, 0)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:track-updated', { detail: allTracks[0] }),
+		)
+		onClose()
+
 		try {
 			await playTrackWithProxy(allTracks[0]!, true)
 		} catch (err) {
 			console.error('播放全部失败:', err)
 		}
-		onClose()
 	}
 
 	const handleAppendAllParts = () => {
@@ -280,9 +303,11 @@ export const VideoPartsModal: React.FC<VideoPartsModalProps> = ({
 						</div>
 					) : (
 						parts.map((p) => {
+							// 严格高亮匹配：如果有 activeCid，只认 cid 相等；只有没有 activeCid 时才比对 page
 							const isCurrent =
-								Boolean(activePage && p.page === activePage) ||
-								Boolean(activeCid && p.cid === activeCid)
+								activeCid !== null && activeCid !== undefined
+									? p.cid === activeCid
+									: activePage !== null && activePage !== undefined && p.page === activePage
 
 							return (
 								<div

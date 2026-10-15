@@ -25,6 +25,7 @@ import {
 	useCurrentTrack,
 	useLocalPlaylistStore,
 	useSkinStore,
+	type Track,
 	type BilibiliTrack,
 } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
@@ -67,7 +68,45 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		desktopAudioEngine.isLoudnessNormalizationEnabled(),
 	)
 
-	const currentTrack = useCurrentTrack()
+	const storeTrack = useCurrentTrack()
+	const [engineTrack, setEngineTrack] = useState<Track | null>(() =>
+		desktopAudioEngine.getCurrentTrack(),
+	)
+
+	// 优先以最新触发的 storeTrack 或真实发声的 engineTrack 为准，彻底解决声音是 P2 但底栏还显示 P1 的不同步问题
+	const currentTrack = useMemo(() => {
+		if (
+			engineTrack &&
+			storeTrack &&
+			engineTrack.source === 'bilibili' &&
+			storeTrack.source === 'bilibili'
+		) {
+			const eb = engineTrack as BilibiliTrack
+			const sb = storeTrack as BilibiliTrack
+			if (
+				eb.bilibiliMetadata.bvid === sb.bilibiliMetadata.bvid &&
+				eb.bilibiliMetadata.pageIndex !== undefined &&
+				eb.bilibiliMetadata.pageIndex !== sb.bilibiliMetadata.pageIndex
+			) {
+				return engineTrack
+			}
+		}
+		return storeTrack || engineTrack
+	}, [storeTrack, engineTrack])
+
+	// 监听 bbplayer:track-updated 事件，确保点击 P2 瞬间底栏立刻刷新
+	useEffect(() => {
+		const handleTrackUpdated = (e: any) => {
+			if (e.detail) {
+				setEngineTrack({ ...e.detail })
+			}
+		}
+		window.addEventListener('bbplayer:track-updated', handleTrackUpdated)
+		return () => {
+			window.removeEventListener('bbplayer:track-updated', handleTrackUpdated)
+		}
+	}, [])
+
 	const biliTrack =
 		currentTrack?.source === 'bilibili' ? (currentTrack as BilibiliTrack) : null
 	const currentQualityId = biliTrack?.bilibiliMetadata?.bilibiliStreamUrl?.quality
@@ -164,7 +203,15 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	// 4. Audio Engine event subscription
 	useEffect(() => {
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
-			if (event.type === 'play') setIsPlaying(true)
+			if (event.type === 'play') {
+				setIsPlaying(true)
+				const active = desktopAudioEngine.getCurrentTrack()
+				if (active) setEngineTrack({ ...active })
+			}
+			if (event.type === 'loadedmetadata') {
+				const active = desktopAudioEngine.getCurrentTrack()
+				if (active) setEngineTrack({ ...active })
+			}
 			if (event.type === 'pause') setIsPlaying(false)
 			if (event.type === 'timeupdate') {
 				setCurrentTime(event.currentTime)
@@ -431,49 +478,68 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 								</div>
 							</div>
 
-							<div className="overflow-hidden space-y-0.5">
-								<div className="flex items-center gap-1.5 overflow-hidden">
-									<p
-										onClick={onToggleFullscreenLyrics}
-										className="text-xs font-bold truncate hover:text-[#00AEEC] cursor-pointer text-foreground transition-colors"
-										title={
-											biliTrack?.bilibiliMetadata?.isMultiPage && (biliTrack.bilibiliMetadata.pagePart || biliTrack.bilibiliMetadata.pageIndex)
-												? `${biliTrack.bilibiliMetadata.mainTrackTitle || currentTrack.title} · [P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart || currentTrack.title}`
-												: currentTrack.title
-										}
-									>
-										{biliTrack?.bilibiliMetadata?.isMultiPage && (biliTrack.bilibiliMetadata.pagePart || biliTrack.bilibiliMetadata.pageIndex)
-											? `[P${biliTrack.bilibiliMetadata.pageIndex || 1}] ${biliTrack.bilibiliMetadata.pagePart || currentTrack.title}`
-											: currentTrack.title}
-									</p>
-									{biliTrack?.bilibiliMetadata?.isMultiPage && (
-										<button
-											onClick={() => setPartsModalOpen(true)}
-											className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 text-[#00AEEC] border border-[#00AEEC]/30 shrink-0 transition-colors"
-											title="点击查看并切换本视频所有分 P 选集"
-										>
-											<Layers className="w-2.5 h-2.5" />
-											<span>
-												P{biliTrack.bilibiliMetadata.pageIndex || 1}/
-												{biliTrack.bilibiliMetadata.pages?.length || 1}
-											</span>
-										</button>
-									)}
-								</div>
-								<div className="flex items-center gap-2">
-									<p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
-										{currentTrack.artist?.name || '未知歌手'}
-									</p>
-									{badgeInfo && (
-										<span
-											className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold border shrink-0 leading-tight ${badgeInfo.bg} ${badgeInfo.border} ${badgeInfo.color}`}
-											title={badgeInfo.tooltip}
-										>
-											{badgeInfo.text}
-										</span>
-									)}
-								</div>
-							</div>
+							{(() => {
+								const isMulti = Boolean(
+									biliTrack?.bilibiliMetadata?.isMultiPage &&
+										(biliTrack.bilibiliMetadata.pagePart ||
+											biliTrack.bilibiliMetadata.pageIndex ||
+											(biliTrack.bilibiliMetadata.pages &&
+												biliTrack.bilibiliMetadata.pages.length > 1)),
+								)
+								const activePageIndex = biliTrack?.bilibiliMetadata?.pageIndex ?? 1
+								const activePagePart =
+									biliTrack?.bilibiliMetadata?.pagePart || currentTrack.title
+
+								const displayTitle = isMulti
+									? `[P${activePageIndex}] ${activePagePart}`
+									: currentTrack.title
+
+								const tooltipTitle = isMulti
+									? `${
+											biliTrack!.bilibiliMetadata.mainTrackTitle || currentTrack.title
+									  } · ${displayTitle}`
+									: currentTrack.title
+
+								return (
+									<div className="overflow-hidden space-y-0.5">
+										<div className="flex items-center gap-1.5 overflow-hidden">
+											<p
+												onClick={onToggleFullscreenLyrics}
+												className="text-xs font-bold truncate hover:text-[#00AEEC] cursor-pointer text-foreground transition-colors"
+												title={tooltipTitle}
+											>
+												{displayTitle}
+											</p>
+											{isMulti && (
+												<button
+													onClick={() => setPartsModalOpen(true)}
+													className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 text-[#00AEEC] border border-[#00AEEC]/30 shrink-0 transition-colors"
+													title="点击查看并切换本视频所有分 P 选集"
+												>
+													<Layers className="w-2.5 h-2.5" />
+													<span>
+														P{activePageIndex}/
+														{biliTrack?.bilibiliMetadata.pages?.length || 1}
+													</span>
+												</button>
+											)}
+										</div>
+										<div className="flex items-center gap-2">
+											<p className="text-[11px] text-muted-foreground truncate max-w-[120px]">
+												{currentTrack.artist?.name || '未知歌手'}
+											</p>
+											{badgeInfo && (
+												<span
+													className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold border shrink-0 leading-tight ${badgeInfo.bg} ${badgeInfo.border} ${badgeInfo.color}`}
+													title={badgeInfo.tooltip}
+												>
+													{badgeInfo.text}
+												</span>
+											)}
+										</div>
+									</div>
+								)
+							})()}
 						</>
 					) : (
 						<div className="flex items-center gap-3 text-muted-foreground text-xs">
@@ -813,7 +879,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					coverUrl={currentTrack?.coverUrl}
 					author={currentTrack?.artist?.name}
 					currentCid={biliTrack.bilibiliMetadata.cid}
-					currentPage={biliTrack.bilibiliMetadata.pageIndex || 1}
+					currentPage={biliTrack.bilibiliMetadata.pageIndex ?? 1}
 					initialParts={biliTrack.bilibiliMetadata.pages}
 				/>
 			)}

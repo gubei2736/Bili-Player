@@ -13,35 +13,42 @@ let currentLoadingTrackKey: string | null = null
 let latestPlayRequestId = 0
 let cachedProxyPort: number | null = null
 
-export async function playTrackWithProxy(track: Track, forceReplay = false): Promise<void> {
+export async function playTrackWithProxy(inputTrack: Track, forceReplay = false): Promise<void> {
 	// 1. 防重保护：如果相同曲目已在加载中，直接返回，避免并发打断与二次重播从 0 秒开始
-	if (!forceReplay && currentLoadingTrackKey === track.uniqueKey) {
+	if (!forceReplay && currentLoadingTrackKey === inputTrack.uniqueKey) {
 		return
 	}
 	const currentPlaying = desktopAudioEngine.getCurrentTrack()
 	if (
 		!forceReplay &&
-		currentPlaying?.uniqueKey === track.uniqueKey &&
+		currentPlaying?.uniqueKey === inputTrack.uniqueKey &&
 		desktopAudioEngine.isPlaying()
 	) {
 		return
 	}
 
-	const originalKey = track.uniqueKey
-	currentLoadingTrackKey = track.uniqueKey
+	const originalKey = inputTrack.uniqueKey
+	currentLoadingTrackKey = inputTrack.uniqueKey
 	const requestId = ++latestPlayRequestId
 
 	try {
-		if (track.source === 'bilibili') {
-			const biliTrack = track as BilibiliTrack
+		if (inputTrack.source === 'bilibili') {
+			// 克隆独立副本，避免直接修改入参导致引用脏检查问题
+			const biliTrack: BilibiliTrack = {
+				...(inputTrack as BilibiliTrack),
+				bilibiliMetadata: {
+					...(inputTrack as BilibiliTrack).bilibiliMetadata,
+				},
+			}
 			const bvid = biliTrack.bilibiliMetadata.bvid
 			let cid = biliTrack.bilibiliMetadata.cid
+			const explicitPageIndex = biliTrack.bilibiliMetadata.pageIndex
 
 			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID
 			let extraMetadata: Partial<BilibiliTrack['bilibiliMetadata']> = {}
 			let trackOverrides: { title?: string; duration?: number; uniqueKey?: string } | undefined
 
-			if (!biliTrack.bilibiliMetadata.pages || !cid) {
+			if (!biliTrack.bilibiliMetadata.pages || biliTrack.bilibiliMetadata.pages.length === 0 || !cid) {
 				const pageListRes = await bilibiliApi.getPageList({ bvid })
 				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
 				if (pageListRes.isOk() && pageListRes.value.length > 0) {
@@ -53,36 +60,28 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 					}))
 
 					const isMulti = pages.length > 1
-					const targetPageIndex = biliTrack.bilibiliMetadata.pageIndex || 1
+					// 核心修复：优先匹配显式传入的 cid 或 explicitPageIndex，绝不使用 || 1 短路回退到 P1！
 					const currentPage =
-						(targetPageIndex && pages.find((p) => p.page === targetPageIndex)) ||
-						(cid && pages.find((p) => p.cid === cid)) ||
+						(cid !== null && cid !== undefined && pages.find((p) => p.cid === cid)) ||
+						(explicitPageIndex !== undefined && pages.find((p) => p.page === explicitPageIndex)) ||
 						pages[0]!
 
 					cid = currentPage.cid
+					const mainTitle = biliTrack.bilibiliMetadata.mainTrackTitle || biliTrack.title
+					const newTitle = isMulti && currentPage.part ? currentPage.part : biliTrack.title
+					const newDuration = currentPage.duration || biliTrack.duration
+					const newKey = isMulti ? `bilibili_${bvid}_${currentPage.page}` : biliTrack.uniqueKey
+
 					biliTrack.bilibiliMetadata.cid = cid
 					biliTrack.bilibiliMetadata.isMultiPage = isMulti
 					biliTrack.bilibiliMetadata.pageIndex = currentPage.page
 					biliTrack.bilibiliMetadata.pagePart = currentPage.part
 					biliTrack.bilibiliMetadata.pages = pages
-					if (!biliTrack.bilibiliMetadata.mainTrackTitle) {
-						biliTrack.bilibiliMetadata.mainTrackTitle = biliTrack.title
-					}
-
-					if (isMulti && currentPage.part) {
-						biliTrack.title = currentPage.part
-						if (currentPage.duration) {
-							biliTrack.duration = currentPage.duration
-						}
-						const newKey = `bilibili_${bvid}_${currentPage.page}`
-						biliTrack.uniqueKey = newKey
-						currentLoadingTrackKey = newKey
-						trackOverrides = {
-							title: biliTrack.title,
-							duration: biliTrack.duration,
-							uniqueKey: newKey,
-						}
-					}
+					biliTrack.bilibiliMetadata.mainTrackTitle = mainTitle
+					biliTrack.title = newTitle
+					biliTrack.duration = newDuration
+					biliTrack.uniqueKey = newKey
+					currentLoadingTrackKey = newKey
 
 					extraMetadata = {
 						bvid,
@@ -91,35 +90,51 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 						pageIndex: currentPage.page,
 						pagePart: currentPage.part,
 						pages,
-						mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle,
+						mainTrackTitle: mainTitle,
+					}
+					trackOverrides = {
+						title: newTitle,
+						duration: newDuration,
+						uniqueKey: newKey,
 					}
 				} else if (!cid) {
 					throw new Error('无法获取该视频的分 P CID 信息')
 				}
 			} else {
-				if (biliTrack.bilibiliMetadata.isMultiPage && biliTrack.bilibiliMetadata.pages) {
-					const targetIdx = biliTrack.bilibiliMetadata.pageIndex || 1
-					const matchedPage =
-						(targetIdx && biliTrack.bilibiliMetadata.pages.find((p) => p.page === targetIdx)) ||
-						(cid && biliTrack.bilibiliMetadata.pages.find((p) => p.cid === cid))
-					if (matchedPage) {
-						cid = matchedPage.cid
-						biliTrack.bilibiliMetadata.cid = cid
-						biliTrack.bilibiliMetadata.pageIndex = matchedPage.page
-						biliTrack.bilibiliMetadata.pagePart = matchedPage.part
-						if (matchedPage.part) {
-							biliTrack.title = matchedPage.part
-						}
+				const pages = biliTrack.bilibiliMetadata.pages
+				const isMulti = pages.length > 1 || Boolean(biliTrack.bilibiliMetadata.isMultiPage)
+				// 优先通过 cid 精确命中分 P，其次通过 explicitPageIndex
+				const matchedPage =
+					(cid !== null && cid !== undefined && pages.find((p) => p.cid === cid)) ||
+					(explicitPageIndex !== undefined && pages.find((p) => p.page === explicitPageIndex)) ||
+					pages[0]
+
+				if (matchedPage) {
+					cid = matchedPage.cid
+					biliTrack.bilibiliMetadata.cid = cid
+					biliTrack.bilibiliMetadata.isMultiPage = isMulti
+					biliTrack.bilibiliMetadata.pageIndex = matchedPage.page
+					biliTrack.bilibiliMetadata.pagePart = matchedPage.part
+					if (isMulti && matchedPage.part) {
+						biliTrack.title = matchedPage.part
+					}
+					if (matchedPage.duration) {
+						biliTrack.duration = matchedPage.duration
+					}
+					if (isMulti) {
+						biliTrack.uniqueKey = `bilibili_${bvid}_${matchedPage.page}`
+						currentLoadingTrackKey = biliTrack.uniqueKey
 					}
 				}
+
 				extraMetadata = {
 					bvid,
 					cid,
-					isMultiPage: biliTrack.bilibiliMetadata.isMultiPage,
+					isMultiPage: isMulti,
 					pageIndex: biliTrack.bilibiliMetadata.pageIndex,
 					pagePart: biliTrack.bilibiliMetadata.pagePart,
 					pages: biliTrack.bilibiliMetadata.pages,
-					mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle,
+					mainTrackTitle: biliTrack.bilibiliMetadata.mainTrackTitle || inputTrack.title,
 				}
 				trackOverrides = {
 					title: biliTrack.title,
@@ -140,9 +155,9 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 				enableHiRes = true
 				enableDolby = true
 				preferDolbyFirst = false // 智能优先选择账号权限下最高档位清晰度：Hi-Res > 杜比 > 常规 AAC
-			} else if (qualityPref === 'hires_lossless') {
+			} else if (qualityPref === 'hires_lossless' || (qualityPref as any) === 'high_192k') {
 				audioQuality = 30280
-				enableHiRes = true
+				enableHiRes = qualityPref === 'hires_lossless'
 				enableDolby = false
 				preferDolbyFirst = false
 			} else if (qualityPref === 'dolby_atmos') {
@@ -150,8 +165,8 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 				enableHiRes = false
 				enableDolby = true
 				preferDolbyFirst = true
-			} else if (qualityPref === 'standard_aac') {
-				audioQuality = 30280
+			} else {
+				audioQuality = 30232
 				enableHiRes = false
 				enableDolby = false
 				preferDolbyFirst = false
@@ -159,15 +174,14 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 
 			const streamRes = await bilibiliApi.getAudioStream({
 				bvid,
-				cid,
+				cid: cid!,
 				audioQuality,
 				enableDolby,
 				enableHiRes,
 				preferDolbyFirst,
 			})
 
-			// 如果在等待网络响应期间用户切换到了另一首歌，直接放弃旧请求
-			if (requestId !== latestPlayRequestId) return
+			if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
 
 			if (streamRes.isErr()) {
 				throw new Error(`获取 B 站音频流失败: ${streamRes.error.message}`)
@@ -176,7 +190,7 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 			const streamData = streamRes.value
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
 
-			// 3. Query local stream proxy port from Tauri backend (using cached port to save IPC roundtrip)
+			// 3. Query local stream proxy port from Tauri backend (使用模块全局静态缓存)
 			if (cachedProxyPort === null || cachedProxyPort <= 0) {
 				try {
 					cachedProxyPort = await invoke<number>('get_stream_proxy_port')
@@ -200,28 +214,38 @@ export async function playTrackWithProxy(track: Track, forceReplay = false): Pro
 				loudnessDeltaDb = streamData.volume.target_i - streamData.volume.measured_i
 			}
 
-			// 5. 优先切歌出声：第一时间送入音频引擎播放，不阻塞在后续数据持久化
-			await desktopAudioEngine.loadAndPlay(track, proxyUrl, loudnessDeltaDb)
+			// 5. 优先切歌出声：第一时间送入音频引擎播放（必须传入具有最新 title 与 pageIndex 的 biliTrack！）
+			await desktopAudioEngine.loadAndPlay(biliTrack, proxyUrl, loudnessDeltaDb)
 
 			if (requestId !== latestPlayRequestId) return
 
 			// 6. 优先播放之后，再更新识别出的音频真实规格（320K/Hi-Res/杜比等）与分 P 选集信息
 			useQueueStore.getState().updateTrackStream(originalKey, streamData, extraMetadata, trackOverrides)
+
+			// 7. 广播全局切歌/音轨更新事件，通知所有 UI 组件（底栏、歌词、选集弹窗）同步更新
+			window.dispatchEvent(
+				new CustomEvent('bbplayer:track-updated', { detail: biliTrack }),
+			)
+			useHistoryStore.getState().addRecord(biliTrack)
 		} else {
 			// Local track fallback
-			const localTrack = track as any
+			const localTrack = inputTrack as any
 			await desktopAudioEngine.loadAndPlay(
-				track,
+				inputTrack,
 				localTrack.localMetadata?.localPath || '',
 			)
-		}
-
-		// 6. 成功启动播放后记录到收听历史
-		if (requestId === latestPlayRequestId) {
-			useHistoryStore.getState().addRecord(track)
+			if (requestId === latestPlayRequestId) {
+				window.dispatchEvent(
+					new CustomEvent('bbplayer:track-updated', { detail: inputTrack }),
+				)
+				useHistoryStore.getState().addRecord(inputTrack)
+			}
 		}
 	} finally {
-		if (currentLoadingTrackKey === track.uniqueKey || (track.source === 'bilibili' && currentLoadingTrackKey === originalKey)) {
+		if (
+			currentLoadingTrackKey === inputTrack.uniqueKey ||
+			currentLoadingTrackKey === originalKey
+		) {
 			currentLoadingTrackKey = null
 		}
 	}
