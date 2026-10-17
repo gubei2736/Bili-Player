@@ -81,6 +81,18 @@ html.is-debug-mode *,
 	-webkit-user-select: text !important;
 }
 
+/* 确保桌面歌词窗口在任何情况下均无默认边框、无外边框、全透明底色与无阴影 */
+html.is-lyrics-window,
+body.is-lyrics-window,
+body.is-lyrics-window #root,
+.is-lyrics-window {
+	background: transparent !important;
+	background-color: transparent !important;
+	border: none !important;
+	outline: none !important;
+	box-shadow: none !important;
+}
+
 /* 高阶流光毛玻璃表面 (轻度清透磨砂，保留自定义背景清晰度) */
 .mica-surface {
 	background-color: rgba(11, 14, 22, 0.65);

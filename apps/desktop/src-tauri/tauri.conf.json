@@ -30,11 +30,12 @@
         "url": "index.html#lyrics",
         "width": 800,
         "height": 140,
-        "resizable": true,
+        "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
+        "shadow": false,
         "visible": false
       }
     ],

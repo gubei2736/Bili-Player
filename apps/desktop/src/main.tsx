@@ -85,9 +85,11 @@ class GlobalErrorBoundary extends React.Component<
 
 const isLyricsWindow = window.location.hash.includes('lyrics')
 if (isLyricsWindow) {
+	document.documentElement.classList.add('is-lyrics-window')
 	document.documentElement.classList.remove('bg-[#0b0f17]')
 	document.documentElement.classList.add('bg-transparent')
 	document.documentElement.style.background = 'transparent'
+	document.body.classList.add('is-lyrics-window')
 	document.body.classList.remove('bg-[#0b0f17]')
 	document.body.classList.add('bg-transparent')
 	document.body.style.background = 'transparent'

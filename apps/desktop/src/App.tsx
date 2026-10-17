@@ -435,6 +435,7 @@ export const App: React.FC = () => {
 		}
 
 		let unlistenFn: (() => void) | undefined
+		let unlistenNav: (() => void) | undefined
 		listen<string>('global-shortcut-event', (event) => {
 			handleGlobalShortcutAction(event.payload)
 		})
@@ -443,9 +444,20 @@ export const App: React.FC = () => {
 			})
 			.catch(() => {})
 
+		listen<string>('navigate-to-tab', (event) => {
+			if (event.payload) {
+				setActiveTab(event.payload as NavTab)
+			}
+		})
+			.then((fn) => {
+				unlistenNav = fn
+			})
+			.catch(() => {})
+
 		return () => {
 			delete (window as any).__triggerGlobalShortcut
 			if (unlistenFn) unlistenFn()
+			if (unlistenNav) unlistenNav()
 		}
 	}, [handleGlobalShortcutAction])
 

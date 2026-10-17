@@ -209,16 +209,15 @@ export const DesktopLyricsApp: React.FC = () => {
 		<div
 			className={`w-screen h-screen flex flex-col justify-center items-center px-6 relative select-none rounded-2xl transition-colors duration-300 group ${
 				isLocked
-					? 'bg-transparent border-0 border-transparent shadow-none ring-0 outline-none'
+					? 'bg-transparent shadow-none ring-0 outline-none'
 					: 'bg-black/60 hover:bg-black/75 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
 			}`}
 			style={{
-				background: isLocked ? 'transparent' : undefined,
+				background: 'transparent',
 				backgroundColor: isLocked ? 'transparent' : undefined,
 				boxShadow: isLocked ? 'none' : undefined,
+				border: isLocked ? 'none' : undefined,
 				borderColor: isLocked ? 'transparent' : undefined,
-				borderWidth: isLocked ? '0px' : undefined,
-				borderStyle: isLocked ? 'none' : undefined,
 				outline: 'none',
 				backdropFilter: isLocked ? 'none' : undefined,
 				WebkitBackdropFilter: isLocked ? 'none' : undefined,
@@ -229,7 +228,7 @@ export const DesktopLyricsApp: React.FC = () => {
 				<div className="absolute top-2 px-3.5 py-1.5 rounded-full bg-black/85 border border-white/20 text-white/95 text-xs flex items-center gap-2 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 pointer-events-none z-50">
 					<Lock className="w-3.5 h-3.5 text-[#00AEEC]" />
 					<span>
-						已开启鼠标穿透 · 按 <strong>Ctrl+Alt+L</strong> 或右键底栏歌词图标解锁
+						已开启鼠标穿透 · 按 <strong>Ctrl+Alt+L</strong> 或<strong>双击底栏歌词图标</strong>解锁
 					</span>
 				</div>
 			)}

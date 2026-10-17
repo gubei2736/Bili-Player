@@ -4,7 +4,7 @@ pub mod shortcuts;
 pub mod stream_proxy;
 pub mod window_ext;
 
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager};
 
@@ -69,12 +69,49 @@ pub fn run() {
             let default_shortcuts = shortcuts::get_default_shortcuts();
             shortcuts::register_all_shortcuts(app.handle(), &default_shortcuts);
 
-            // 3. Setup System Tray Menu
-            let toggle_main = MenuItem::with_id(app, "toggle_main", "显示/隐藏主窗口", true, None::<&str>)?;
-            let toggle_lyrics = MenuItem::with_id(app, "toggle_lyrics", "显示/隐藏桌面歌词", true, None::<&str>)?;
+            // Enable dark mode for all Win32 menus and system controls
+            #[cfg(target_os = "windows")]
+            window_ext::enable_windows_dark_mode();
+
+            // Setup desktop lyrics window effects and remove borders
+            if let Some(lyrics_win) = app.get_webview_window("lyrics") {
+                window_ext::setup_lyrics_window(&lyrics_win);
+            }
+
+            // 3. Setup System Tray Menu with unified Dark Mode aesthetics
+            let open_main = MenuItem::with_id(app, "open_main", "打开主界面", true, None::<&str>)?;
+            let open_settings = MenuItem::with_id(app, "open_settings", "偏好设置...", true, None::<&str>)?;
+
+            let sep1 = PredefinedMenuItem::separator(app)?;
+
+            let play_pause = MenuItem::with_id(app, "play_pause", "播放 / 暂停 (Space)", true, None::<&str>)?;
+            let prev_track = MenuItem::with_id(app, "prev_track", "上一首 (Ctrl+Left)", true, None::<&str>)?;
+            let next_track = MenuItem::with_id(app, "next_track", "下一首 (Ctrl+Right)", true, None::<&str>)?;
+
+            let sep2 = PredefinedMenuItem::separator(app)?;
+
+            let toggle_lyrics = MenuItem::with_id(app, "toggle_lyrics", "显示/隐藏桌面歌词 (Ctrl+Alt+D)", true, None::<&str>)?;
             let toggle_lock = MenuItem::with_id(app, "toggle_lock", "锁定/解锁桌面歌词 (Ctrl+Alt+L)", true, None::<&str>)?;
+
+            let sep3 = PredefinedMenuItem::separator(app)?;
+
             let quit_item = MenuItem::with_id(app, "quit", "退出 Bili Player", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle_main, &toggle_lyrics, &toggle_lock, &quit_item])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &open_main,
+                    &open_settings,
+                    &sep1,
+                    &play_pause,
+                    &prev_track,
+                    &next_track,
+                    &sep2,
+                    &toggle_lyrics,
+                    &toggle_lock,
+                    &sep3,
+                    &quit_item,
+                ],
+            )?;
 
             if let Some(icon) = app.default_window_icon() {
                 let _tray = TrayIconBuilder::new()
@@ -84,17 +121,27 @@ pub fn run() {
                         "quit" => {
                             app.exit(0);
                         }
-                        "toggle_main" => {
+                        "open_main" => {
                             if let Some(win) = app.get_webview_window("main") {
-                                if let Ok(visible) = win.is_visible() {
-                                    if visible {
-                                        let _ = win.hide();
-                                    } else {
-                                        let _ = win.show();
-                                        let _ = win.set_focus();
-                                    }
-                                }
+                                let _ = win.show();
+                                let _ = win.set_focus();
                             }
+                        }
+                        "open_settings" => {
+                            if let Some(win) = app.get_webview_window("main") {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                                let _ = win.emit("navigate-to-tab", "settings");
+                            }
+                        }
+                        "play_pause" => {
+                            let _ = app.emit("global-shortcut-event", "play_pause");
+                        }
+                        "prev_track" => {
+                            let _ = app.emit("global-shortcut-event", "prev_track");
+                        }
+                        "next_track" => {
+                            let _ = app.emit("global-shortcut-event", "next_track");
                         }
                         "toggle_lyrics" => {
                             let _ = window_ext::toggle_lyrics_window(app.clone());

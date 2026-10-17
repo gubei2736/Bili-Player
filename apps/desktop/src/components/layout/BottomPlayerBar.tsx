@@ -423,6 +423,8 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		else setPlayMode('sequential')
 	}
 
+	const desktopLyricsClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
 	const handleToggleDesktopLyrics = async () => {
 		if (onToggleLyricsWindow) {
 			onToggleLyricsWindow()
@@ -436,8 +438,39 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		}
 	}
 
+	const handleClickDesktopLyrics = () => {
+		if (desktopLyricsClickTimerRef.current) {
+			clearTimeout(desktopLyricsClickTimerRef.current)
+			desktopLyricsClickTimerRef.current = null
+			return
+		}
+		desktopLyricsClickTimerRef.current = setTimeout(() => {
+			desktopLyricsClickTimerRef.current = null
+			handleToggleDesktopLyrics()
+		}, 260)
+	}
+
+	const handleDoubleClickDesktopLyrics = async (e: React.MouseEvent) => {
+		e.preventDefault()
+		e.stopPropagation()
+		if (desktopLyricsClickTimerRef.current) {
+			clearTimeout(desktopLyricsClickTimerRef.current)
+			desktopLyricsClickTimerRef.current = null
+		}
+		try {
+			const locked = await invoke<boolean>('toggle_lyrics_lock')
+			setLyricsLocked(locked)
+		} catch (err) {
+			console.warn('Failed to toggle lyrics lock on double click:', err)
+		}
+	}
+
 	const handleRightClickDesktopLyrics = async (e: React.MouseEvent) => {
 		e.preventDefault()
+		if (desktopLyricsClickTimerRef.current) {
+			clearTimeout(desktopLyricsClickTimerRef.current)
+			desktopLyricsClickTimerRef.current = null
+		}
 		try {
 			const locked = await invoke<boolean>('toggle_lyrics_lock')
 			setLyricsLocked(locked)
@@ -857,14 +890,15 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 					{/* Desktop Floating Lyrics Window Toggle */}
 					<button
-						onClick={handleToggleDesktopLyrics}
+						onClick={handleClickDesktopLyrics}
+						onDoubleClick={handleDoubleClickDesktopLyrics}
 						onContextMenu={handleRightClickDesktopLyrics}
 						title={
 							lyricsLocked
-								? '桌面歌词已锁定穿透 · 左键显示/隐藏，右键点击解锁 (Ctrl+Alt+L)'
+								? '桌面歌词已锁定穿透 · 双击或右键点击解锁 (Ctrl+Alt+L)'
 								: lyricsVisible
-								? '桌面歌词已开启 · 左键隐藏 (Ctrl+Alt+D)，右键锁定穿透 (Ctrl+Alt+L)'
-								: '桌面歌词 · 左键开启 (Ctrl+Alt+D)，右键锁定穿透 (Ctrl+Alt+L)'
+								? '桌面歌词已开启 · 单击隐藏，双击或右键锁定'
+								: '桌面歌词 · 单击开启'
 						}
 						className={`relative p-1.5 rounded-lg transition-all ${
 							lyricsVisible
