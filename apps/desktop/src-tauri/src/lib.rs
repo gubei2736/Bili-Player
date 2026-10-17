@@ -8,6 +8,11 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager};
 
+#[tauri::command]
+pub fn is_debug_mode() -> bool {
+    cfg!(debug_assertions)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -29,6 +34,7 @@ pub fn run() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            is_debug_mode,
             window_ext::exit_app,
             window_ext::set_ignore_cursor_events,
             window_ext::toggle_lyrics_window,

@@ -3,7 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
-import { getStoredLyricOffset, getAutoMatchLyricsEnabled } from '../../services/lyricService'
+import {
+	getStoredLyricOffset,
+	getAutoMatchLyricsEnabled,
+	getLyricFontSizes,
+	type LyricFontSizes,
+} from '../../services/lyricService'
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
 import { useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
 import { getQualityBadgeInfo } from '../../audio/audioSettings'
@@ -35,9 +40,20 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const [currentTime, setCurrentTime] = useState(() => desktopAudioEngine.getCurrentTime())
 	const [lyricOffsetSec, setLyricOffsetSec] = useState(0)
 	const [autoMatchEnabled, setAutoMatchEnabled] = useState(() => getAutoMatchLyricsEnabled())
+	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
 	const lyricsContainerRef = useRef<HTMLDivElement | null>(null)
 	const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 	const haloCanvasRef = useRef<HTMLCanvasElement | null>(null)
+
+	useEffect(() => {
+		const handleFontSizeChange = (e: any) => {
+			setFontSizes(e.detail ?? getLyricFontSizes())
+		}
+		window.addEventListener('bbplayer:lyric-font-size-change', handleFontSizeChange)
+		return () => {
+			window.removeEventListener('bbplayer:lyric-font-size-change', handleFontSizeChange)
+		}
+	}, [])
 
 	useEffect(() => {
 		const handleAutoMatchChange = (e: any) => {
@@ -364,7 +380,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											}}
 										>
 											{/* Main line with syllable highlight */}
-											<p className="text-xl md:text-2xl font-bold tracking-wide leading-relaxed">
+											<p
+												className="font-bold tracking-wide leading-relaxed"
+												style={{ fontSize: `${fontSizes.main}px` }}
+											>
 												{line.isDynamic && line.spans && line.spans.length > 0 ? (
 													line.spans.map((span, sIdx) => {
 														let fillPct = 0
@@ -408,14 +427,20 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 
 											{/* Romaji syllable translation */}
 											{line.romaji && (
-												<p className="text-xs text-white/50 font-mono mt-1">
+												<p
+													className="text-white/50 font-mono mt-1"
+													style={{ fontSize: `${fontSizes.roma}px` }}
+												>
 													{line.romaji}
 												</p>
 											)}
 
 											{/* Bilingual translated line */}
 											{line.translation && (
-												<p className="text-sm text-sky-200/75 mt-1 font-medium">
+												<p
+													className="text-sky-200/75 mt-1 font-medium"
+													style={{ fontSize: `${fontSizes.trans}px` }}
+												>
 													{line.translation}
 												</p>
 											)}

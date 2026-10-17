@@ -9,6 +9,7 @@ import {
 	Loader2,
 	Save,
 	Languages,
+	Type,
 } from 'lucide-react'
 import type { Track } from '@bbplayer/shared-core'
 import {
@@ -24,8 +25,14 @@ import {
 	getPreferredLyricSource,
 	setPreferredLyricSource,
 	cleanTrackTitle,
+	getLyricFontSizes,
+	setLyricFontSizes,
+	getStoredTrackSearchCache,
+	setStoredTrackSearchCache,
+	markTrackAdoptedCandidate,
 	type LyricSearchCandidate,
 	type PreferredLyricSource,
+	type LyricFontSizes,
 } from '../../services/lyricService'
 
 export interface LyricsSettingsModalProps {
@@ -41,13 +48,16 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	track,
 	onLyricsUpdated,
 }) => {
-	const [activeTab, setActiveTab] = useState<'search' | 'custom' | 'offset'>('search')
+	const [activeTab, setActiveTab] = useState<'search' | 'custom' | 'offset' | 'typography'>('search')
 	const [searchKeyword, setSearchKeyword] = useState('')
 	const [candidates, setCandidates] = useState<LyricSearchCandidate[]>([])
 	const [isSearching, setIsSearching] = useState(false)
 	const [customText, setCustomText] = useState('')
 	const [offsetSec, setOffsetSec] = useState(0)
 	const [loadingCandidateId, setLoadingCandidateId] = useState<string | number | null>(null)
+	const [adoptedCandidateId, setAdoptedCandidateId] = useState<string | number | null>(null)
+	const [adoptedSource, setAdoptedSource] = useState<string | null>(null)
+	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
 	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
@@ -61,6 +71,16 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		try {
 			const results = await lyricService.searchCandidates(kw.trim(), filter)
 			setCandidates(results)
+			// 缓存搜索结果
+			if (track) {
+				setStoredTrackSearchCache(track.uniqueKey, {
+					candidates: results,
+					adoptedId: adoptedCandidateId,
+					adoptedSource: adoptedSource ?? undefined,
+					searchKeyword: kw.trim(),
+					updatedAt: Date.now(),
+				})
+			}
 			// 立即在后台并行预加载候选歌词原始数据，用户点击时直接命中内存，瞬间完成采用！
 			lyricService.prefetchCandidates(results)
 		} catch (err) {
@@ -100,15 +120,31 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 
 			const currentPreferred = getPreferredLyricSource()
 			setSourceFilter(currentPreferred)
-			setSearchKeyword(kw)
 			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
-			setCandidates([])
-			setIsSearching(false)
-			setHasSearched(false)
+			setFontSizes(getLyricFontSizes())
 
-			if (kw) {
-				handleSearch(kw, currentPreferred)
+			// 检查是否已有上次搜索并采用过的记忆缓存！
+			const searchCache = getStoredTrackSearchCache(track.uniqueKey)
+			if (searchCache && searchCache.candidates && searchCache.candidates.length > 0) {
+				setSearchKeyword(searchCache.searchKeyword || kw)
+				setCandidates(searchCache.candidates)
+				setAdoptedCandidateId(searchCache.adoptedId ?? null)
+				setAdoptedSource(searchCache.adoptedSource ?? null)
+				setHasSearched(true)
+				setIsSearching(false)
+				lyricService.prefetchCandidates(searchCache.candidates)
+			} else {
+				setSearchKeyword(kw)
+				setAdoptedCandidateId(null)
+				setAdoptedSource(null)
+				setCandidates([])
+				setIsSearching(false)
+				setHasSearched(false)
+
+				if (kw) {
+					handleSearch(kw, currentPreferred)
+				}
 			}
 		}
 	}, [isOpen, track?.uniqueKey])
@@ -129,6 +165,9 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 			if (spl) {
 				setStoredCustomLyric(track.uniqueKey, spl)
 				setCustomText(spl)
+				markTrackAdoptedCandidate(track.uniqueKey, candidate, candidates, searchKeyword)
+				setAdoptedCandidateId(candidate.id)
+				setAdoptedSource(candidate.source)
 				onLyricsUpdated?.(spl)
 				setSuccessMsg(`已成功应用【${candidate.title}】的歌词！`)
 				setTimeout(() => setSuccessMsg(null), 2000)
@@ -245,36 +284,46 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 					</div>
 
 					{/* Tabs */}
-					<div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/5">
+					<div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-white/5 border border-white/5">
 						<button
 							onClick={() => setActiveTab('search')}
-							className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+							className={`py-1.5 text-xs font-semibold rounded-lg transition-all text-center truncate ${
 								activeTab === 'search'
 									? 'bg-primary text-white shadow'
 									: 'text-muted-foreground hover:text-foreground'
 							}`}
 						>
-							智能搜索匹配
+							智能搜索
 						</button>
 						<button
 							onClick={() => setActiveTab('custom')}
-							className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+							className={`py-1.5 text-xs font-semibold rounded-lg transition-all text-center truncate ${
 								activeTab === 'custom'
 									? 'bg-primary text-white shadow'
 									: 'text-muted-foreground hover:text-foreground'
 							}`}
 						>
-							粘贴 LRC/SPL
+							粘贴歌词
 						</button>
 						<button
 							onClick={() => setActiveTab('offset')}
-							className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+							className={`py-1.5 text-xs font-semibold rounded-lg transition-all text-center truncate ${
 								activeTab === 'offset'
 									? 'bg-primary text-white shadow'
 									: 'text-muted-foreground hover:text-foreground'
 							}`}
 						>
-							时间微调 ({offsetSec >= 0 ? `+${offsetSec}` : offsetSec}s)
+							时间微调
+						</button>
+						<button
+							onClick={() => setActiveTab('typography')}
+							className={`py-1.5 text-xs font-semibold rounded-lg transition-all text-center truncate ${
+								activeTab === 'typography'
+									? 'bg-primary text-white shadow'
+									: 'text-muted-foreground hover:text-foreground'
+							}`}
+						>
+							字号大小
 						</button>
 					</div>
 
@@ -397,43 +446,66 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 										输入关键词后点击“搜索”或回车检索歌词库，也可点击上方“粘贴 LRC/SPL”自定义
 									</div>
 								) : (
-									candidates.map((item) => (
-										<div
-											key={`${item.source}_${item.id}`}
-											className="p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 flex items-center justify-between gap-3 text-xs transition-colors group"
-										>
-											<div className="overflow-hidden space-y-1 flex-1">
-												<div className="flex items-center gap-2">
-													<span className="font-semibold text-foreground truncate max-w-[220px]" title={item.title}>
-														{item.title}
-													</span>
-													<span
-														className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
-															item.source === 'netease'
-																? 'bg-red-500/20 text-red-300 border border-red-500/30'
-																: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-														}`}
-													>
-														{item.source === 'netease' ? '网易云音乐' : 'QQ 音乐'}
-													</span>
-												</div>
-												<p className="text-[11px] text-muted-foreground truncate">
-													歌手: {item.artist || '未知'}
-												</p>
-											</div>
+									candidates.map((item) => {
+										const isAdopted =
+											adoptedCandidateId !== null &&
+											String(item.id) === String(adoptedCandidateId) &&
+											(!adoptedSource || item.source === adoptedSource)
 
-											<button
-												onClick={() => handleApplyCandidate(item)}
-												disabled={loadingCandidateId === item.id}
-												className="px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0"
+										return (
+											<div
+												key={`${item.source}_${item.id}`}
+												className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-xs transition-all ${
+													isAdopted
+														? 'border-primary/60 bg-primary/[0.08] shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] ring-1 ring-primary/40'
+														: 'border-white/5 bg-white/[0.02] hover:bg-white/5'
+												}`}
 											>
-												{loadingCandidateId === item.id && (
-													<Loader2 className="w-3 h-3 animate-spin" />
-												)}
-												<span>采用</span>
-											</button>
-										</div>
-									))
+												<div className="overflow-hidden space-y-1 flex-1">
+													<div className="flex items-center gap-2">
+														<span className="font-semibold text-foreground truncate max-w-[200px]" title={item.title}>
+															{item.title}
+														</span>
+														<span
+															className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+																item.source === 'netease'
+																	? 'bg-red-500/20 text-red-300 border border-red-500/30'
+																	: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+															}`}
+														>
+															{item.source === 'netease' ? '网易云音乐' : 'QQ 音乐'}
+														</span>
+														{isAdopted && (
+															<span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/25 border border-primary/40 text-primary font-bold flex items-center gap-1 shrink-0">
+																<Check className="w-3 h-3 stroke-[3]" />
+																已采用
+															</span>
+														)}
+													</div>
+													<p className="text-[11px] text-muted-foreground truncate">
+														歌手: {item.artist || '未知'}
+													</p>
+												</div>
+
+												<button
+													onClick={() => handleApplyCandidate(item)}
+													disabled={loadingCandidateId === item.id}
+													className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 ${
+														isAdopted
+															? 'bg-primary text-white shadow-sm hover:bg-primary/90'
+															: 'bg-primary/20 hover:bg-primary/30 text-primary'
+													}`}
+												>
+													{loadingCandidateId === item.id ? (
+														<Loader2 className="w-3.5 h-3.5 animate-spin" />
+													) : isAdopted ? (
+														<Check className="w-3.5 h-3.5" />
+													) : null}
+													<span>{isAdopted ? '重新应用' : '采用'}</span>
+												</button>
+											</div>
+										)
+									})
 								)}
 							</div>
 						</div>
@@ -512,6 +584,143 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								>
 									+0.5s
 								</button>
+							</div>
+						</div>
+					)}
+
+					{/* Tab 4: Typography / 字号大小调节 */}
+					{activeTab === 'typography' && (
+						<div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-1 select-none">
+							<p className="text-xs text-muted-foreground leading-relaxed">
+								独立微调全屏沉浸歌词与桌面歌词各行文本的字体尺寸：
+							</p>
+
+							{/* Sliders Card */}
+							<div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-4 text-xs">
+								{/* 1. 原文歌词大小 */}
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<span className="font-semibold text-foreground">歌词正文字号 (原文)</span>
+										<span className="font-mono text-primary font-bold">{fontSizes.main} px</span>
+									</div>
+									<input
+										type="range"
+										min="16"
+										max="40"
+										step="1"
+										value={fontSizes.main}
+										onChange={(e) => {
+											const val = parseInt(e.target.value, 10)
+											setFontSizes((prev) => ({ ...prev, main: val }))
+											setLyricFontSizes({ main: val })
+										}}
+										className="w-full accent-primary cursor-pointer"
+									/>
+									<div className="flex justify-between text-[10px] text-muted-foreground/60 font-mono">
+										<span>16px (紧凑)</span>
+										<span>24px (标准)</span>
+										<span>40px (特大)</span>
+									</div>
+								</div>
+
+								{/* 2. 歌词翻译大小 */}
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<span className="font-semibold text-foreground">翻译歌词字号</span>
+										<span className="font-mono text-sky-400 font-bold">{fontSizes.trans} px</span>
+									</div>
+									<input
+										type="range"
+										min="12"
+										max="28"
+										step="1"
+										value={fontSizes.trans}
+										onChange={(e) => {
+											const val = parseInt(e.target.value, 10)
+											setFontSizes((prev) => ({ ...prev, trans: val }))
+											setLyricFontSizes({ trans: val })
+										}}
+										className="w-full accent-sky-400 cursor-pointer"
+									/>
+									<div className="flex justify-between text-[10px] text-muted-foreground/60 font-mono">
+										<span>12px (精细)</span>
+										<span>15px (标准)</span>
+										<span>28px (清晰)</span>
+									</div>
+								</div>
+
+								{/* 3. 罗马音注音大小 */}
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<span className="font-semibold text-foreground">罗马音 / 注音字号</span>
+										<span className="font-mono text-purple-400 font-bold">{fontSizes.roma} px</span>
+									</div>
+									<input
+										type="range"
+										min="10"
+										max="24"
+										step="1"
+										value={fontSizes.roma}
+										onChange={(e) => {
+											const val = parseInt(e.target.value, 10)
+											setFontSizes((prev) => ({ ...prev, roma: val }))
+											setLyricFontSizes({ roma: val })
+										}}
+										className="w-full accent-purple-400 cursor-pointer"
+									/>
+									<div className="flex justify-between text-[10px] text-muted-foreground/60 font-mono">
+										<span>10px (微型)</span>
+										<span>13px (标准)</span>
+										<span>24px (大号)</span>
+									</div>
+								</div>
+
+								{/* Reset button */}
+								<div className="pt-1 flex justify-end">
+									<button
+										onClick={() => {
+											const def = { main: 24, trans: 15, roma: 13 }
+											setFontSizes(def)
+											setLyricFontSizes(def)
+										}}
+										className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium flex items-center gap-1.5 transition-colors"
+									>
+										<RotateCcw className="w-3 h-3" />
+										<span>恢复默认字号</span>
+									</button>
+								</div>
+							</div>
+
+							{/* Live Preview Card */}
+							<div className="p-4 rounded-xl bg-black/40 border border-white/10 space-y-3">
+								<div className="flex items-center justify-between text-[11px] text-muted-foreground pb-2 border-b border-white/5">
+									<span className="font-medium">实时效果预览</span>
+									<span className="text-[10px] text-primary">沉浸全屏与桌面歌词同步生效</span>
+								</div>
+								<div className="pt-2 text-center space-y-1.5">
+									{includeRomaji && (
+										<p
+											className="font-mono text-white/55 tracking-wider truncate"
+											style={{ fontSize: `${fontSizes.roma}px` }}
+										>
+											kimi to mita yuki no hana ga
+										</p>
+									)}
+									<p
+										className="font-bold text-primary tracking-wide drop-shadow-[0_2px_12px_rgba(var(--primary-rgb),0.5)] truncate"
+										style={{ fontSize: `${fontSizes.main}px` }}
+									>
+										君と見た雪の華が
+									</p>
+									{includeTranslation && (
+										<p
+											className="font-medium text-sky-200/85 truncate"
+											style={{ fontSize: `${fontSizes.trans}px` }}
+										>
+											与你一同看过的雪之花
+										</p>
+									)}
+								</div>
 							</div>
 						</div>
 					)}

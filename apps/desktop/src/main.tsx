@@ -6,15 +6,31 @@ import { setDefaultHttpClient } from '@bbplayer/shared-core'
 import { DesktopTauriHttpClient } from './api/desktopHttpClient'
 import './styles/globals.css'
 
+import { invoke } from '@tauri-apps/api/core'
+
 // Route all API requests through Rust native HTTP engine (CORS & Set-Cookie safe)
 setDefaultHttpClient(new DesktopTauriHttpClient())
 
-// 生产模式下禁用右键菜单，开发/调试模式下允许使用审查元素
-if ((import.meta as any).env?.PROD) {
-	document.addEventListener('contextmenu', (e) => {
-		e.preventDefault()
+// 检查是否为 Debug 构建模式
+invoke<boolean>('is_debug_mode')
+	.then((isDebug) => {
+		if (isDebug) {
+			document.body.classList.add('is-debug-mode')
+			document.documentElement.classList.add('is-debug-mode')
+		} else {
+			// 仅在真正的 Release 模式下禁用默认右键菜单
+			document.addEventListener('contextmenu', (e) => {
+				e.preventDefault()
+			})
+		}
 	})
-}
+	.catch(() => {
+		if (!(import.meta as any).env?.DEV) {
+			document.addEventListener('contextmenu', (e) => {
+				e.preventDefault()
+			})
+		}
+	})
 
 window.addEventListener('error', (e) => {
 	console.error('[Global Window Error]:', e.error || e.message)

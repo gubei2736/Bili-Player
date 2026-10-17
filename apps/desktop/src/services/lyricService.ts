@@ -167,6 +167,94 @@ export function setStoredCustomLyric(trackKey: string, splContent: string): void
 	} catch {}
 }
 
+// -------------------------------------------------------------
+// 歌词各语言层级字号管理 (原文、翻译、罗马音)
+// -------------------------------------------------------------
+const LYRIC_FONT_SIZE_MAIN_KEY = 'bbplayer_lyric_font_size_main'
+const LYRIC_FONT_SIZE_TRANS_KEY = 'bbplayer_lyric_font_size_trans'
+const LYRIC_FONT_SIZE_ROMA_KEY = 'bbplayer_lyric_font_size_roma'
+
+export interface LyricFontSizes {
+	main: number // 原文歌词大小 (默认 24px)
+	trans: number // 翻译歌词大小 (默认 15px)
+	roma: number // 罗马音大小 (默认 13px)
+}
+
+export function getLyricFontSizes(): LyricFontSizes {
+	try {
+		const main = parseInt(localStorage.getItem(LYRIC_FONT_SIZE_MAIN_KEY) || '24', 10)
+		const trans = parseInt(localStorage.getItem(LYRIC_FONT_SIZE_TRANS_KEY) || '15', 10)
+		const roma = parseInt(localStorage.getItem(LYRIC_FONT_SIZE_ROMA_KEY) || '13', 10)
+		return {
+			main: isNaN(main) || main < 12 ? 24 : main,
+			trans: isNaN(trans) || trans < 10 ? 15 : trans,
+			roma: isNaN(roma) || roma < 9 ? 13 : roma,
+		}
+	} catch {
+		return { main: 24, trans: 15, roma: 13 }
+	}
+}
+
+export function setLyricFontSizes(sizes: Partial<LyricFontSizes>): void {
+	try {
+		if (sizes.main !== undefined) localStorage.setItem(LYRIC_FONT_SIZE_MAIN_KEY, String(sizes.main))
+		if (sizes.trans !== undefined) localStorage.setItem(LYRIC_FONT_SIZE_TRANS_KEY, String(sizes.trans))
+		if (sizes.roma !== undefined) localStorage.setItem(LYRIC_FONT_SIZE_ROMA_KEY, String(sizes.roma))
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:lyric-font-size-change', {
+				detail: getLyricFontSizes(),
+			}),
+		)
+	} catch {}
+}
+
+// -------------------------------------------------------------
+// 歌曲专属搜索候选与已采用歌词记忆缓存
+// -------------------------------------------------------------
+export interface TrackSearchCache {
+	candidates: LyricSearchCandidate[]
+	adoptedId?: string | number | null
+	adoptedSource?: string
+	searchKeyword?: string
+	updatedAt: number
+}
+
+const LYRIC_TRACK_CACHE_PREFIX = 'bbplayer_track_lyric_cache_'
+
+export function getStoredTrackSearchCache(trackKey: string): TrackSearchCache | null {
+	try {
+		const raw = localStorage.getItem(LYRIC_TRACK_CACHE_PREFIX + trackKey)
+		if (!raw) return null
+		return JSON.parse(raw) as TrackSearchCache
+	} catch {
+		return null
+	}
+}
+
+export function setStoredTrackSearchCache(trackKey: string, cache: TrackSearchCache): void {
+	try {
+		localStorage.setItem(LYRIC_TRACK_CACHE_PREFIX + trackKey, JSON.stringify(cache))
+	} catch {}
+}
+
+export function markTrackAdoptedCandidate(
+	trackKey: string,
+	candidate: LyricSearchCandidate,
+	allCandidates: LyricSearchCandidate[],
+	keyword?: string,
+): void {
+	try {
+		const cache: TrackSearchCache = {
+			candidates: allCandidates,
+			adoptedId: candidate.id,
+			adoptedSource: candidate.source,
+			searchKeyword: keyword,
+			updatedAt: Date.now(),
+		}
+		setStoredTrackSearchCache(trackKey, cache)
+	} catch {}
+}
+
 function parseSecondaryLrcMap(lrcStr?: string): Map<number, string> {
 	const map = new Map<number, string>()
 	if (!lrcStr) return map

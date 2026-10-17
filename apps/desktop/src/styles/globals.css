@@ -70,6 +70,17 @@ body {
 	overflow: hidden;
 }
 
+/* Debug 模式下解除所有 select-none 限制，允许对任意界面文本进行鼠标拖拽选中与复制 (Ctrl+C / 右键复制) */
+body.is-debug-mode,
+body.is-debug-mode *,
+html.is-debug-mode,
+html.is-debug-mode *,
+.is-debug-mode,
+.is-debug-mode * {
+	user-select: text !important;
+	-webkit-user-select: text !important;
+}
+
 /* 高阶流光毛玻璃表面 (轻度清透磨砂，保留自定义背景清晰度) */
 .mica-surface {
 	background-color: rgba(11, 14, 22, 0.65);

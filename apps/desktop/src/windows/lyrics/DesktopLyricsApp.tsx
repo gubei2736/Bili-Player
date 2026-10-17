@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { emit, listen } from '@tauri-apps/api/event'
 import { parseSpl, type SplLyricData, type LyricLine } from '@bbplayer/splash'
+import { getLyricFontSizes } from '../../services/lyricService'
 
 export type LyricsSyncEvent =
 	| {
@@ -312,112 +313,122 @@ export const DesktopLyricsApp: React.FC = () => {
 			)}
 
 			{/* Center: Syllable Lyric Text & Multi-language Lines */}
-			<div
-				data-tauri-drag-region={!isLocked ? true : undefined}
-				className={`text-center space-y-1 w-full max-w-4xl px-4 flex flex-col items-center justify-center ${
-					isLocked ? 'pointer-events-none' : 'cursor-move pt-3'
-				}`}
-			>
-				{activeLine ? (
-					<>
-						{/* Romaji subline if available */}
-						{activeLine.romaji && (
-							<p
-								className="text-[12px] md:text-[13px] text-white/90 font-mono tracking-wider truncate max-w-full pointer-events-none"
-								style={{
-									filter:
-										'drop-shadow(0 1px 2px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.9))',
-								}}
-							>
-								{activeLine.romaji}
-							</p>
-						)}
+			{(() => {
+				const baseFontSizes = getLyricFontSizes()
+				const romajiFontSize = Math.max(10, Math.round(fontSize * (baseFontSizes.roma / baseFontSizes.main)))
+				const transFontSize = Math.max(11, Math.round(fontSize * (baseFontSizes.trans / baseFontSizes.main)))
 
-						{/* Main lyric line with 60fps/144fps rAF syllable karaoke highlight */}
-						<p
-							className="font-black tracking-wide leading-snug max-w-full line-clamp-2 px-2 pointer-events-none"
-							style={{
-								fontSize: `${fontSize}px`,
-								filter:
-									'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,1))',
-							}}
-						>
-							{activeLine.isDynamic &&
-							activeLine.spans &&
-							activeLine.spans.length > 0 ? (
-								activeLine.spans.map((span, idx) => {
-									let fillPct = 0
-									if (displayTimeMs >= span.endTime) {
-										fillPct = 100
-									} else if (displayTimeMs > span.startTime) {
-										fillPct = Math.min(
-											100,
-											((displayTimeMs - span.startTime) /
-												Math.max(1, span.duration || span.endTime - span.startTime)) *
-												100,
-										)
-									}
+				return (
+					<div
+						data-tauri-drag-region={!isLocked ? true : undefined}
+						className={`text-center space-y-1 w-full max-w-4xl px-4 flex flex-col items-center justify-center ${
+							isLocked ? 'pointer-events-none' : 'cursor-move pt-3'
+						}`}
+					>
+						{activeLine ? (
+							<>
+								{/* Romaji subline if available */}
+								{activeLine.romaji && (
+									<p
+										className="text-white/90 font-mono tracking-wider truncate max-w-full pointer-events-none"
+										style={{
+											fontSize: `${romajiFontSize}px`,
+											filter:
+												'drop-shadow(0 1px 2px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.9))',
+										}}
+									>
+										{activeLine.romaji}
+									</p>
+								)}
 
-									return (
-										<span
-											key={idx}
-											className="inline-block"
-											style={{
-												background: `linear-gradient(to right, ${primaryColor} ${fillPct}%, rgba(255, 255, 255, 0.92) ${fillPct}%)`,
-												WebkitBackgroundClip: 'text',
-												WebkitTextFillColor: 'transparent',
-											}}
-										>
-											{span.text}
-										</span>
-									)
-								})
-							) : (
-								<span
-									style={{ color: primaryColor }}
-									className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.8)]"
+								{/* Main lyric line with 60fps/144fps rAF syllable karaoke highlight */}
+								<p
+									className="font-black tracking-wide leading-snug max-w-full line-clamp-2 px-2 pointer-events-none"
+									style={{
+										fontSize: `${fontSize}px`,
+										filter:
+											'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,1))',
+									}}
 								>
-									{activeLine.content}
-								</span>
-							)}
-						</p>
+									{activeLine.isDynamic &&
+									activeLine.spans &&
+									activeLine.spans.length > 0 ? (
+										activeLine.spans.map((span, idx) => {
+											let fillPct = 0
+											if (displayTimeMs >= span.endTime) {
+												fillPct = 100
+											} else if (displayTimeMs > span.startTime) {
+												fillPct = Math.min(
+													100,
+													((displayTimeMs - span.startTime) /
+														Math.max(1, span.duration || span.endTime - span.startTime)) *
+														100,
+												)
+											}
 
-						{/* Chinese Translation line */}
-						{activeLine.translation && (
-							<p
-								className="text-xs md:text-sm text-sky-200 font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
-								style={{
-									filter:
-										'drop-shadow(0 1px 3px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.85))',
-								}}
-							>
-								{activeLine.translation}
-							</p>
+											return (
+												<span
+													key={idx}
+													className="inline-block"
+													style={{
+														background: `linear-gradient(to right, ${primaryColor} ${fillPct}%, rgba(255, 255, 255, 0.92) ${fillPct}%)`,
+														WebkitBackgroundClip: 'text',
+														WebkitTextFillColor: 'transparent',
+													}}
+												>
+													{span.text}
+												</span>
+											)
+										})
+									) : (
+										<span
+											style={{ color: primaryColor }}
+											className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.8)]"
+										>
+											{activeLine.content}
+										</span>
+									)}
+								</p>
+
+								{/* Chinese Translation line */}
+								{activeLine.translation && (
+									<p
+										className="text-sky-200 font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
+										style={{
+											fontSize: `${transFontSize}px`,
+											filter:
+												'drop-shadow(0 1px 3px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.85))',
+										}}
+									>
+										{activeLine.translation}
+									</p>
+								)}
+							</>
+						) : (
+							<div className="space-y-1 pointer-events-none">
+								<p
+									className="font-bold text-white tracking-wide"
+									style={{
+										fontSize: `${fontSize}px`,
+										filter:
+											'drop-shadow(0 2px 6px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.85))',
+									}}
+								>
+									{title}
+								</p>
+								<p
+									className="text-xs text-white/80 font-medium tracking-wider"
+									style={{
+										filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))',
+									}}
+								>
+									{artist}
+								</p>
+							</div>
 						)}
-					</>
-				) : (
-					<div className="space-y-1 pointer-events-none">
-						<p
-							className="font-bold text-white tracking-wide"
-							style={{
-								fontSize: `${fontSize}px`,
-								filter:
-									'drop-shadow(0 2px 6px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.85))',
-							}}
-						>
-							{title}
-						</p>
-						<p
-							className="text-xs text-white/80 font-medium tracking-wider"
-							style={{
-								filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))',
-							}}
-						>
-							{artist}
-						</p>
 					</div>
-				)}
-			</div>
+				)
+			})()}
 		</div>
 	)
 }
