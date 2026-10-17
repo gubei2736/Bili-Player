@@ -103,9 +103,9 @@ Bili Player 是一款 **100% 本地优先、零数据上报、零遥测（No Tel
 
 ---
 
-## 致敬与感谢
+## 感谢
 
-本项目的设计与实现离不开开源社区与前辈项目的启发，特别感谢：
+本项目的设计与实现离不开开源社区，感谢：
 - [BBPlayer](https://github.com/bbplayer-app/BBPlayer)
 - [Bilibili](https://www.bilibili.com/)
 
