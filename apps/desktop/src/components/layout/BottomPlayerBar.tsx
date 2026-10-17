@@ -766,7 +766,72 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					</div>
 
 					{/* Playback Controls (Line 2) - Roomy, centered, 100% full circle */}
-					<div className="flex items-center justify-center gap-4 sm:gap-5">
+					<div className="flex items-center justify-center gap-3 sm:gap-4">
+						{/* Open Video Webpage in Default Browser */}
+						<button
+							onClick={() => {
+								if (!currentTrack) return
+								const bvid =
+									(currentTrack as any).bilibiliMetadata?.bvid ||
+									(currentTrack as any).bvid
+								if (bvid) {
+									const pageIndex = (currentTrack as any).bilibiliMetadata?.pageIndex
+									const url = `https://www.bilibili.com/video/${bvid}${pageIndex && pageIndex > 1 ? `?p=${pageIndex}` : ''}`
+									openExternalUrl(url)
+								}
+							}}
+							disabled={
+								!currentTrack ||
+								!((currentTrack as any).bilibiliMetadata?.bvid || (currentTrack as any).bvid)
+							}
+							title={
+								((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
+									? '在浏览器打开 B 站视频原网页'
+									: '当前歌曲无在线视频网页'
+							}
+							className={`p-1.5 rounded-full transition-colors ${
+								((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
+									? 'text-muted-foreground hover:text-[#00AEEC] hover:bg-white/10'
+									: 'text-muted-foreground/30 cursor-not-allowed'
+							}`}
+						>
+							<Globe className="w-4 h-4" />
+						</button>
+
+						{/* Add To Custom Playlist */}
+						<button
+							onClick={() => currentTrack && setIsAddToPlaylistOpen(true)}
+							disabled={!currentTrack}
+							title={currentTrack ? '添加到歌单' : '暂无播放歌曲'}
+							className={`p-1.5 rounded-full transition-colors ${
+								currentTrack
+									? 'text-muted-foreground hover:text-foreground hover:bg-white/10'
+									: 'text-muted-foreground/30 cursor-not-allowed'
+							}`}
+						>
+							<FolderPlus className="w-4 h-4" />
+						</button>
+
+						{/* Favorite Heart (添加至我喜欢的音乐) */}
+						<button
+							onClick={toggleLike}
+							disabled={!currentTrack}
+							title={isLiked ? '已收藏到我喜欢的音乐' : '添加至我喜欢的音乐'}
+							className={`p-1.5 rounded-full transition-colors ${
+								currentTrack
+									? 'hover:bg-white/10'
+									: 'cursor-not-allowed opacity-40'
+							}`}
+						>
+							<Heart
+								className={`w-4 h-4 transition-all ${
+									isLiked
+										? 'text-rose-500 fill-rose-500 scale-110 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+										: 'text-muted-foreground hover:text-rose-400'
+								}`}
+							/>
+						</button>
+
 						{/* Loop Mode */}
 						<button
 							onClick={toggleLoopMode}
@@ -844,66 +909,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 				{/* 3. Right Column: Volume, Lyric Setting, Desktop Lyrics, Fullscreen */}
 				<div className="flex items-center justify-end gap-3 w-[28%] min-w-[220px]">
-					{/* Open Video Webpage in Default Browser */}
-					<button
-						onClick={() => {
-							if (!currentTrack) return
-							const bvid =
-								(currentTrack as any).bilibiliMetadata?.bvid ||
-								(currentTrack as any).bvid
-							if (bvid) {
-								const pageIndex = (currentTrack as any).bilibiliMetadata?.pageIndex
-								const url = `https://www.bilibili.com/video/${bvid}${pageIndex && pageIndex > 1 ? `?p=${pageIndex}` : ''}`
-								openExternalUrl(url)
-							}
-						}}
-						disabled={
-							!currentTrack ||
-							!((currentTrack as any).bilibiliMetadata?.bvid || (currentTrack as any).bvid)
-						}
-						title={
-							((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
-								? '在浏览器打开 B 站视频原网页'
-								: '当前歌曲无在线视频网页'
-						}
-						className={`p-1.5 rounded-full transition-colors ${
-							((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
-								? 'text-muted-foreground hover:text-[#00AEEC] hover:bg-white/10'
-								: 'text-muted-foreground/30 cursor-not-allowed'
-						}`}
-					>
-						<Globe className="w-4 h-4" />
-					</button>
-
-					{/* Add To Custom Playlist */}
-					<button
-						onClick={() => currentTrack && setIsAddToPlaylistOpen(true)}
-						disabled={!currentTrack}
-						title={currentTrack ? '添加到歌单' : '暂无播放歌曲'}
-						className={`p-1.5 rounded-full transition-colors ${
-							currentTrack
-								? 'text-muted-foreground hover:text-foreground hover:bg-white/10'
-								: 'text-muted-foreground/30 cursor-not-allowed'
-						}`}
-					>
-						<FolderPlus className="w-4 h-4" />
-					</button>
-
-					{/* Favorite Heart */}
-					<button
-						onClick={toggleLike}
-						title={isLiked ? '已收藏到我喜欢的音乐' : '添加至我喜欢的音乐'}
-						className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
-					>
-						<Heart
-							className={`w-4 h-4 transition-all ${
-								isLiked
-									? 'text-rose-500 fill-rose-500 scale-110 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]'
-									: 'text-muted-foreground hover:text-rose-400'
-							}`}
-						/>
-					</button>
-
 					{/* Queue Drawer Button */}
 					<button
 						onClick={() => setQueueOpen(!queueOpen)}

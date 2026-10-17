@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X, Maximize2, Minimize2 } from 'lucide-react'
 import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import {
@@ -44,6 +44,69 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const lyricsContainerRef = useRef<HTMLDivElement | null>(null)
 	const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 	const haloCanvasRef = useRef<HTMLCanvasElement | null>(null)
+	const [isWindowFullscreen, setIsWindowFullscreen] = useState(false)
+
+	// 检查并同步当前应用窗口是否处于全屏状态
+	useEffect(() => {
+		let unmounted = false
+		const checkFs = async () => {
+			try {
+				const { getCurrentWindow } = await import('@tauri-apps/api/window')
+				const fs = await getCurrentWindow().isFullscreen()
+				if (!unmounted) setIsWindowFullscreen(fs)
+			} catch {}
+		}
+		if (isOpen) {
+			checkFs()
+		}
+		return () => {
+			unmounted = true
+		}
+	}, [isOpen])
+
+	// 切换操作系统窗口全屏
+	const toggleWindowFullscreen = async () => {
+		try {
+			const { getCurrentWindow } = await import('@tauri-apps/api/window')
+			const win = getCurrentWindow()
+			const current = await win.isFullscreen()
+			await win.setFullscreen(!current)
+			setIsWindowFullscreen(!current)
+		} catch (err) {
+			console.warn('Toggle window fullscreen failed:', err)
+		}
+	}
+
+	// 关闭沉浸式全屏歌词模式
+	const handleClose = async () => {
+		try {
+			const { getCurrentWindow } = await import('@tauri-apps/api/window')
+			const win = getCurrentWindow()
+			if (await win.isFullscreen()) {
+				await win.setFullscreen(false)
+				setIsWindowFullscreen(false)
+			}
+		} catch {}
+		onClose()
+	}
+
+	// 监听键盘按键: F11 切换窗口全屏, Esc 退出
+	useEffect(() => {
+		if (!isOpen) return
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'F11') {
+				e.preventDefault()
+				toggleWindowFullscreen()
+			} else if (e.key === 'Escape') {
+				e.preventDefault()
+				handleClose()
+			}
+		}
+		window.addEventListener('keydown', handleKeyDown)
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown)
+		}
+	}, [isOpen])
 
 	useEffect(() => {
 		const handleFontSizeChange = (e: any) => {
@@ -243,13 +306,24 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 						<FluidBackground coverUrl={track?.coverUrl} />
 					)}
 
-					{/* Top bar (Cleaned up: removed '沉浸式 SPL 歌词体验' hint & icon) */}
+					{/* Top bar */}
 					<header
 						data-tauri-drag-region
-						className="relative z-10 h-14 w-full flex items-center justify-end px-6 bg-transparent"
+						className="relative z-10 h-14 w-full flex items-center justify-end px-6 bg-transparent gap-2"
 					>
 						<button
-							onClick={onClose}
+							onClick={toggleWindowFullscreen}
+							className="p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/80 hover:text-white transition-all shadow-sm"
+							title={isWindowFullscreen ? '退出窗口全屏 (F11)' : '窗口全屏 (F11)'}
+						>
+							{isWindowFullscreen ? (
+								<Minimize2 className="w-5 h-5" />
+							) : (
+								<Maximize2 className="w-5 h-5" />
+							)}
+						</button>
+						<button
+							onClick={handleClose}
 							className="p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/80 hover:text-white transition-all shadow-sm"
 							title="关闭全屏 (Esc)"
 						>

@@ -162,11 +162,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			<div className="pt-3 border-t border-white/[0.08]">
 				{isLoggedIn && userInfo ? (
 					<div
-						className="flex items-center justify-between p-2.5 rounded-xl backdrop-blur-sm border border-white/[0.08] shadow-inner transition-colors duration-300"
+						className="flex items-center justify-between p-2.5 rounded-xl backdrop-blur-sm border border-white/[0.06] hover:border-white/15 transition-all duration-300"
 						style={{
 							backgroundColor: customBgUrl
-								? `rgba(0, 0, 0, ${Math.min(0.9, uiOpacity + 0.1)})`
-								: 'rgba(0, 0, 0, 0.35)',
+								? 'rgba(255, 255, 255, 0.05)'
+								: 'rgba(255, 255, 255, 0.04)',
 						}}
 					>
 						<div className="flex items-center gap-2.5 overflow-hidden">
