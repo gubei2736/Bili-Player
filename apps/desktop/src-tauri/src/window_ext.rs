@@ -229,6 +229,27 @@ pub fn open_debug_log_file() {
     }
 }
 
+/// Tauri Command: Open external URL with system default web browser
+#[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("rundll32")
+            .args(&["url.dll,FileProtocolHandler", &url])
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {}", e))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {}", e))?;
+        Ok(())
+    }
+}
+
 /// Tauri Command: Toggle DevTools on the main window (F12 or debug helper)
 #[tauri::command]
 pub fn toggle_devtools(_app: AppHandle) {

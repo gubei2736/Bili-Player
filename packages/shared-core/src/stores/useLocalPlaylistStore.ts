@@ -39,7 +39,16 @@ export interface LocalPlaylistState {
 	deletePlaylist: (id: string) => void
 	addTrackToPlaylist: (playlistId: string, track: Track) => boolean
 	removeTrackFromPlaylist: (playlistId: string, trackUniqueKey: string) => void
-	getPlaylistById: (id: string) => LocalPlaylist | undefined
+	updatePlaylist: (
+		id: string,
+		updates: { title?: string; intro?: string; coverUrl?: string | null },
+	) => void
+	reorderTracks: (playlistId: string, fromIndex: number, toIndex: number) => void
+	updateTrackInPlaylist: (
+		playlistId: string,
+		trackUniqueKey: string,
+		updatedTrack: Track,
+	) => void
 	toggleFavoriteTrack: (track: Track) => boolean
 	isFavoriteTrack: (trackUniqueKey: string) => boolean
 }
@@ -119,6 +128,60 @@ export const useLocalPlaylistStore = create<LocalPlaylistState>()(
 						return {
 							...pl,
 							tracks: pl.tracks.filter((t) => t.uniqueKey !== trackUniqueKey),
+							updatedAt: Date.now(),
+						}
+					}),
+				}))
+			},
+
+			updatePlaylist: (id, updates) => {
+				set((state) => ({
+					playlists: state.playlists.map((pl) => {
+						if (pl.id !== id) return pl
+						return {
+							...pl,
+							...(updates.title !== undefined ? { title: updates.title.trim() || pl.title } : {}),
+							...(updates.intro !== undefined ? { intro: updates.intro.trim() } : {}),
+							...(updates.coverUrl !== undefined ? { coverUrl: updates.coverUrl } : {}),
+							updatedAt: Date.now(),
+						}
+					}),
+				}))
+			},
+
+			reorderTracks: (playlistId, fromIndex, toIndex) => {
+				if (fromIndex === toIndex) return
+				set((state) => ({
+					playlists: state.playlists.map((pl) => {
+						if (pl.id !== playlistId) return pl
+						const newTracks = [...pl.tracks]
+						if (
+							fromIndex < 0 ||
+							fromIndex >= newTracks.length ||
+							toIndex < 0 ||
+							toIndex >= newTracks.length
+						) {
+							return pl
+						}
+						const [movedItem] = newTracks.splice(fromIndex, 1)
+						if (!movedItem) return pl
+						newTracks.splice(toIndex, 0, movedItem)
+						return {
+							...pl,
+							tracks: newTracks,
+							updatedAt: Date.now(),
+						}
+					}),
+				}))
+			},
+
+			updateTrackInPlaylist: (playlistId, trackUniqueKey, updatedTrack) => {
+				set((state) => ({
+					playlists: state.playlists.map((pl) => {
+						if (pl.id !== playlistId) return pl
+						return {
+							...pl,
+							tracks: pl.tracks.map((t) => (t.uniqueKey === trackUniqueKey ? updatedTrack : t)),
 							updatedAt: Date.now(),
 						}
 					}),

@@ -22,9 +22,11 @@ import {
 	Trash2,
 	Layers,
 	PictureInPicture2,
+	Globe,
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { openExternalUrl } from '../../utils/openUrl'
 import {
 	useQueueStore,
 	useCurrentTrack,
@@ -842,6 +844,37 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 				{/* 3. Right Column: Volume, Lyric Setting, Desktop Lyrics, Fullscreen */}
 				<div className="flex items-center justify-end gap-3 w-[28%] min-w-[220px]">
+					{/* Open Video Webpage in Default Browser */}
+					<button
+						onClick={() => {
+							if (!currentTrack) return
+							const bvid =
+								(currentTrack as any).bilibiliMetadata?.bvid ||
+								(currentTrack as any).bvid
+							if (bvid) {
+								const pageIndex = (currentTrack as any).bilibiliMetadata?.pageIndex
+								const url = `https://www.bilibili.com/video/${bvid}${pageIndex && pageIndex > 1 ? `?p=${pageIndex}` : ''}`
+								openExternalUrl(url)
+							}
+						}}
+						disabled={
+							!currentTrack ||
+							!((currentTrack as any).bilibiliMetadata?.bvid || (currentTrack as any).bvid)
+						}
+						title={
+							((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
+								? '在浏览器打开 B 站视频原网页'
+								: '当前歌曲无在线视频网页'
+						}
+						className={`p-1.5 rounded-full transition-colors ${
+							((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
+								? 'text-muted-foreground hover:text-[#00AEEC] hover:bg-white/10'
+								: 'text-muted-foreground/30 cursor-not-allowed'
+						}`}
+					>
+						<Globe className="w-4 h-4" />
+					</button>
+
 					{/* Add To Custom Playlist */}
 					<button
 						onClick={() => currentTrack && setIsAddToPlaylistOpen(true)}
@@ -1048,9 +1081,28 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 												</span>
 												<span className="truncate">{track.title}</span>
 											</div>
-											<span className="text-[10px] opacity-60 truncate">
-												{track.artist?.name || '未知歌手'}
-											</span>
+											<div className="flex items-center gap-1.5 shrink-0">
+												<span className="text-[10px] opacity-60 truncate max-w-[80px]">
+													{track.artist?.name || '未知歌手'}
+												</span>
+												{((track as any).bilibiliMetadata?.bvid || (track as any).bvid) && (
+													<button
+														onClick={(e) => {
+															e.stopPropagation()
+															const bvid =
+																(track as any).bilibiliMetadata?.bvid ||
+																(track as any).bvid
+															const pageIndex = (track as any).bilibiliMetadata?.pageIndex
+															const url = `https://www.bilibili.com/video/${bvid}${pageIndex && pageIndex > 1 ? `?p=${pageIndex}` : ''}`
+															openExternalUrl(url)
+														}}
+														title="在浏览器打开 B 站视频原网页"
+														className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] transition-colors"
+													>
+														<Globe className="w-3 h-3" />
+													</button>
+												)}
+											</div>
 										</div>
 									)
 								})

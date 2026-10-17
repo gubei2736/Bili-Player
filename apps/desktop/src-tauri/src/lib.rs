@@ -40,6 +40,7 @@ pub fn run() {
             window_ext::append_debug_log,
             window_ext::get_debug_log_path,
             window_ext::open_debug_log_file,
+            window_ext::open_external_url,
             window_ext::toggle_devtools,
             window_ext::trigger_player_action,
             window_ext::player_seek,
