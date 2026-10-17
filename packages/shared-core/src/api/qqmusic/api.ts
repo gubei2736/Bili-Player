@@ -83,34 +83,89 @@ export class QQMusicApi {
 		songmid: string,
 		signal?: AbortSignal,
 	): ResultAsync<QQMusicLyricResponse, Error> {
-		const url = `https://i.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${songmid}&g_tk=5381&format=json&inCharset=utf8&outCharset=utf-8&nobase64=1`
+		const modernBody = {
+			comm: {
+				ct: '26',
+				cv: '0',
+				uin: '0',
+			},
+			req: {
+				module: 'music.musichallSong.PlayLyricInfo',
+				method: 'GetPlayLyricInfo',
+				param: {
+					songMID: songmid,
+					trans: 1,
+					roma: 1,
+				},
+			},
+		}
 
 		return ResultAsync.fromPromise(
 			this.http
-				.fetch(url, {
+				.fetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
+					method: 'POST',
+					body: JSON.stringify(modernBody),
 					headers: {
+						'User-Agent':
+							'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+						Accept: 'application/json, text/plain, */*',
+						'Content-Type': 'application/json;charset=utf-8',
 						Referer: 'https://y.qq.com/',
 					},
 					signal,
 				})
 				.then(async (res) => {
-					if (!res.ok) {
-						throw new Error(`QQ Music API error: ${res.statusText}`)
+					if (res.ok) {
+						const json = (await res.json()) as any
+						const lyricData = json?.req?.data
+						if (lyricData && (lyricData.lyric || lyricData.qrc)) {
+							return {
+								code: 0,
+								retcode: 0,
+								subcode: 0,
+								lyric: lyricData.lyric || '',
+								trans: lyricData.trans || '',
+								roma: lyricData.roma || '',
+							} as QQMusicLyricResponse
+						}
 					}
-					return (await res.json()) as QQMusicLyricResponse
+
+					// Fallback to classic fcg endpoint
+					const fallbackUrl = `https://i.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${songmid}&g_tk=5381&format=json&inCharset=utf8&outCharset=utf-8&nobase64=1`
+					const fallbackRes = await this.http.fetch(fallbackUrl, {
+						headers: { Referer: 'https://y.qq.com/' },
+						signal,
+					})
+					if (!fallbackRes.ok) {
+						throw new Error(`QQ Music API error: ${fallbackRes.statusText}`)
+					}
+					return (await fallbackRes.json()) as QQMusicLyricResponse
 				}),
 			(e) => new Error('Failed to fetch lyrics from QQ Music', { cause: e }),
 		)
 	}
 
 	parseLyrics(response: QQMusicLyricResponse): LyricProviderResponseData {
-		const rawLyrics = response.lyric ? decode(response.lyric) : undefined
-		const transLyrics = response.trans ? decode(response.trans) : undefined
+		const decodeField = (str?: string): string | undefined => {
+			if (!str || typeof str !== 'string' || !str.trim()) return undefined
+			try {
+				const binary = atob(str.trim())
+				const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+				const decoded = new TextDecoder().decode(bytes)
+				return decode(decoded)
+			} catch {
+				try {
+					return decode(str)
+				} catch {
+					return str
+				}
+			}
+		}
 
 		return {
-			lrc: rawLyrics,
-			tlyric: transLyrics,
-			romalrc: undefined,
+			lrc: decodeField(response.lyric),
+			tlyric: decodeField(response.trans),
+			romalrc: decodeField(response.roma),
 		}
 	}
 

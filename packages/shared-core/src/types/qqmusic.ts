@@ -46,11 +46,12 @@ export interface QQMusicSearchResponse {
 }
 
 export interface QQMusicLyricResponse {
-	retcode: number
-	code: number
-	subcode: number
-	lyric: string
-	trans: string
+	retcode?: number
+	code?: number
+	subcode?: number
+	lyric?: string
+	trans?: string
+	roma?: string
 }
 
 export interface QQMusicPlaylist {

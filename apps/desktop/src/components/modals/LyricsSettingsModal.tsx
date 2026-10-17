@@ -21,8 +21,11 @@ import {
 	setLyricOptionTranslation,
 	getLyricOptionRomaji,
 	setLyricOptionRomaji,
+	getPreferredLyricSource,
+	setPreferredLyricSource,
 	cleanTrackTitle,
 	type LyricSearchCandidate,
+	type PreferredLyricSource,
 } from '../../services/lyricService'
 
 export interface LyricsSettingsModalProps {
@@ -48,23 +51,30 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
 	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
+	const [sourceFilter, setSourceFilter] = useState<PreferredLyricSource>(() => getPreferredLyricSource())
 	const [hasSearched, setHasSearched] = useState(false)
 
-	const handleSearch = async (kw: string) => {
+	const handleSearch = async (kw: string, filter = sourceFilter) => {
 		if (!kw.trim()) return
 		setIsSearching(true)
 		setHasSearched(true)
 		try {
-			const results = await lyricService.searchCandidates(kw.trim())
+			const results = await lyricService.searchCandidates(kw.trim(), filter)
 			setCandidates(results)
-			// 立即在后台并行预加载候选歌词，用户点击时直接命中内存，瞬间完成采用！
-			if (track) {
-				lyricService.prefetchCandidates(results, track.uniqueKey)
-			}
+			// 立即在后台并行预加载候选歌词原始数据，用户点击时直接命中内存，瞬间完成采用！
+			lyricService.prefetchCandidates(results)
 		} catch (err) {
 			console.warn('Search lyrics error:', err)
 		} finally {
 			setIsSearching(false)
+		}
+	}
+
+	const handleSourceFilterChange = (filter: PreferredLyricSource) => {
+		setSourceFilter(filter)
+		setPreferredLyricSource(filter)
+		if (searchKeyword.trim()) {
+			handleSearch(searchKeyword.trim(), filter)
 		}
 	}
 
@@ -88,6 +98,8 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 				}
 			}
 
+			const currentPreferred = getPreferredLyricSource()
+			setSourceFilter(currentPreferred)
 			setSearchKeyword(kw)
 			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
@@ -96,7 +108,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 			setHasSearched(false)
 
 			if (kw) {
-				handleSearch(kw)
+				handleSearch(kw, currentPreferred)
 			}
 		}
 	}, [isOpen, track?.uniqueKey])
@@ -306,6 +318,48 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 					{/* Tab 1: Search */}
 					{activeTab === 'search' && (
 						<div className="flex-1 flex flex-col min-h-0 space-y-3">
+							{/* 音源切换选择栏 */}
+							<div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-white/[0.03] border border-white/5">
+								<span className="text-[11px] text-muted-foreground px-1 font-medium shrink-0">
+									检索平台：
+								</span>
+								<div className="flex items-center gap-1 flex-1 justify-end">
+									<button
+										type="button"
+										onClick={() => handleSourceFilterChange('all')}
+										className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all ${
+											sourceFilter === 'all'
+												? 'bg-primary text-white shadow-sm font-semibold'
+												: 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+										}`}
+									>
+										全部音源
+									</button>
+									<button
+										type="button"
+										onClick={() => handleSourceFilterChange('qqmusic')}
+										className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all ${
+											sourceFilter === 'qqmusic'
+												? 'bg-emerald-600 text-white shadow-sm font-semibold'
+												: 'text-muted-foreground hover:text-emerald-400 hover:bg-white/5'
+										}`}
+									>
+										QQ 音乐
+									</button>
+									<button
+										type="button"
+										onClick={() => handleSourceFilterChange('netease')}
+										className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all ${
+											sourceFilter === 'netease'
+												? 'bg-red-600 text-white shadow-sm font-semibold'
+												: 'text-muted-foreground hover:text-red-400 hover:bg-white/5'
+										}`}
+									>
+										网易云音乐
+									</button>
+								</div>
+							</div>
+
 							<div className="flex items-center gap-2">
 								<input
 									type="text"
@@ -336,7 +390,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 									</div>
 								) : hasSearched && candidates.length === 0 ? (
 									<div className="py-16 text-center text-xs text-muted-foreground">
-										未找到匹配歌词，可尝试修改关键词或点击上方“粘贴 LRC/SPL”自定义
+										未找到匹配歌词，可尝试切换音源平台、修改关键词或点击上方“粘贴 LRC/SPL”自定义
 									</div>
 								) : candidates.length === 0 ? (
 									<div className="py-16 text-center text-xs text-muted-foreground">
@@ -356,11 +410,11 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 													<span
 														className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
 															item.source === 'netease'
-																? 'bg-red-500/20 text-red-300'
-																: 'bg-emerald-500/20 text-emerald-300'
+																? 'bg-red-500/20 text-red-300 border border-red-500/30'
+																: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
 														}`}
 													>
-														{item.source === 'netease' ? '网易云 (逐字)' : 'QQ音乐'}
+														{item.source === 'netease' ? '网易云音乐' : 'QQ 音乐'}
 													</span>
 												</div>
 												<p className="text-[11px] text-muted-foreground truncate">

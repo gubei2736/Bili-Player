@@ -7,20 +7,29 @@ import {
 	setLyricOptionTranslation,
 	getLyricOptionRomaji,
 	setLyricOptionRomaji,
+	getPreferredLyricSource,
+	setPreferredLyricSource,
+	type PreferredLyricSource,
 } from '../../services/lyricService'
 
 export const LyricsSettingsCard: React.FC = () => {
 	const [autoMatch, setAutoMatch] = useState<boolean>(getAutoMatchLyricsEnabled())
 	const [showTranslation, setShowTranslation] = useState<boolean>(getLyricOptionTranslation())
 	const [showRomaji, setShowRomaji] = useState<boolean>(getLyricOptionRomaji())
+	const [preferredSource, setPreferredSource] = useState<PreferredLyricSource>(() => getPreferredLyricSource())
 
 	useEffect(() => {
 		const handleAutoMatchChange = (e: any) => {
 			setAutoMatch(e.detail?.enabled ?? getAutoMatchLyricsEnabled())
 		}
+		const handlePreferredSourceChange = (e: any) => {
+			setPreferredSource(e.detail?.source ?? getPreferredLyricSource())
+		}
 		window.addEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
+		window.addEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
 		return () => {
 			window.removeEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
+			window.removeEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
 		}
 	}, [])
 
@@ -37,6 +46,11 @@ export const LyricsSettingsCard: React.FC = () => {
 	const handleToggleRomaji = (checked: boolean) => {
 		setShowRomaji(checked)
 		setLyricOptionRomaji(checked)
+	}
+
+	const handleChangePreferredSource = (src: PreferredLyricSource) => {
+		setPreferredSource(src)
+		setPreferredLyricSource(src)
 	}
 
 	return (
@@ -88,7 +102,52 @@ export const LyricsSettingsCard: React.FC = () => {
 					</button>
 				</div>
 
-				{/* 2. 歌词中文翻译开关 */}
+				{/* 2. 默认检索与匹配音源偏好 */}
+				<div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+					<div className="space-y-0.5">
+						<span className="font-semibold text-foreground">默认优先匹配音源</span>
+						<p className="text-[11px] text-muted-foreground leading-relaxed">
+							自动匹配或多源检索时首选的歌词平台。如首选平台无结果将自动回退另一平台。
+						</p>
+					</div>
+					<div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 shrink-0">
+						<button
+							type="button"
+							onClick={() => handleChangePreferredSource('qqmusic')}
+							className={`px-2.5 py-1 text-[11px] rounded-lg transition-all ${
+								preferredSource === 'qqmusic'
+									? 'bg-emerald-600 text-white shadow-sm font-semibold'
+									: 'text-muted-foreground hover:text-emerald-400'
+							}`}
+						>
+							QQ 音乐
+						</button>
+						<button
+							type="button"
+							onClick={() => handleChangePreferredSource('netease')}
+							className={`px-2.5 py-1 text-[11px] rounded-lg transition-all ${
+								preferredSource === 'netease'
+									? 'bg-red-600 text-white shadow-sm font-semibold'
+									: 'text-muted-foreground hover:text-red-400'
+							}`}
+						>
+							网易云音乐
+						</button>
+						<button
+							type="button"
+							onClick={() => handleChangePreferredSource('all')}
+							className={`px-2.5 py-1 text-[11px] rounded-lg transition-all ${
+								preferredSource === 'all'
+									? 'bg-primary text-white shadow-sm font-semibold'
+									: 'text-muted-foreground hover:text-foreground'
+							}`}
+						>
+							聚合全部
+						</button>
+					</div>
+				</div>
+
+				{/* 3. 歌词中文翻译开关 */}
 				<div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
 					<div className="space-y-0.5">
 						<span className="font-semibold text-foreground">外语歌词中文翻译</span>
