@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
  * 仅在开发/Debug 模式下输出控制台与落盘追踪日志，Release 生产包彻底禁用
  */
 export function logMultipart(module: string, message: string, data?: any): void {
-	if (import.meta.env.PROD) {
+	if ((import.meta as any).env?.PROD) {
 		return
 	}
 	const now = new Date()
