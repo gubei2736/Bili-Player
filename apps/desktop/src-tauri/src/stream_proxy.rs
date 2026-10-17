@@ -103,8 +103,10 @@ async fn serve_cached_file(
         .header(header::CONTENT_TYPE, "audio/mp4")
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
         .header(header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
         .header(header::ACCESS_CONTROL_EXPOSE_HEADERS, "*")
+        .header("Access-Control-Allow-Private-Network", "true")
         .header(header::CONTENT_LENGTH, content_len.to_string());
 
     if status == StatusCode::PARTIAL_CONTENT {
@@ -161,15 +163,12 @@ async fn proxy_handler(
     let mut response_builder = Response::builder()
         .status(status)
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
         .header(header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
         .header(header::ACCESS_CONTROL_EXPOSE_HEADERS, "*")
-        .header(header::ACCEPT_RANGES, "bytes");
-
-    if let Some(ct) = upstream.headers().get(header::CONTENT_TYPE) {
-        response_builder = response_builder.header(header::CONTENT_TYPE, ct);
-    } else {
-        response_builder = response_builder.header(header::CONTENT_TYPE, "audio/mp4");
-    }
+        .header("Access-Control-Allow-Private-Network", "true")
+        .header(header::ACCEPT_RANGES, "bytes")
+        .header(header::CONTENT_TYPE, "audio/mp4");
 
     if let Some(cr) = upstream.headers().get(header::CONTENT_RANGE) {
         response_builder = response_builder.header(header::CONTENT_RANGE, cr);
@@ -242,6 +241,18 @@ async fn proxy_handler(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
+async fn options_handler() -> Response {
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
+        .header(header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
+        .header(header::ACCESS_CONTROL_EXPOSE_HEADERS, "*")
+        .header("Access-Control-Allow-Private-Network", "true")
+        .body(Body::empty())
+        .unwrap()
+}
+
 /// Spawns the local Axum proxy server on loopback, binding to an ephemeral port.
 pub async fn start_proxy_server(
     cache_dir: std::path::PathBuf,
@@ -258,7 +269,7 @@ pub async fn start_proxy_server(
     });
 
     let app = Router::new()
-        .route("/proxy", get(proxy_handler))
+        .route("/proxy", get(proxy_handler).options(options_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
