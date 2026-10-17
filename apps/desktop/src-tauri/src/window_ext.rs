@@ -31,6 +31,12 @@ pub fn setup_window_effects(window: &WebviewWindow) {
     }
 }
 
+/// Tauri Command: Check if app is running in debug mode
+#[tauri::command]
+pub fn is_debug_mode() -> bool {
+    cfg!(debug_assertions)
+}
+
 /// Tauri Command: Set ignore cursor events (mouse penetration) for lyrics window
 #[tauri::command]
 pub fn set_ignore_cursor_events(
