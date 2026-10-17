@@ -1,1 +1,0 @@
-ALTER TABLE `playlists` ADD `is_pinned` integer DEFAULT false NOT NULL;

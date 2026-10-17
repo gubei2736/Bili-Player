@@ -1,9 +1,0 @@
-{
-	"platforms": ["android"],
-	"android": {
-		"modules": [
-			"expo.modules.bbplayernative.BBPlayerNativeModule",
-			"expo.modules.bbplayernative.BootSplashVideoViewModule"
-		]
-	}
-}

@@ -1,1 +1,0 @@
-ALTER TABLE `playlists` ADD `player_preference` text DEFAULT 'inherit' NOT NULL;
