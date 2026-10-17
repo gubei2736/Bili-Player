@@ -76,12 +76,17 @@ export const TrayMenuApp: React.FC = () => {
 	return (
 		<div className="w-full h-full p-2 bg-[#0e121e]/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-2xl flex flex-col justify-between text-xs select-none text-white overflow-hidden">
 			{/* Brand Header */}
-			<div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-white/[0.04] border border-white/5">
-				<div className="w-5 h-5 rounded-lg bg-gradient-to-br from-[#00AEEC] to-[#FB7299] flex items-center justify-center shadow-sm">
-					<Music className="w-3 h-3 text-white" />
+			<div className="flex items-center justify-between px-2.5 py-1.5 mb-1 rounded-xl bg-white/[0.04] border border-white/5">
+				<div className="flex items-center gap-2">
+					<div className="w-5 h-5 rounded-lg bg-gradient-to-br from-[#00AEEC] to-[#FB7299] flex items-center justify-center shadow-sm">
+						<Music className="w-3 h-3 text-white" />
+					</div>
+					<span className="font-semibold text-white/90 tracking-wide text-[11px]">
+						Bili Player
+					</span>
 				</div>
-				<span className="font-semibold text-white/90 tracking-wide text-[11px]">
-					Bili Player
+				<span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-white/10 text-white/50 border border-white/10">
+					v1.1.0
 				</span>
 			</div>
 

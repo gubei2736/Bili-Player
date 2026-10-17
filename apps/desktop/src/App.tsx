@@ -1048,6 +1048,30 @@ export const App: React.FC = () => {
 								<div className="pt-2">
 									<ShortcutsSettingsView />
 								</div>
+
+								{/* About & Version Card */}
+								<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs flex items-center justify-between">
+									<div className="flex items-center gap-3">
+										<div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#00A1D6] to-[#00AEEC] flex items-center justify-center text-white shadow-md">
+											<Music className="w-5 h-5 fill-white" />
+										</div>
+										<div>
+											<div className="flex items-center gap-2">
+												<span className="font-bold text-foreground text-sm">Bili Player</span>
+												<span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold border border-primary/30">
+													V1.1.0
+												</span>
+											</div>
+											<p className="text-[11px] text-muted-foreground mt-0.5">
+												基于 Bilibili 音视频生态的沉浸式桌面 Hi-Fi 播放器
+											</p>
+										</div>
+									</div>
+									<div className="text-right text-[11px] text-muted-foreground">
+										<p>Windows x64 / Tauri 2.0</p>
+										<p className="text-[10px] opacity-60 mt-0.5">最新版本</p>
+									</div>
+								</div>
 							</div>
 						)}
 					</div>

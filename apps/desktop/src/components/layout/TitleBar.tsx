@@ -153,8 +153,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 				<span className="font-bold tracking-tight text-foreground text-[13px] bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/70">
 					Bili Player
 				</span>
-				<span className="text-[9px] px-1.5 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/25 font-mono font-medium">
-					PRO
+				<span className="text-[9px] px-1.5 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/25 font-mono font-medium tracking-tight">
+					v1.1.0
 				</span>
 			</div>
 
