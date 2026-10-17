@@ -23,6 +23,7 @@ import { FavoritesView } from './components/views/FavoritesView'
 import { CollectionsView } from './components/views/CollectionsView'
 import { LibraryView } from './components/views/LibraryView'
 import { AudioQualitySettingsCard } from './components/views/AudioQualitySettingsCard'
+import { LyricsSettingsCard } from './components/views/LyricsSettingsCard'
 import { initDesktopDatabase } from './db/desktopDb'
 import { loginQrService } from './services/loginQrService'
 import {
@@ -771,6 +772,9 @@ export const App: React.FC = () => {
 
 								{/* Audio Quality Preferences */}
 								<AudioQualitySettingsCard />
+
+								{/* Lyrics Preferences */}
+								<LyricsSettingsCard />
 
 								{/* Window Close Behavior Card */}
 								<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs space-y-3">

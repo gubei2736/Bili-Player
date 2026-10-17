@@ -33,6 +33,27 @@ const LYRIC_STORAGE_PREFIX = 'bbplayer_spl_lyric_'
 const LYRIC_OFFSET_PREFIX = 'bbplayer_lyric_offset_'
 const LYRIC_OPT_TRANS_KEY = 'bbplayer_lyric_opt_translation'
 const LYRIC_OPT_ROMA_KEY = 'bbplayer_lyric_opt_romaji'
+const LYRIC_OPT_AUTO_MATCH_KEY = 'bbplayer_auto_match_lyrics'
+
+export function getAutoMatchLyricsEnabled(): boolean {
+	try {
+		const val = localStorage.getItem(LYRIC_OPT_AUTO_MATCH_KEY)
+		return val !== null ? val === 'true' : true
+	} catch {
+		return true
+	}
+}
+
+export function setAutoMatchLyricsEnabled(enabled: boolean): void {
+	try {
+		localStorage.setItem(LYRIC_OPT_AUTO_MATCH_KEY, String(enabled))
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:auto-match-lyrics-change', {
+				detail: { enabled },
+			}),
+		)
+	} catch {}
+}
 
 export function getLyricOptionTranslation(): boolean {
 	try {
@@ -352,6 +373,11 @@ export class LyricService {
 				artist: track.artist?.name || '',
 				offsetMs,
 			}
+		}
+
+		// 若关闭了自动匹配歌词，且不是用户主动触发重新匹配 (forceFresh)，则跳过在线搜索
+		if (!forceFresh && !getAutoMatchLyricsEnabled()) {
+			return null
 		}
 
 		let queryTitle = cleanTrackTitle(track.title) || track.title

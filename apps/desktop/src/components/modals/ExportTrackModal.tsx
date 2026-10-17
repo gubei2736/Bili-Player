@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { X, FileAudio, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { desktopDir, downloadDir, join } from '@tauri-apps/api/path'
-import type { Track, BilibiliTrack } from '@bbplayer/shared-core'
+import { bilibiliApi, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
+import { lyricService } from '../../services/lyricService'
 
 export interface ExportTrackModalProps {
 	isOpen: boolean
@@ -25,52 +26,118 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 	useEffect(() => {
 		setExportSuccess(false)
 		setError(null)
-		if (isOpen && track && track.source === 'bilibili') {
-			const bili = track as BilibiliTrack
-			const bvid = bili.bilibiliMetadata.bvid
-			const cid = bili.bilibiliMetadata.cid || 0
+		if (isOpen && track) {
+			const defaultName = `${track.title} - ${
+				track.artist?.name || '未知歌手'
+			}.m4a`.replace(/[\\/:*?"<>|]/g, '_')
 
-			invoke<string | null>('get_cached_track_path', { bvid, cid })
-				.then(async (path) => {
-					setCachedPath(path)
-					if (path) {
-						const defaultName = `${track.title} - ${
-							track.artist?.name || '未知歌手'
-						}.m4a`.replace(/[\\/:*?"<>|]/g, '_')
-
-						try {
-							const baseDir = (await desktopDir().catch(() => downloadDir())) || ''
-							const fullPath = baseDir
-								? await join(baseDir, defaultName)
-								: defaultName
-							setOutputPath(fullPath)
-						} catch {
-							setOutputPath(defaultName)
-						}
-					}
+			desktopDir()
+				.catch(() => downloadDir())
+				.then(async (baseDir) => {
+					const fullPath = baseDir
+						? await join(baseDir, defaultName)
+						: defaultName
+					setOutputPath(fullPath)
 				})
-				.catch((err) => console.error(err))
+				.catch(() => {
+					setOutputPath(defaultName)
+				})
+
+			if (track.source === 'bilibili') {
+				const bili = track as BilibiliTrack
+				const bvid = bili.bilibiliMetadata.bvid
+				const cid = bili.bilibiliMetadata.cid || 0
+
+				if (cid) {
+					invoke<string | null>('get_cached_track_path', { bvid, cid })
+						.then((path) => setCachedPath(path))
+						.catch(() => setCachedPath(null))
+				} else {
+					setCachedPath(null)
+				}
+			} else {
+				setCachedPath(null)
+			}
 		}
 	}, [isOpen, track])
 
 	if (!isOpen || !track) return null
 
 	const handleExport = async () => {
-		if (!cachedPath || !outputPath) return
+		if (!outputPath || !track) return
 		setIsExporting(true)
 		setError(null)
+
 		try {
+			let streamUrl: string | null = null
+			let finalCachedPath = cachedPath
+
+			if (!finalCachedPath && track.source === 'bilibili') {
+				const bili = track as BilibiliTrack
+				const bvid = bili.bilibiliMetadata.bvid
+				let cid = bili.bilibiliMetadata.cid
+
+				// 如果未拿到 CID，动态拉取分 P 列表获取 CID
+				if (!cid) {
+					const pageListRes = await bilibiliApi.getPageList({ bvid })
+					if (pageListRes.isOk() && pageListRes.value.length > 0) {
+						const explicitPageIndex = bili.bilibiliMetadata.pageIndex
+						const matched = explicitPageIndex
+							? pageListRes.value.find((p) => p.page === explicitPageIndex)
+							: pageListRes.value[0]
+						cid = matched?.cid || pageListRes.value[0]!.cid
+					}
+				}
+
+				if (!cid) {
+					throw new Error('未能获取该歌曲的音频流分 P 标识 (CID)')
+				}
+
+				// 检查本地是否有对应缓存
+				try {
+					finalCachedPath = await invoke<string | null>('get_cached_track_path', { bvid, cid })
+				} catch {}
+
+				if (!finalCachedPath) {
+					// 从 B 站 API 获取音频直链
+					const streamRes = await bilibiliApi.getAudioStream({
+						bvid,
+						cid,
+						audioQuality: 30280,
+						enableDolby: false,
+						enableHiRes: false,
+					})
+
+					if (streamRes.isErr()) {
+						throw new Error(`获取音频流失败: ${streamRes.error.message}`)
+					}
+					streamUrl = streamRes.value.url
+				}
+			}
+
+			// 获取歌词元数据用于内嵌
+			let lyricsText: string | null = null
+			try {
+				const lrc = await lyricService.fetchLyricForTrack(track)
+				if (lrc?.splContent) {
+					lyricsText = lrc.splContent
+				}
+			} catch {}
+
 			await invoke('export_cached_track_to_m4a', {
 				params: {
-					cached_file_path: cachedPath,
+					cached_file_path: finalCachedPath,
+					stream_url: streamUrl,
+					cache_save_path: null,
 					output_path: outputPath,
 					title: track.title,
 					artist: track.artist?.name || '未知歌手',
 					album: 'Bili Player',
 					cover_url: track.coverUrl,
-					lyrics: null,
+					lyrics: lyricsText,
 				},
 			})
+
 			setIsExporting(false)
 			setExportSuccess(true)
 		} catch (err: any) {
@@ -131,28 +198,32 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 							</p>
 						</div>
 
-						{cachedPath ? (
-							<div className="space-y-3">
-								<div className="space-y-1.5">
-									<label className="text-[11px] font-semibold text-foreground/80">
-										导出目标路径
-									</label>
-									<input
-										type="text"
-										value={outputPath}
-										onChange={(e) => setOutputPath(e.target.value)}
-										className="w-full h-8 px-3 text-xs rounded-xl bg-white/5 border border-white/10 text-foreground outline-none font-mono"
-									/>
-								</div>
-								<p className="text-[10px] text-muted-foreground">
-									将自动内嵌高清封面二进制、歌名、UP主元数据与标准 MPEG-4 容器。
-								</p>
+						<div className="space-y-3">
+							<div className="flex items-center justify-between">
+								<label className="text-[11px] font-semibold text-foreground/80">
+									导出目标路径
+								</label>
+								{cachedPath ? (
+									<span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+										本地已就绪 (秒速导出)
+									</span>
+								) : (
+									<span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-sky-500/15 text-sky-400 border border-sky-500/20">
+										在线提取 (导出时自动拉取无损音频流)
+									</span>
+								)}
 							</div>
-						) : (
-							<div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-								该歌曲尚未完成本地流媒体缓存，请先播放试听该歌曲，流媒体代理将自动完成无损落盘缓存。
-							</div>
-						)}
+							<input
+								type="text"
+								value={outputPath}
+								onChange={(e) => setOutputPath(e.target.value)}
+								className="w-full h-8 px-3 text-xs rounded-xl bg-white/5 border border-white/10 text-foreground outline-none font-mono"
+								placeholder="请输入或调整导出完整路径 (.m4a)"
+							/>
+							<p className="text-[10px] text-muted-foreground">
+								将自动封装为标准 MPEG-4 (.m4a) 容器，并内嵌高清封面、歌曲名称、UP主信息及歌词元数据。
+							</p>
+						</div>
 
 						{error && (
 							<div className="flex items-center gap-2 p-2 rounded-xl bg-red-500/10 text-xs text-red-400">
@@ -170,11 +241,11 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 							</button>
 							<button
 								onClick={handleExport}
-								disabled={!cachedPath || isExporting}
+								disabled={!outputPath || isExporting}
 								className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-50 shadow-md"
 							>
 								{isExporting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-								<span>立即导出</span>
+								<span>{isExporting ? '正在导出...' : '立即导出'}</span>
 							</button>
 						</div>
 					</div>

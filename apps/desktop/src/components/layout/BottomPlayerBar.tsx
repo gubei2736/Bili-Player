@@ -62,6 +62,8 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		clearQueue,
 	} = useQueueStore()
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
+	const themeColors = useSkinStore((s) => s.themeColors)
+	const primaryColor = themeColors?.color || '#00AEEC'
 
 	const [isPlaying, setIsPlaying] = useState(false)
 	const [currentTime, setCurrentTime] = useState(0)
@@ -522,28 +524,36 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 								left: `${Math.max(2, Math.min(98, hoverProgress * 100))}%`,
 							}}
 						>
-							<span className="w-1.5 h-1.5 rounded-full bg-[#00AEEC] animate-pulse" />
+							<span
+								className="w-1.5 h-1.5 rounded-full animate-pulse"
+								style={{ backgroundColor: primaryColor }}
+							/>
 							{formatTime(hoverProgress * duration)}
 						</div>
 					)}
 
 					{/* Background Line */}
 					<div className="w-full h-[3px] group-hover/progress:h-[4px] rounded-full bg-white/10 group-hover/progress:bg-white/15 transition-all duration-150 overflow-hidden relative">
-						{/* Played Sky-Blue Progress Line */}
+						{/* Played Themed Progress Line */}
 						<div
-							className="h-full rounded-full"
+							className="h-full rounded-full transition-all duration-75"
 							style={{
 								width: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
-								backgroundColor: '#00AEEC',
+								backgroundColor: primaryColor,
 							}}
 						/>
 					</div>
 
-					{/* Pure White Glowing Handle (No wave distortion, perfectly centered) */}
+					{/* Thumb circle: 缩小并隐藏，鼠标 hover 在进度条或拖拽时显现 */}
 					<div
-						className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_8px_rgba(0,174,236,0.8),0_2px_4px_rgba(0,0,0,0.5)] border border-white/60 pointer-events-none group-hover/progress:scale-125"
+						className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-white border border-white/80 pointer-events-none transition-all duration-150 ${
+							isDragging
+								? 'opacity-100 scale-125'
+								: 'opacity-0 group-hover/progress:opacity-100 group-hover/progress:scale-110'
+						}`}
 						style={{
 							left: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
+							boxShadow: `0 0 6px ${primaryColor}, 0 2px 4px rgba(0,0,0,0.5)`,
 						}}
 					/>
 				</div>

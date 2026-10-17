@@ -5,7 +5,12 @@ use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct ExportTrackParams {
-    pub cached_file_path: String,
+    #[serde(default)]
+    pub cached_file_path: Option<String>,
+    #[serde(default)]
+    pub stream_url: Option<String>,
+    #[serde(default)]
+    pub cache_save_path: Option<String>,
     pub output_path: String,
     pub title: String,
     pub artist: String,
@@ -25,18 +30,67 @@ pub struct ExportResult {
 pub async fn export_cached_track_to_m4a(
     params: ExportTrackParams,
 ) -> Result<ExportResult, String> {
-    let cached_path = PathBuf::from(&params.cached_file_path);
-    if !cached_path.exists() {
-        return Err(format!("缓存音频文件不存在: {}", params.cached_file_path));
-    }
-
     let out_path = PathBuf::from(&params.output_path);
     if let Some(parent) = out_path.parent() {
         let _ = fs::create_dir_all(parent);
     }
 
-    // 1. Copy cached audio stream to output location
-    fs::copy(&cached_path, &out_path).map_err(|e| format!("复制音频文件失败: {}", e))?;
+    // 1. Obtain audio data either from existing local cache or by downloading the stream
+    let has_cached = match &params.cached_file_path {
+        Some(p) if !p.trim().is_empty() => {
+            let path = PathBuf::from(p);
+            path.exists() && fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false)
+        }
+        _ => false,
+    };
+
+    if has_cached {
+        let cached_path = PathBuf::from(params.cached_file_path.as_ref().unwrap());
+        fs::copy(&cached_path, &out_path)
+            .map_err(|e| format!("复制本地缓存音频文件失败: {}", e))?;
+    } else if let Some(ref stream_url) = params.stream_url {
+        if stream_url.trim().is_empty() {
+            return Err("未找到本地缓存且音频流地址为空".to_string());
+        }
+
+        let client = reqwest::Client::builder()
+            .user_agent(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            .build()
+            .map_err(|e| format!("初始化网络请求客户端失败: {}", e))?;
+
+        let resp = client
+            .get(stream_url)
+            .header(reqwest::header::REFERER, "https://www.bilibili.com/")
+            .send()
+            .await
+            .map_err(|e| format!("请求远程音频流失败: {}", e))?;
+
+        if !resp.status().is_success() {
+            return Err(format!("下载音频流服务器返回错误状态码: {}", resp.status()));
+        }
+
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| format!("读取音频流数据失败: {}", e))?;
+
+        tokio::fs::write(&out_path, &bytes)
+            .await
+            .map_err(|e| format!("保存音频文件失败: {}", e))?;
+
+        // If cache_save_path is provided, write a copy so that the player can reuse it
+        if let Some(ref cache_save_path) = params.cache_save_path {
+            let cache_p = PathBuf::from(cache_save_path);
+            if let Some(parent) = cache_p.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let _ = tokio::fs::write(&cache_p, &bytes).await;
+        }
+    } else {
+        return Err("音频尚未在本地缓存，且未提供下载流地址".to_string());
+    }
 
     // 2. Fetch cover image binary if provided
     let cover_data: Option<Vec<u8>> = if let Some(ref url) = params.cover_url {

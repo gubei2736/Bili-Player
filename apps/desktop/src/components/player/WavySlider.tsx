@@ -131,23 +131,23 @@ export const WavySlider: React.FC<WavySliderProps> = ({
 			ctx.restore()
 		}
 
-		// 3. 游标控制手柄（始终稳固贴合于 progressX, midY）
-		const thumbRadius = (isDragging || hoverValue !== null ? 7.5 : 6) * dpr
-		ctx.save()
-		// 外层白玉光晕环
-		ctx.beginPath()
-		ctx.arc(progressX, midY, thumbRadius, 0, Math.PI * 2)
-		ctx.fillStyle = '#FFFFFF'
-		ctx.shadowColor = primaryColor
-		ctx.shadowBlur = 12 * dpr
-		ctx.fill()
+		// 3. 游标控制手柄（缩小并仅在悬停或拖拽时显现）
+		if (isDragging || hoverValue !== null) {
+			const thumbRadius = 4.5 * dpr
+			ctx.save()
+			ctx.beginPath()
+			ctx.arc(progressX, midY, thumbRadius, 0, Math.PI * 2)
+			ctx.fillStyle = '#FFFFFF'
+			ctx.shadowColor = primaryColor
+			ctx.shadowBlur = 8 * dpr
+			ctx.fill()
 
-		// 内芯主题色宝石点
-		ctx.beginPath()
-		ctx.arc(progressX, midY, 2.4 * dpr, 0, Math.PI * 2)
-		ctx.fillStyle = primaryColor
-		ctx.fill()
-		ctx.restore()
+			ctx.beginPath()
+			ctx.arc(progressX, midY, 1.8 * dpr, 0, Math.PI * 2)
+			ctx.fillStyle = primaryColor
+			ctx.fill()
+			ctx.restore()
+		}
 
 		animationFrameId.current = requestAnimationFrame(render)
 	}, [value, isPlaying, isDragging, hoverValue, targetAmplitude, primaryColor])
