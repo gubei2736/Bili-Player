@@ -670,6 +670,11 @@ export class LyricService {
 		}
 		return null
 	}
+
+	public getAutoMatchLyricsEnabled = getAutoMatchLyricsEnabled
+	public setAutoMatchLyricsEnabled = setAutoMatchLyricsEnabled
+	public getStoredCustomLyric = getStoredCustomLyric
+	public getStoredLyricOffset = getStoredLyricOffset
 }
 
 export const lyricService = new LyricService()

@@ -14,7 +14,12 @@ import { PlaylistImportModal } from './components/modals/PlaylistImportModal'
 import { CreatePlaylistModal } from './components/modals/CreatePlaylistModal'
 import { ExportTrackModal } from './components/modals/ExportTrackModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
-import { lyricService, getStoredLyricOffset } from './services/lyricService'
+import {
+	lyricService,
+	getStoredLyricOffset,
+	getAutoMatchLyricsEnabled,
+	getStoredCustomLyric,
+} from './services/lyricService'
 import { SkinStoreView, applyFontColorToDom } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
@@ -173,8 +178,8 @@ export const App: React.FC = () => {
 		let cancelled = false
 		setActiveSplContent('')
 		if (currentTrack) {
-			const autoEnabled = lyricService.getAutoMatchLyricsEnabled()
-			const custom = lyricService.getStoredCustomLyric(currentTrack.uniqueKey)
+			const autoEnabled = getAutoMatchLyricsEnabled()
+			const custom = getStoredCustomLyric(currentTrack.uniqueKey)
 			if (autoEnabled || custom) {
 				setIsMatchingLyrics(true)
 			} else {
@@ -204,7 +209,7 @@ export const App: React.FC = () => {
 
 	useEffect(() => {
 		const handleAutoMatchChange = (e: any) => {
-			const enabled = e.detail?.enabled ?? lyricService.getAutoMatchLyricsEnabled()
+			const enabled = e.detail?.enabled ?? getAutoMatchLyricsEnabled()
 			if (!enabled && !activeSplContent) {
 				setIsMatchingLyrics(false)
 			}
