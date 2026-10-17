@@ -1,12 +1,12 @@
 [package]
-name = "bbplayer"
+name = "bili-player"
 version = "0.1.0"
 description = "Bili Player Desktop Application"
 authors = ["bili-player"]
 edition = "2021"
 
 [lib]
-name = "bbplayer_lib"
+name = "bili_player_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

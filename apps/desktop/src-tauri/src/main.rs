@@ -7,5 +7,5 @@ fn main() {
     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
     "--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows",
   );
-  bbplayer_lib::run();
+  bili_player_lib::run();
 }
