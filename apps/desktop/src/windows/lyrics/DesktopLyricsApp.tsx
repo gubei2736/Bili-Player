@@ -124,7 +124,13 @@ export const DesktopLyricsApp: React.FC = () => {
 			},
 		)
 
-		// 窗口挂载时，主动通知主窗口补发一次当前正在播放的歌曲与歌词状态
+		// 窗口挂载时，主动拉取 Rust 端真实的穿透锁定状态，并通知主窗口补发当前歌词状态
+		invoke<boolean>('is_lyrics_locked')
+			.then((locked) => {
+				setIsLocked(Boolean(locked))
+			})
+			.catch(() => {})
+
 		emit('lyrics-request-initial-sync').catch(() => {})
 
 		return () => {
@@ -207,10 +213,10 @@ export const DesktopLyricsApp: React.FC = () => {
 
 	return (
 		<div
-			className={`w-screen h-screen flex flex-col justify-center items-center px-6 relative select-none rounded-2xl transition-colors duration-300 group ${
+			className={`w-full h-full flex flex-col justify-center items-center px-6 relative select-none transition-colors duration-300 group ${
 				isLocked
-					? 'bg-transparent shadow-none ring-0 outline-none'
-					: 'bg-black/60 hover:bg-black/75 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
+					? 'bg-transparent border-0 border-transparent shadow-none ring-0 outline-none rounded-none'
+					: 'bg-black/60 hover:bg-black/75 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] rounded-2xl'
 			}`}
 			style={{
 				background: 'transparent',
@@ -218,6 +224,8 @@ export const DesktopLyricsApp: React.FC = () => {
 				boxShadow: isLocked ? 'none' : undefined,
 				border: isLocked ? 'none' : undefined,
 				borderColor: isLocked ? 'transparent' : undefined,
+				borderWidth: isLocked ? '0px' : undefined,
+				borderStyle: isLocked ? 'none' : undefined,
 				outline: 'none',
 				backdropFilter: isLocked ? 'none' : undefined,
 				WebkitBackdropFilter: isLocked ? 'none' : undefined,

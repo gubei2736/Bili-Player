@@ -603,6 +603,22 @@ export const App: React.FC = () => {
 	}, [])
 
 	useEffect(() => {
+		const broadcastMiniPlayerState = () => {
+			const activeTrack =
+				desktopAudioEngine.getCurrentTrack() || currentTrackRef.current
+			emit('mini-player-state-sync', {
+				title: activeTrack?.title || '暂无播放歌曲',
+				artist: activeTrack?.artist?.name || 'Bili Player',
+				coverUrl: activeTrack?.coverUrl || '',
+				currentTime: desktopAudioEngine.getCurrentTime(),
+				duration: desktopAudioEngine.getDuration() || activeTrack?.duration || 0,
+				isPlaying: desktopAudioEngine.isPlaying(),
+				playMode: useQueueStore.getState().playMode,
+				volume: desktopAudioEngine.getVolume(),
+				isMuted: desktopAudioEngine.isMuted(),
+			}).catch(() => {})
+		}
+
 		let lastSentMs = 0
 		let lastPlayState = false
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
@@ -626,6 +642,16 @@ export const App: React.FC = () => {
 					currentTimeMs: Math.max(0, (event.currentTime + offsetSec) * 1000),
 					timestamp: now,
 				}).catch(() => {})
+
+				emit('mini-player-state-sync', {
+					currentTime: event.currentTime,
+					duration: event.duration,
+					isPlaying,
+				}).catch(() => {})
+
+				if (event.type === 'trackchange') {
+					broadcastMiniPlayerState()
+				}
 			}
 		})
 
@@ -636,6 +662,58 @@ export const App: React.FC = () => {
 		})
 			.then((fn) => {
 				unlistenInitSync = fn
+			})
+			.catch(() => {})
+
+		// 当迷你播放器打开或请求同步时，补发迷你播放器状态
+		let unlistenMiniSync: (() => void) | undefined
+		let unlistenSeek: (() => void) | undefined
+		let unlistenMute: (() => void) | undefined
+		let unlistenMode: (() => void) | undefined
+
+		listen('mini-player-request-sync', () => {
+			broadcastMiniPlayerState()
+		})
+			.then((fn) => {
+				unlistenMiniSync = fn
+			})
+			.catch(() => {})
+
+		listen<number>('player-seek', (e) => {
+			if (typeof e.payload === 'number') {
+				desktopAudioEngine.seek(e.payload)
+			}
+		})
+			.then((fn) => {
+				unlistenSeek = fn
+			})
+			.catch(() => {})
+
+		listen('player-toggle-mute', () => {
+			const nextMuted = !desktopAudioEngine.isMuted()
+			desktopAudioEngine.setMuted(nextMuted)
+			emit('mini-player-state-sync', { isMuted: nextMuted }).catch(() => {})
+		})
+			.then((fn) => {
+				unlistenMute = fn
+			})
+			.catch(() => {})
+
+		listen('player-toggle-mode', () => {
+			const q = useQueueStore.getState()
+			const nextMode =
+				q.playMode === 'sequential'
+					? 'repeat_all'
+					: q.playMode === 'repeat_all'
+					? 'repeat_one'
+					: q.playMode === 'repeat_one'
+					? 'shuffle'
+					: 'sequential'
+			q.setPlayMode(nextMode)
+			emit('mini-player-state-sync', { playMode: nextMode }).catch(() => {})
+		})
+			.then((fn) => {
+				unlistenMode = fn
 			})
 			.catch(() => {})
 
@@ -651,6 +729,10 @@ export const App: React.FC = () => {
 		return () => {
 			unsubscribe()
 			if (unlistenInitSync) unlistenInitSync()
+			if (unlistenMiniSync) unlistenMiniSync()
+			if (unlistenSeek) unlistenSeek()
+			if (unlistenMute) unlistenMute()
+			if (unlistenMode) unlistenMode()
 			window.removeEventListener(
 				'bbplayer:lyric-offset-change',
 				handleOffsetImmediate,

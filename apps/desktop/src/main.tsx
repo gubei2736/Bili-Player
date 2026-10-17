@@ -83,13 +83,19 @@ class GlobalErrorBoundary extends React.Component<
 	}
 }
 
+import { MiniPlayerApp } from './windows/mini/MiniPlayerApp'
+import { TrayMenuApp } from './windows/tray/TrayMenuApp'
+
 const isLyricsWindow = window.location.hash.includes('lyrics')
-if (isLyricsWindow) {
-	document.documentElement.classList.add('is-lyrics-window')
+const isMiniWindow = window.location.hash.includes('mini')
+const isTrayWindow = window.location.hash.includes('tray')
+
+if (isLyricsWindow || isMiniWindow || isTrayWindow) {
+	document.documentElement.classList.add('is-transparent-window')
 	document.documentElement.classList.remove('bg-[#0b0f17]')
 	document.documentElement.classList.add('bg-transparent')
 	document.documentElement.style.background = 'transparent'
-	document.body.classList.add('is-lyrics-window')
+	document.body.classList.add('is-transparent-window')
 	document.body.classList.remove('bg-[#0b0f17]')
 	document.body.classList.add('bg-transparent')
 	document.body.style.background = 'transparent'
@@ -100,7 +106,15 @@ if (isLyricsWindow) {
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 	<React.StrictMode>
 		<GlobalErrorBoundary>
-			{isLyricsWindow ? <DesktopLyricsApp /> : <App />}
+			{isLyricsWindow ? (
+				<DesktopLyricsApp />
+			) : isMiniWindow ? (
+				<MiniPlayerApp />
+			) : isTrayWindow ? (
+				<TrayMenuApp />
+			) : (
+				<App />
+			)}
 		</GlobalErrorBoundary>
 	</React.StrictMode>,
 )

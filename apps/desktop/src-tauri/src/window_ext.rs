@@ -44,52 +44,6 @@ pub mod win32_theme {
             }
         }
     }
-
-    /// Completely remove Windows 11 DWM 1px white border and rectangular frame on transparent windows
-    pub fn remove_dwm_border(hwnd_isize: isize) {
-        unsafe {
-            let dwmapi = LoadLibraryA(b"dwmapi.dll\0".as_ptr());
-            if !dwmapi.is_null() {
-                let set_attr_ptr = GetProcAddress(dwmapi, b"DwmSetWindowAttribute\0".as_ptr());
-                if !set_attr_ptr.is_null() {
-                    let set_attr: unsafe extern "system" fn(
-                        isize,
-                        u32,
-                        *const std::ffi::c_void,
-                        u32,
-                    ) -> i32 = std::mem::transmute(set_attr_ptr);
-
-                    // 1. DWMWA_BORDER_COLOR = 34, DWMWA_COLOR_NONE = 0xFFFFFFFE (Disables the 1px white border on Win11)
-                    let color: u32 = 0xFFFFFFFE;
-                    let _ = set_attr(
-                        hwnd_isize,
-                        34,
-                        &color as *const _ as *const std::ffi::c_void,
-                        std::mem::size_of::<u32>() as u32,
-                    );
-
-                    // 2. DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_DONOTROUND = 1
-                    let corner: u32 = 1;
-                    let _ = set_attr(
-                        hwnd_isize,
-                        33,
-                        &corner as *const _ as *const std::ffi::c_void,
-                        std::mem::size_of::<u32>() as u32,
-                    );
-
-                    // 3. DWMWA_NCRENDERING_POLICY = 2, DWMNCRP_DISABLED = 1
-                    let nc_policy: u32 = 1;
-                    let _ = set_attr(
-                        hwnd_isize,
-                        2,
-                        &nc_policy as *const _ as *const std::ffi::c_void,
-                        std::mem::size_of::<u32>() as u32,
-                    );
-                }
-                FreeLibrary(dwmapi);
-            }
-        }
-    }
 }
 
 #[cfg(target_os = "windows")]
@@ -97,15 +51,26 @@ pub fn enable_windows_dark_mode() {
     win32_theme::enable_windows_dark_mode();
 }
 
-/// Configure lyrics window to be completely borderless with no DWM shadow or border
+#[cfg(target_os = "windows")]
+pub fn get_cursor_pos() -> (i32, i32) {
+    unsafe {
+        #[repr(C)]
+        struct POINT {
+            x: i32,
+            y: i32,
+        }
+        extern "system" {
+            fn GetCursorPos(lpPoint: *mut POINT) -> i32;
+        }
+        let mut pt = POINT { x: 0, y: 0 };
+        GetCursorPos(&mut pt);
+        (pt.x, pt.y)
+    }
+}
+
+/// Configure lyrics window to be completely borderless with no shadow
 pub fn setup_lyrics_window(window: &WebviewWindow) {
     let _ = window.set_shadow(false);
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(hwnd) = window.hwnd() {
-            win32_theme::remove_dwm_border(hwnd.0 as isize);
-        }
-    }
 }
 
 /// Apply native window effects (Shadow, Win11 Mica, macOS Vibrancy)
@@ -229,4 +194,78 @@ pub fn append_debug_log(message: String) {
     {
         let _ = message;
     }
+}
+
+/// Tauri Command: Check if lyrics window is currently in locked (mouse penetration) state
+#[tauri::command]
+pub fn is_lyrics_locked() -> bool {
+    crate::shortcuts::LYRICS_IGNORE_CURSOR.load(Ordering::SeqCst)
+}
+
+/// Tauri Command: Toggle Mini Player mode (hide main, show mini or vice versa)
+#[tauri::command]
+pub fn toggle_mini_player(app: AppHandle) -> Result<bool, String> {
+    if let (Some(main_win), Some(mini_win)) = (
+        app.get_webview_window("main"),
+        app.get_webview_window("mini"),
+    ) {
+        let is_mini_visible = mini_win.is_visible().unwrap_or(false);
+        if is_mini_visible {
+            let _ = mini_win.hide();
+            let _ = main_win.show();
+            let _ = main_win.set_focus();
+            let _ = app.emit("mini-player-visibility-change", false);
+            Ok(false)
+        } else {
+            let _ = main_win.hide();
+            let _ = mini_win.show();
+            let _ = mini_win.set_focus();
+            let _ = app.emit("mini-player-visibility-change", true);
+            let _ = app.emit("mini-player-request-sync", ());
+            Ok(true)
+        }
+    } else {
+        Err("Window not found".to_string())
+    }
+}
+
+/// Tauri Command: Restore main window from Mini Player
+#[tauri::command]
+pub fn restore_main_from_mini(app: AppHandle) -> Result<(), String> {
+    if let (Some(main_win), Some(mini_win)) = (
+        app.get_webview_window("main"),
+        app.get_webview_window("mini"),
+    ) {
+        let _ = mini_win.hide();
+        let _ = main_win.show();
+        let _ = main_win.set_focus();
+        let _ = app.emit("mini-player-visibility-change", false);
+    }
+    Ok(())
+}
+
+/// Tauri Command: Show or hide the custom rounded-corner Tray Menu window near mouse
+#[tauri::command]
+pub fn show_tray_menu(app: AppHandle) -> Result<(), String> {
+    if let Some(tray_win) = app.get_webview_window("tray_menu") {
+        let is_visible = tray_win.is_visible().unwrap_or(false);
+        if is_visible {
+            let _ = tray_win.hide();
+            return Ok(());
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let (cx, cy) = get_cursor_pos();
+            let win_w = 210;
+            let win_h = 330;
+            let x = (cx - win_w / 2).max(10);
+            let y = (cy - win_h - 8).max(10);
+            let _ = tray_win.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+        }
+
+        let _ = tray_win.show();
+        let _ = tray_win.set_focus();
+    }
+    Ok(())
 }

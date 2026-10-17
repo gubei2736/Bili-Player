@@ -7,6 +7,7 @@ import {
 	Pin,
 	History,
 	Trash2,
+	Minimize2,
 } from 'lucide-react'
 import { BiliPlayerLogo } from '../common/BiliPlayerLogo'
 
@@ -248,6 +249,21 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 				</button>
 
 				<div className="h-3.5 w-px bg-white/10 mx-1.5" />
+
+				<button
+					onClick={async () => {
+						try {
+							const { invoke } = await import('@tauri-apps/api/core')
+							await invoke('toggle_mini_player')
+						} catch (err) {
+							console.warn('Failed to toggle mini player:', err)
+						}
+					}}
+					title="切换到迷你播放器 (Ctrl+Alt+M)"
+					className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+				>
+					<Minimize2 className="w-3.5 h-3.5" />
+				</button>
 
 				<button
 					onClick={handleMinimize}

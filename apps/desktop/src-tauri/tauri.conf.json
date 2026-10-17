@@ -37,6 +37,34 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "mini",
+        "title": "Bili Player - 迷你播放器",
+        "url": "index.html#mini",
+        "width": 380,
+        "height": 86,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
+      },
+      {
+        "label": "tray_menu",
+        "title": "Bili Player - 菜单",
+        "url": "index.html#tray",
+        "width": 210,
+        "height": 330,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
       }
     ],
     "security": {
