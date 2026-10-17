@@ -7,7 +7,16 @@
 一款基于 **Tauri v2 + React 18 + Rust** 构建的高性能、轻量级本地优先 Bilibili PC 桌面音乐播放器。  
 提供纯粹、高音质、无冗余干扰的沉浸式听歌体验。
 
+<p>
+  <a href="https://github.com/gubei2736">
+    <img src="https://github.com/gubei2736.png" width="48" height="48" alt="gubei2736" style="border-radius: 50%;" />
+  </a>
+  <br />
+  <sub><b>Author & Maintainer: <a href="https://github.com/gubei2736">gubei2736</a></b></sub>
+</p>
+
 [![Release](https://img.shields.io/badge/Release-v1.1.0-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
+[![Maintainer](https://img.shields.io/badge/Maintainer-gubei2736-EA4AAA?style=flat-square&logo=github&logoColor=white)](https://github.com/gubei2736)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/gubei2736/Bili-Player)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://v2.tauri.app/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
