@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { X, FolderPlus, Sparkles, Loader2, Cloud, HardDrive, CheckCircle2 } from 'lucide-react'
-import { useAuthStore, usePlaylistStore, useLocalPlaylistStore, bilibiliApi } from '@bbplayer/shared-core'
+import { X, FolderPlus, Sparkles, Loader2, CheckCircle2 } from 'lucide-react'
+import { useLocalPlaylistStore } from '@bbplayer/shared-core'
 
 export interface CreatePlaylistModalProps {
 	isOpen: boolean
@@ -13,14 +13,8 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 	onClose,
 	onSuccess,
 }) => {
-	const { isLoggedIn, userInfo } = useAuthStore()
-	const { syncRemotePlaylists } = usePlaylistStore()
-
 	const [title, setTitle] = useState('')
 	const [intro, setIntro] = useState('')
-	const [targetType, setTargetType] = useState<'bilibili' | 'local'>(
-		isLoggedIn ? 'bilibili' : 'local',
-	)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [createdSuccess, setCreatedSuccess] = useState(false)
@@ -36,38 +30,16 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 		setLoading(true)
 
 		try {
-			if (targetType === 'bilibili' && isLoggedIn && userInfo) {
-				const res = await bilibiliApi.createFavoriteFolder({
-					title: title.trim(),
-					intro: intro.trim(),
-					privacy: 0,
-				})
-
-				if (res.isOk()) {
-					await syncRemotePlaylists(userInfo.mid)
-					setCreatedSuccess(true)
-					setTimeout(() => {
-						setCreatedSuccess(false)
-						setTitle('')
-						setIntro('')
-						onSuccess?.(title.trim())
-						onClose()
-					}, 1000)
-				} else {
-					setError(res.error.message || '创建 B 站收藏夹失败，请重试')
-				}
-			} else {
-				// Local playlist creation
-				useLocalPlaylistStore.getState().createPlaylist(title.trim(), intro.trim())
-				setCreatedSuccess(true)
-				setTimeout(() => {
-					setCreatedSuccess(false)
-					setTitle('')
-					setIntro('')
-					onSuccess?.(title.trim())
-					onClose()
-				}, 1000)
-			}
+			// 本地独立歌单创建
+			useLocalPlaylistStore.getState().createPlaylist(title.trim(), intro.trim())
+			setCreatedSuccess(true)
+			setTimeout(() => {
+				setCreatedSuccess(false)
+				setTitle('')
+				setIntro('')
+				onSuccess?.(title.trim())
+				onClose()
+			}, 1000)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : '创建歌单遇到异常')
 		} finally {
@@ -105,39 +77,6 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({
 					</div>
 				) : (
 					<div className="space-y-4">
-						{/* Target Type Selector */}
-						<div className="grid grid-cols-2 gap-2">
-							<button
-								type="button"
-								onClick={() => setTargetType('bilibili')}
-								disabled={!isLoggedIn}
-								className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs ${
-									targetType === 'bilibili'
-										? 'bg-primary/15 border-primary/40 text-primary font-semibold shadow-sm'
-										: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/5'
-								} ${!isLoggedIn ? 'opacity-40 cursor-not-allowed' : ''}`}
-							>
-								<Cloud className="w-4 h-4" />
-								<span>B 站云端收藏夹</span>
-								<span className="text-[10px] opacity-70">
-									{isLoggedIn ? '双端实时同步' : '需先登录账号'}
-								</span>
-							</button>
-
-							<button
-								type="button"
-								onClick={() => setTargetType('local')}
-								className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs ${
-									targetType === 'local'
-										? 'bg-primary/15 border-primary/40 text-primary font-semibold shadow-sm'
-										: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/5'
-								}`}
-							>
-								<HardDrive className="w-4 h-4" />
-								<span>本地独立歌单</span>
-								<span className="text-[10px] opacity-70">仅保存在本设备</span>
-							</button>
-						</div>
 
 						{/* Title input */}
 						<div className="space-y-1.5">

@@ -874,7 +874,7 @@ export const App: React.FC = () => {
 									<div className="flex items-center justify-between">
 										<h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
 											<TrendingUp className="w-4 h-4 text-sky-400" />
-											<span>今日精选推荐</span>
+											<span>B站今日精选</span>
 										</h2>
 										<span className="text-xs text-muted-foreground">
 											共 {featuredTracks.length} 首音乐

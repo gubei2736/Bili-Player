@@ -52,6 +52,12 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		this.audio = new Audio()
 		this.audio.crossOrigin = 'anonymous'
 		try {
+			const savedVol = localStorage.getItem('bbplayer_volume')
+			this.audio.volume = savedVol !== null ? Math.max(0, Math.min(1, parseFloat(savedVol))) : 0.5
+		} catch {
+			this.audio.volume = 0.5
+		}
+		try {
 			const saved = localStorage.getItem('bbplayer_audio_volume_balance')
 			if (saved !== null) {
 				this.loudnessNormalizationEnabled = saved === 'true'
@@ -413,11 +419,15 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	}
 
 	public setVolume(volume: number): void {
-		this.audio.volume = Math.max(0, Math.min(1, volume))
+		const clamped = Math.max(0, Math.min(1, volume))
+		this.audio.volume = clamped
+		try {
+			localStorage.setItem('bbplayer_volume', clamped.toString())
+		} catch {}
 	}
 
 	public getVolume(): number {
-		return this.audio.volume ?? 1
+		return this.audio.volume ?? 0.5
 	}
 
 	public isMuted(): boolean {

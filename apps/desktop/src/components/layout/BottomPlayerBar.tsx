@@ -11,6 +11,7 @@ import {
 	VolumeX,
 	Maximize2,
 	Sliders,
+	FolderPlus,
 	Heart,
 	ListMusic,
 	FileText,
@@ -42,6 +43,7 @@ import {
 } from '../../services/lyricService'
 import { LyricsSettingsModal } from '../modals/LyricsSettingsModal'
 import { VideoPartsModal } from '../modals/VideoPartsModal'
+import { AddToPlaylistModal } from '../modals/AddToPlaylistModal'
 import { logMultipart } from '../../utils/debugLogger'
 
 export interface BottomPlayerBarProps {
@@ -69,8 +71,16 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [isPlaying, setIsPlaying] = useState(false)
 	const [currentTime, setCurrentTime] = useState(0)
 	const [duration, setDuration] = useState(0)
-	const [volume, setVolume] = useState(0.8)
+	const [volume, setVolume] = useState<number>(() => {
+		try {
+			const saved = localStorage.getItem('bbplayer_volume')
+			return saved !== null ? Math.max(0, Math.min(1, parseFloat(saved))) : 0.5
+		} catch {
+			return 0.5
+		}
+	})
 	const [isMuted, setIsMuted] = useState(false)
+	const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false)
 	const [loudnessEnabled, setLoudnessEnabled] = useState(() =>
 		desktopAudioEngine.isLoudnessNormalizationEnabled(),
 	)
@@ -421,7 +431,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 	const toggleMute = () => {
 		if (isMuted) {
-			const restoreVal = volume > 0 ? volume : 0.8
+			const restoreVal = volume > 0 ? volume : 0.5
 			setIsMuted(false)
 			desktopAudioEngine.setVolume(restoreVal)
 		} else {
@@ -832,6 +842,20 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 				{/* 3. Right Column: Volume, Lyric Setting, Desktop Lyrics, Fullscreen */}
 				<div className="flex items-center justify-end gap-3 w-[28%] min-w-[220px]">
+					{/* Add To Custom Playlist */}
+					<button
+						onClick={() => currentTrack && setIsAddToPlaylistOpen(true)}
+						disabled={!currentTrack}
+						title={currentTrack ? '添加到歌单' : '暂无播放歌曲'}
+						className={`p-1.5 rounded-full transition-colors ${
+							currentTrack
+								? 'text-muted-foreground hover:text-foreground hover:bg-white/10'
+								: 'text-muted-foreground/30 cursor-not-allowed'
+						}`}
+					>
+						<FolderPlus className="w-4 h-4" />
+					</button>
+
 					{/* Favorite Heart */}
 					<button
 						onClick={toggleLike}
@@ -1070,6 +1094,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					initialParts={biliTrack.bilibiliMetadata.pages}
 				/>
 			)}
+
+			{/* Add to Custom Playlist Modal */}
+			<AddToPlaylistModal
+				isOpen={isAddToPlaylistOpen}
+				onClose={() => setIsAddToPlaylistOpen(false)}
+				track={currentTrack}
+			/>
 		</footer>
 	)
 }

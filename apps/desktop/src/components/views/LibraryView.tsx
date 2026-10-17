@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
 	FolderPlus,
 	Import,
@@ -13,6 +14,7 @@ import {
 	Heart,
 	Search,
 	X,
+	AlertCircle,
 } from 'lucide-react'
 import {
 	useLocalPlaylistStore,
@@ -42,6 +44,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 }) => {
 	const { playlists, deletePlaylist, removeTrackFromPlaylist } = useLocalPlaylistStore()
 	const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null)
+	const [playlistToDelete, setPlaylistToDelete] = useState<LocalPlaylist | null>(null)
 	const [trackSearchKeyword, setTrackSearchKeyword] = useState('')
 	const [playlistSearchKeyword, setPlaylistSearchKeyword] = useState('')
 	const { setQueue } = useQueueStore()
@@ -147,13 +150,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
 								{currentPlaylist.id !== DEFAULT_FAVORITES_PLAYLIST_ID && (
 									<button
-										onClick={() => {
-											if (window.confirm(`确定要删除歌单【${currentPlaylist.title}】吗？`)) {
-												deletePlaylist(currentPlaylist.id)
-												setActivePlaylistId(null)
-												setTrackSearchKeyword('')
-											}
-										}}
+										onClick={() => setPlaylistToDelete(currentPlaylist)}
 										className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
 										title="删除歌单"
 									>
@@ -423,6 +420,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 					))}
 				</div>
 			)}
+
+			{/* Custom Delete Playlist Confirmation Modal */}
+			{playlistToDelete &&
+				createPortal(
+					<div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+						<div className="w-full max-w-sm rounded-2xl bg-[#0e131f]/95 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col p-5 space-y-4 text-xs animate-in fade-in zoom-in-95 duration-150">
+							<div className="flex items-center gap-3">
+								<div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 flex-shrink-0">
+									<AlertCircle className="w-5 h-5" />
+								</div>
+								<div>
+									<h3 className="font-bold text-sm text-foreground">删除歌单确认</h3>
+									<p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+										确定要删除歌单【<span className="text-foreground font-semibold">{playlistToDelete.title}</span>】吗？删除后不可恢复。
+									</p>
+								</div>
+							</div>
+
+							<div className="flex items-center justify-end gap-2 pt-1">
+								<button
+									onClick={() => setPlaylistToDelete(null)}
+									className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-foreground font-medium transition-colors"
+								>
+									取消
+								</button>
+								<button
+									onClick={() => {
+										deletePlaylist(playlistToDelete.id)
+										setPlaylistToDelete(null)
+										setActivePlaylistId(null)
+										setTrackSearchKeyword('')
+									}}
+									className="px-3.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-medium transition-colors shadow-md shadow-rose-500/20 active:scale-95"
+								>
+									确认删除
+								</button>
+							</div>
+						</div>
+					</div>,
+					document.body,
+				)}
 		</div>
 	)
 }

@@ -49,7 +49,7 @@ export const MiniPlayerApp: React.FC = () => {
 		duration: 0,
 		isPlaying: false,
 		playMode: 'repeat_all',
-		volume: 0.8,
+		volume: 0.5,
 		isMuted: false,
 		queue: [],
 		currentIndex: -1,

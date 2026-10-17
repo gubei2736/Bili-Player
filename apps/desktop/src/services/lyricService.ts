@@ -64,9 +64,9 @@ export function setPreferredLyricSource(source: PreferredLyricSource): void {
 export function getAutoMatchLyricsEnabled(): boolean {
 	try {
 		const val = localStorage.getItem(LYRIC_OPT_AUTO_MATCH_KEY)
-		return val !== null ? val === 'true' : true
+		return val !== null ? val === 'true' : false
 	} catch {
-		return true
+		return false
 	}
 }
 
