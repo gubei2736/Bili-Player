@@ -15,12 +15,16 @@ export interface SkinState {
 	customBgOpacity: number // 0.1 to 1.0 (default 0.5)
 	customBgBlur: number // 0 to 40 px (default 0)
 	customTextColor: string | null // e.g. '#FFFFFF', '#FDE047', or null for default
+	uiBlur: number // 0 to 40 px (default 16) UI面板毛玻璃模糊度
+	uiOpacity: number // 0.05 to 0.9 (default 0.35) UI面板遮罩暗度
 
 	setSkin: (suit: BilibiliGarbSuitDetailResponse | null) => void
 	clearSkin: () => void
 	setCustomBg: (url: string | null, opacity?: number, blur?: number) => void
 	clearCustomBg: () => void
 	setTextColor: (color: string | null) => void
+	setUiBlur: (blur: number) => void
+	setUiOpacity: (opacity: number) => void
 }
 
 export const useSkinStore = create<SkinState>()(
@@ -33,6 +37,8 @@ export const useSkinStore = create<SkinState>()(
 			customBgOpacity: 0.5,
 			customBgBlur: 0,
 			customTextColor: null,
+			uiBlur: 16,
+			uiOpacity: 0.35,
 
 			setSkin: (suit) => {
 				if (!suit) {
@@ -93,6 +99,14 @@ export const useSkinStore = create<SkinState>()(
 
 			setTextColor: (color) => {
 				set({ customTextColor: color })
+			},
+
+			setUiBlur: (blur: number) => {
+				set({ uiBlur: blur })
+			},
+
+			setUiOpacity: (opacity: number) => {
+				set({ uiOpacity: opacity })
 			},
 		}),
 		{

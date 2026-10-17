@@ -27,13 +27,32 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 fn get_reqwest_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
         let mut builder = reqwest::Client::builder()
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(15))
             // 不自动跟随重定向，以便手动拦截捕获 302 跨域换票响应头中的 Set-Cookie
             .redirect(reqwest::redirect::Policy::none());
 
-        if let Ok(proxy_val) = std::env::var("HTTP_PROXY").or_else(|_| std::env::var("http_proxy")) {
-            if let Ok(proxy) = reqwest::Proxy::all(&proxy_val) {
+        // 1. 优先读取系统/环境代理变量
+        let env_proxy = std::env::var("HTTP_PROXY")
+            .or_else(|_| std::env::var("http_proxy"))
+            .or_else(|_| std::env::var("ALL_PROXY"))
+            .or_else(|_| std::env::var("all_proxy"))
+            .ok();
+
+        if let Some(ref p) = env_proxy {
+            if let Ok(proxy) = reqwest::Proxy::all(p) {
                 builder = builder.proxy(proxy);
+            }
+        } else {
+            // 2. 检测本地代理端口 127.0.0.1:7879，若处于监听状态则自动配置代理（解决 Clash Fake-IP 模式下直连黑洞丢包问题）
+            if std::net::TcpStream::connect_timeout(
+                &std::net::SocketAddr::from(([127, 0, 0, 1], 7879)),
+                Duration::from_millis(100),
+            )
+            .is_ok()
+            {
+                if let Ok(proxy) = reqwest::Proxy::all("http://127.0.0.1:7879") {
+                    builder = builder.proxy(proxy);
+                }
             }
         }
 

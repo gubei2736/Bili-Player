@@ -32,6 +32,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
 	const customBgOpacity = useSkinStore((s) => s.customBgOpacity)
 	const customBgBlur = useSkinStore((s) => s.customBgBlur)
+	const uiBlur = useSkinStore((s) => s.uiBlur ?? 16)
+	const uiOpacity = useSkinStore((s) => s.uiOpacity ?? 0.35)
 
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07090e] text-foreground border border-white/10 shadow-2xl relative select-none">
@@ -77,9 +79,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 					onOpenLoginModal={onOpenLoginModal}
 				/>
 				<main
-					className={`flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl ${
-						customBgUrl ? 'bg-black/10' : 'bg-black/25'
-					} border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 backdrop-blur-sm`}
+					className="flex-1 h-full min-w-0 overflow-y-auto relative rounded-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] px-7 py-6 transition-all duration-300"
+					style={{
+						backgroundColor: customBgUrl
+							? `rgba(7, 9, 14, ${uiOpacity})`
+							: 'rgba(0, 0, 0, 0.25)',
+						backdropFilter: customBgUrl
+							? `blur(${uiBlur}px)`
+							: 'blur(8px)',
+					}}
 				>
 					{children(activeTab)}
 				</main>

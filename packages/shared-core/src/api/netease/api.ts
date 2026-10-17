@@ -118,12 +118,12 @@ export class NeteaseApi {
 
 		// 1. 对于单曲检索，优先使用响应极速且免加密风控的 Web 开放搜索接口
 		if (type == 1) {
-			const webSearchUrl = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(
-				params.keywords,
-			)}&type=1&offset=${offset}&total=true&limit=${limit}`
+			const doFetchSongs = async (kw: string) => {
+				const webSearchUrl = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(
+					kw,
+				)}&type=1&offset=${offset}&total=true&limit=${limit}`
 
-			const webSearchPromise = this.http
-				.fetch(webSearchUrl, {
+				const res = await this.http.fetch(webSearchUrl, {
 					headers: {
 						Referer: 'https://music.163.com/',
 						'User-Agent':
@@ -131,23 +131,42 @@ export class NeteaseApi {
 					},
 					signal,
 				})
-				.then(async (res) => {
-					if (!res.ok) {
-						throw new Error(`Netease web search error: ${res.statusText}`)
+				if (!res.ok) {
+					throw new Error(`Netease web search error: ${res.statusText}`)
+				}
+				const json = (await res.json()) as any
+				const songs = json?.result?.songs ?? []
+				return songs.map((song: any) => ({
+					source: 'netease' as const,
+					duration: (song.duration ?? song.dt ?? 0) / 1000,
+					title: song.name,
+					artist:
+						song.artists?.[0]?.name ??
+						song.ar?.[0]?.name ??
+						'Unknown',
+					remoteId: song.id,
+				})) as LyricSearchResult
+			}
+
+			const webSearchPromise = (async () => {
+				let list = await doFetchSongs(params.keywords)
+				// 若首次带完整歌手名检索为空，且关键词包含中英文混排空格（如“宇多田光 One Last Kiss”），智能提取核心歌名进行容灾补充
+				if (list.length === 0 && params.keywords.includes(' ')) {
+					const parts = params.keywords.trim().split(/\s+/)
+					// 提取纯英文/外语部分或较长词节
+					const subKws = parts.filter((p) => p.length >= 2)
+					for (const subKw of subKws) {
+						try {
+							const fallbackList = await doFetchSongs(subKw)
+							if (fallbackList.length > 0) {
+								list = fallbackList
+								break
+							}
+						} catch {}
 					}
-					const json = (await res.json()) as any
-					const songs = json?.result?.songs ?? []
-					return songs.map((song: any) => ({
-						source: 'netease' as const,
-						duration: (song.duration ?? song.dt ?? 0) / 1000,
-						title: song.name,
-						artist:
-							song.artists?.[0]?.name ??
-							song.ar?.[0]?.name ??
-							'Unknown',
-						remoteId: song.id,
-					})) as LyricSearchResult
-				})
+				}
+				return list
+			})()
 
 			return ResultAsync.fromPromise(
 				webSearchPromise,

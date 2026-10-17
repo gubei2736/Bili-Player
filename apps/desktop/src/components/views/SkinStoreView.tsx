@@ -140,6 +140,10 @@ export const SkinStoreView: React.FC = () => {
 		setTextColor,
 		setCustomBg,
 		clearCustomBg,
+		uiBlur,
+		uiOpacity,
+		setUiBlur,
+		setUiOpacity,
 	} = useSkinStore()
 
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -345,56 +349,113 @@ export const SkinStoreView: React.FC = () => {
 							</div>
 						</div>
 
-						{/* Sliders for Opacity & Blur */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-							{/* Opacity Slider */}
-							<div className="space-y-1.5">
-								<div className="flex items-center justify-between text-[11px] text-muted-foreground">
-									<span>背景不透明度</span>
-									<span className="font-mono text-foreground font-semibold">
-										{Math.round((customBgOpacity ?? 0.5) * 100)}%
-									</span>
+						{/* Sliders for Wallpaper & UI Panel Glass */}
+						<div className="space-y-4 pt-1">
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+								{/* Opacity Slider */}
+								<div className="space-y-1.5 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+									<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+										<span>壁纸图片不透明度</span>
+										<span className="font-mono text-foreground font-semibold">
+											{Math.round((customBgOpacity ?? 0.5) * 100)}%
+										</span>
+									</div>
+									<input
+										type="range"
+										min="0.1"
+										max="1"
+										step="0.05"
+										value={customBgOpacity ?? 0.5}
+										onChange={(e) =>
+											setCustomBg(
+												customBgUrl,
+												parseFloat(e.target.value),
+												customBgBlur ?? 0,
+											)
+										}
+										className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
+									/>
 								</div>
-								<input
-									type="range"
-									min="0.1"
-									max="1"
-									step="0.05"
-									value={customBgOpacity ?? 0.5}
-									onChange={(e) =>
-										setCustomBg(
-											customBgUrl,
-											parseFloat(e.target.value),
-											customBgBlur ?? 0,
-										)
-									}
-									className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
-								/>
+
+								{/* Blur Slider */}
+								<div className="space-y-1.5 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+									<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+										<span>壁纸图片自模糊</span>
+										<span className="font-mono text-foreground font-semibold">
+											{customBgBlur ?? 0}px
+										</span>
+									</div>
+									<input
+										type="range"
+										min="0"
+										max="30"
+										step="1"
+										value={customBgBlur ?? 0}
+										onChange={(e) =>
+											setCustomBg(
+												customBgUrl,
+												customBgOpacity ?? 0.5,
+												parseInt(e.target.value, 10),
+											)
+										}
+										className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
+									/>
+								</div>
 							</div>
 
-							{/* Blur Slider */}
-							<div className="space-y-1.5">
-								<div className="flex items-center justify-between text-[11px] text-muted-foreground">
-									<span>毛玻璃模糊度</span>
-									<span className="font-mono text-foreground font-semibold">
-										{customBgBlur ?? 0}px
+							{/* UI 面板专属模糊度与暗度（解决自定义背景看不太清内容的问题） */}
+							<div className="p-3.5 rounded-xl bg-primary/[0.04] border border-primary/15 space-y-3">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-1.5">
+										<Sparkles className="w-3.5 h-3.5 text-primary" />
+										<span className="text-xs font-semibold text-foreground">
+											UI 界面通透与清晰度调节
+										</span>
+									</div>
+									<span className="text-[10px] text-muted-foreground">
+										调大模糊或暗度可使背景图下的文字列表更加清晰醒目
 									</span>
 								</div>
-								<input
-									type="range"
-									min="0"
-									max="30"
-									step="1"
-									value={customBgBlur ?? 0}
-									onChange={(e) =>
-										setCustomBg(
-											customBgUrl,
-											customBgOpacity ?? 0.5,
-											parseInt(e.target.value, 10),
-										)
-									}
-									className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
-								/>
+
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+									{/* UI Blur Slider */}
+									<div className="space-y-1.5">
+										<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+											<span>界面毛玻璃模糊度</span>
+											<span className="font-mono text-primary font-semibold">
+												{uiBlur ?? 16}px
+											</span>
+										</div>
+										<input
+											type="range"
+											min="0"
+											max="40"
+											step="2"
+											value={uiBlur ?? 16}
+											onChange={(e) => setUiBlur(parseInt(e.target.value, 10))}
+											className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
+										/>
+									</div>
+
+									{/* UI Dimness/Opacity Slider */}
+									<div className="space-y-1.5">
+										<div className="flex items-center justify-between text-[11px] text-muted-foreground">
+											<span>界面遮罩暗度</span>
+											<span className="font-mono text-primary font-semibold">
+												{Math.round((uiOpacity ?? 0.35) * 100)}%
+											</span>
+										</div>
+										<input
+											type="range"
+											min="0.05"
+											max="0.85"
+											step="0.05"
+											value={uiOpacity ?? 0.35}
+											onChange={(e) => setUiOpacity(parseFloat(e.target.value))}
+											className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-[#00AEEC]"
+										/>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
