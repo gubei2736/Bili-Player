@@ -231,9 +231,9 @@ pub fn open_debug_log_file() {
 
 /// Tauri Command: Toggle DevTools on the main window (F12 or debug helper)
 #[tauri::command]
-pub fn toggle_devtools(app: AppHandle) {
+pub fn toggle_devtools(_app: AppHandle) {
     #[cfg(debug_assertions)]
-    if let Some(win) = app.get_webview_window("main") {
+    if let Some(win) = _app.get_webview_window("main") {
         if win.is_devtools_open() {
             win.close_devtools();
         } else {
