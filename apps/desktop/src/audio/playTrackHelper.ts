@@ -383,8 +383,9 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 
 			// 4. Calculate loudness normalization gain (dB)
 			let loudnessDeltaDb = 0
-			if (streamData.volume) {
-				loudnessDeltaDb = streamData.volume.target_i - streamData.volume.measured_i
+			if (streamData.volume && typeof streamData.volume.measured_i === 'number') {
+				const target = typeof streamData.volume.target_i === 'number' ? streamData.volume.target_i : -14.0
+				loudnessDeltaDb = target - streamData.volume.measured_i
 			}
 
 			// 5. 优先切歌出声：第一时间送入音频引擎播放（必须传入具有最新 title 与 pageIndex 的 biliTrack！）

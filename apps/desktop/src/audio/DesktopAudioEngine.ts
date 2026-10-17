@@ -81,15 +81,15 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		// 2. GainNode (响度均衡前置增益)
 		this.gainNode = this.audioCtx.createGain()
 
-		// 3. DynamicsCompressorNode (平滑音乐响度统一动态压缩器)
+		// 3. DynamicsCompressorNode (专业广播级透明防削波母带限制器 - 保持音乐动态高保真且消除抽吸感)
 		this.compressorNode = this.audioCtx.createDynamicsCompressor()
-		this.compressorNode.threshold.setValueAtTime(-16, this.audioCtx.currentTime)
-		this.compressorNode.knee.setValueAtTime(16, this.audioCtx.currentTime)
-		this.compressorNode.ratio.setValueAtTime(4.0, this.audioCtx.currentTime)
-		this.compressorNode.attack.setValueAtTime(0.005, this.audioCtx.currentTime)
-		this.compressorNode.release.setValueAtTime(0.15, this.audioCtx.currentTime)
+		this.compressorNode.threshold.setValueAtTime(-2.0, this.audioCtx.currentTime)
+		this.compressorNode.knee.setValueAtTime(6.0, this.audioCtx.currentTime)
+		this.compressorNode.ratio.setValueAtTime(12.0, this.audioCtx.currentTime)
+		this.compressorNode.attack.setValueAtTime(0.003, this.audioCtx.currentTime)
+		this.compressorNode.release.setValueAtTime(0.20, this.audioCtx.currentTime)
 
-		// 4. AnalyserNode (FFT 频谱分析)
+		// 4. AnalyserNode (FFT 频谱分析与实时 RMS 响度感知)
 		this.analyserNode = this.audioCtx.createAnalyser()
 		this.analyserNode.fftSize = 256
 		this.analyserNode.smoothingTimeConstant = 0.8
@@ -365,29 +365,29 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		let linearGain = 1.0
 		if (this.loudnessNormalizationEnabled) {
 			if (this.currentLoudnessGainDb !== 0) {
-				// 限制增益在安全范围 [-9dB, +9dB] 之间，防止过大失真或过低音量
-				const clampedDb = Math.max(-9, Math.min(9, this.currentLoudnessGainDb))
+				// 行业标准 EBU R128: 限制增益在平滑安全范围 [-7dB, +6dB] 之间，防止过大失真或提升背景底噪
+				const clampedDb = Math.max(-7, Math.min(6, this.currentLoudnessGainDb))
 				linearGain = Math.pow(10, clampedDb / 20)
 			}
-			// 启用平滑音乐动态压限
+			// 启用透明防削波软拐点限制器 (Limiter)，仅针对 > -2dB 的过载瞬态做柔和防破音保护，绝不压缩正常音乐动态
 			if (this.compressorNode) {
-				this.compressorNode.threshold.setTargetAtTime(-16, this.audioCtx.currentTime, 0.05)
-				this.compressorNode.knee.setTargetAtTime(16, this.audioCtx.currentTime, 0.05)
-				this.compressorNode.ratio.setTargetAtTime(4.0, this.audioCtx.currentTime, 0.05)
+				this.compressorNode.threshold.setTargetAtTime(-2.0, this.audioCtx.currentTime, 0.05)
+				this.compressorNode.knee.setTargetAtTime(6.0, this.audioCtx.currentTime, 0.05)
+				this.compressorNode.ratio.setTargetAtTime(12.0, this.audioCtx.currentTime, 0.05)
 			}
 		} else {
-			// 关闭音量平衡时，压缩器旁通直通
+			// 关闭音量平衡时，限制器完全旁通
 			if (this.compressorNode) {
 				this.compressorNode.threshold.setTargetAtTime(0, this.audioCtx.currentTime, 0.05)
 				this.compressorNode.ratio.setTargetAtTime(1.0, this.audioCtx.currentTime, 0.05)
 			}
 		}
 
-		// 80ms 平滑过渡，杜绝音量骤变产生的爆音
+		// 120ms 高保真平滑过渡曲线，杜绝音量骤变产生爆音
 		this.gainNode.gain.setTargetAtTime(
 			linearGain,
 			this.audioCtx.currentTime,
-			0.08,
+			0.12,
 		)
 	}
 

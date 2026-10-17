@@ -630,9 +630,9 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			</div>
 
 			{/* Bottom: 3-Column Control Layout with guaranteed non-clipped Play Button */}
-			<div className="w-full flex items-center justify-between h-[60px]">
+			<div className="w-full flex items-center justify-between h-[60px] gap-2 px-1">
 				{/* 1. Left Column: Album Art & Track Info */}
-				<div className="flex items-center gap-3.5 w-[28%] min-w-[220px]">
+				<div className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0 max-w-[190px] sm:max-w-[240px]">
 					{currentTrack ? (
 						<>
 							<div
@@ -735,11 +735,11 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				</div>
 
 				{/* 2. Center Column: Scrolling Lyric on top + Non-clipped Circular Play Controls below */}
-				<div className="flex flex-col items-center justify-center flex-1 max-w-lg mx-auto">
+				<div className="flex flex-col items-center justify-center flex-1 min-w-0 max-w-lg mx-auto px-1">
 					{/* Status Bar Lyric (Line 1) */}
 					<div
 						onClick={onToggleFullscreenLyrics}
-						className="h-5 flex items-center justify-center gap-2 cursor-pointer text-center overflow-hidden max-w-md group mb-1"
+						className="h-5 flex items-center justify-center gap-2 cursor-pointer text-center overflow-hidden max-w-md group mb-1 w-full"
 						title="状态栏歌词 (点击展开全屏歌词)"
 					>
 						{currentLine ? (
@@ -759,14 +759,14 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 								)}
 							</div>
 						) : currentTrack ? (
-							<span className="text-[11px] text-muted-foreground/60 tracking-wider">
+							<span className="text-[11px] text-muted-foreground/60 tracking-wider truncate">
 								♪ 沉浸聆听中 · 点击查看全屏歌词
 							</span>
 						) : null}
 					</div>
 
 					{/* Playback Controls (Line 2) - Roomy, centered, 100% full circle */}
-					<div className="flex items-center justify-center gap-3 sm:gap-4">
+					<div className="flex items-center justify-center gap-1.5 sm:gap-2.5 md:gap-3.5 flex-nowrap">
 						{/* Open Video Webpage in Default Browser */}
 						<button
 							onClick={() => {
@@ -908,12 +908,12 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				</div>
 
 				{/* 3. Right Column: Volume, Lyric Setting, Desktop Lyrics, Fullscreen */}
-				<div className="flex items-center justify-end gap-3 w-[28%] min-w-[220px]">
+				<div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0 min-w-0">
 					{/* Queue Drawer Button */}
 					<button
 						onClick={() => setQueueOpen(!queueOpen)}
 						title={`播放队列 (${queue.length} 首)`}
-						className={`p-1.5 rounded-full hover:bg-white/10 transition-colors ${
+						className={`p-1.5 rounded-full hover:bg-white/10 transition-colors shrink-0 ${
 							queueOpen
 								? 'text-[#00AEEC] bg-[#00AEEC]/15'
 								: 'text-muted-foreground hover:text-foreground'
@@ -923,10 +923,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					</button>
 
 					{/* Volume Control */}
-					<div className="flex items-center gap-1.5 group/vol">
+					<div className="flex items-center gap-1 group/vol shrink-0">
 						<button
 							onClick={toggleMute}
-							className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+							className="p-1 sm:p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors shrink-0"
 							title={isMuted ? '取消静音' : '静音'}
 						>
 							{isMuted || volume === 0 ? (
@@ -936,7 +936,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							)}
 						</button>
 
-						<div className="relative w-20 h-5 flex items-center">
+						<div className="relative w-14 sm:w-16 md:w-20 h-5 flex items-center shrink-0">
 							<div className="w-full h-[3px] bg-white/15 rounded-full overflow-hidden">
 								<div
 									className="h-full bg-[#00AEEC] rounded-full transition-all"

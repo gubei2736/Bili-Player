@@ -206,7 +206,7 @@ export const SkinStoreView: React.FC = () => {
 	}
 
 	return (
-		<div className="space-y-6 max-w-4xl pb-10">
+		<div className="space-y-6 w-full max-w-5xl pb-10">
 			{/* Top Header */}
 			<div className="flex items-center justify-between">
 				<div>
@@ -286,8 +286,8 @@ export const SkinStoreView: React.FC = () => {
 								<span>上传本地图片</span>
 							</button>
 
-							{/* UI 字体颜色选项（缩短至紧凑规格并向右移动） */}
-							<div className="w-fit max-w-[260px] ml-6 flex items-center justify-between gap-2.5 h-8 px-2.5 rounded-lg bg-white/5 border border-white/10">
+							{/* UI 字体颜色选项 */}
+							<div className="flex items-center gap-2 h-8 px-2.5 rounded-lg bg-white/5 border border-white/10 shrink-0">
 								<div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
 									<Type className="w-3 h-3 text-[#00AEEC]" />
 									<span className="text-[10px] font-medium text-foreground">
@@ -462,7 +462,7 @@ export const SkinStoreView: React.FC = () => {
 				<h3 className="text-xs font-bold text-foreground">
 					预设主题装扮
 				</h3>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
 					{PRESET_SKINS.map((skin) => {
 						const isActive = activeSkinId === skin.id
 						return (
