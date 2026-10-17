@@ -41,6 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	const { isLoggedIn, userInfo, logout } = useAuthStore()
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
 	const customTextColor = useSkinStore((s) => s.customTextColor)
+	const uiBlur = useSkinStore((s) => s.uiBlur ?? 16)
+	const uiOpacity = useSkinStore((s) => s.uiOpacity ?? 0.35)
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
 	const discoverGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
@@ -112,10 +114,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 	return (
 		<aside
-			style={customTextColor ? { color: customTextColor } : undefined}
-			className={`w-56 h-full flex flex-col justify-between rounded-2xl ${
-				customBgUrl ? 'bg-black/15' : 'bg-black/25'
-			} border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-md select-none p-3`}
+			style={{
+				...(customTextColor ? { color: customTextColor } : {}),
+				backgroundColor: customBgUrl
+					? `rgba(7, 9, 14, ${uiOpacity})`
+					: 'rgba(0, 0, 0, 0.25)',
+				backdropFilter: customBgUrl
+					? `blur(${uiBlur}px)`
+					: 'blur(12px)',
+			}}
+			className="w-56 h-full flex flex-col justify-between rounded-2xl border border-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] select-none p-3 transition-all duration-300"
 		>
 			{/* Top Nav Groups */}
 			<div className="space-y-5 overflow-y-auto no-scrollbar pt-1">
@@ -154,9 +162,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			<div className="pt-3 border-t border-white/[0.08]">
 				{isLoggedIn && userInfo ? (
 					<div
-						className={`flex items-center justify-between p-2.5 rounded-xl ${
-							customBgUrl ? 'bg-black/20' : 'bg-black/35'
-						} backdrop-blur-sm border border-white/[0.08] shadow-inner`}
+						className="flex items-center justify-between p-2.5 rounded-xl backdrop-blur-sm border border-white/[0.08] shadow-inner transition-colors duration-300"
+						style={{
+							backgroundColor: customBgUrl
+								? `rgba(0, 0, 0, ${Math.min(0.9, uiOpacity + 0.1)})`
+								: 'rgba(0, 0, 0, 0.35)',
+						}}
 					>
 						<div className="flex items-center gap-2.5 overflow-hidden">
 							<div className="relative flex-shrink-0">

@@ -22,28 +22,40 @@ pub struct NativeHttpResponse {
     pub body: String,
 }
 
-static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+static DIRECT_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+static PROXY_CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
 
-fn get_reqwest_client() -> &'static reqwest::Client {
-    HTTP_CLIENT.get_or_init(|| {
-        let mut builder = reqwest::Client::builder()
-            .timeout(Duration::from_secs(15))
-            // 不自动跟随重定向，以便手动拦截捕获 302 跨域换票响应头中的 Set-Cookie
-            .redirect(reqwest::redirect::Policy::none());
+fn get_direct_client() -> &'static reqwest::Client {
+    DIRECT_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(12))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new())
+    })
+}
 
-        // 1. 优先读取系统/环境代理变量
-        let env_proxy = std::env::var("HTTP_PROXY")
-            .or_else(|_| std::env::var("http_proxy"))
-            .or_else(|_| std::env::var("ALL_PROXY"))
-            .or_else(|_| std::env::var("all_proxy"))
-            .ok();
+fn get_proxy_client() -> Option<&'static reqwest::Client> {
+    PROXY_CLIENT
+        .get_or_init(|| {
+            let env_proxy = std::env::var("HTTP_PROXY")
+                .or_else(|_| std::env::var("http_proxy"))
+                .or_else(|_| std::env::var("ALL_PROXY"))
+                .or_else(|_| std::env::var("all_proxy"))
+                .ok();
 
-        if let Some(ref p) = env_proxy {
-            if let Ok(proxy) = reqwest::Proxy::all(p) {
-                builder = builder.proxy(proxy);
+            if let Some(ref p) = env_proxy {
+                if let Ok(proxy) = reqwest::Proxy::all(p) {
+                    return reqwest::Client::builder()
+                        .timeout(Duration::from_secs(12))
+                        .redirect(reqwest::redirect::Policy::none())
+                        .proxy(proxy)
+                        .build()
+                        .ok();
+                }
             }
-        } else {
-            // 2. 检测本地代理端口 127.0.0.1:7879，若处于监听状态则自动配置代理（解决 Clash Fake-IP 模式下直连黑洞丢包问题）
+
+            // 检测本地代理端口 127.0.0.1:7879
             if std::net::TcpStream::connect_timeout(
                 &std::net::SocketAddr::from(([127, 0, 0, 1], 7879)),
                 Duration::from_millis(100),
@@ -51,18 +63,24 @@ fn get_reqwest_client() -> &'static reqwest::Client {
             .is_ok()
             {
                 if let Ok(proxy) = reqwest::Proxy::all("http://127.0.0.1:7879") {
-                    builder = builder.proxy(proxy);
+                    return reqwest::Client::builder()
+                        .timeout(Duration::from_secs(12))
+                        .redirect(reqwest::redirect::Policy::none())
+                        .proxy(proxy)
+                        .build()
+                        .ok();
                 }
             }
-        }
 
-        builder.build().unwrap_or_else(|_| reqwest::Client::new())
-    })
+            None
+        })
+        .as_ref()
 }
 
-#[tauri::command]
-pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHttpResponse, String> {
-    let client = get_reqwest_client();
+async fn execute_request_on_client(
+    client: &reqwest::Client,
+    request: &NativeHttpRequest,
+) -> Result<NativeHttpResponse, String> {
     let method = request
         .method
         .as_deref()
@@ -86,12 +104,22 @@ pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHtt
         let mut header_map = HeaderMap::new();
         if let Some(ref headers) = request.headers {
             for (k, v) in headers {
+                let lower_k = k.to_lowercase();
                 if let (Ok(hn), Ok(hv)) = (
-                    HeaderName::from_bytes(k.as_bytes()),
+                    HeaderName::from_bytes(lower_k.as_bytes()),
                     HeaderValue::from_str(v),
                 ) {
                     header_map.insert(hn, hv);
                 }
+            }
+        }
+
+        // 默认补充浏览器 User-Agent，避免防爬系统丢弃无头请求
+        if !header_map.contains_key("user-agent") {
+            if let Ok(ua_val) = HeaderValue::from_str(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            ) {
+                header_map.insert(HeaderName::from_static("user-agent"), ua_val);
             }
         }
 
@@ -185,5 +213,23 @@ pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHtt
             headers: resp_headers,
             body,
         });
+    }
+}
+
+#[tauri::command]
+pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHttpResponse, String> {
+    // 1. 优先尝试直连客户端请求
+    let direct_res = execute_request_on_client(get_direct_client(), &request).await;
+    match direct_res {
+        Ok(ref resp) if resp.ok || (resp.status > 0 && resp.status < 500) => Ok(direct_res.unwrap()),
+        _ => {
+            // 2. 若直连遭遇网络超时/Fake-IP黑洞/连接失败，自动无缝使用代理通道（如 127.0.0.1:7879）进行重试
+            if let Some(proxy_client) = get_proxy_client() {
+                if let Ok(proxy_res) = execute_request_on_client(proxy_client, &request).await {
+                    return Ok(proxy_res);
+                }
+            }
+            direct_res
+        }
     }
 }
