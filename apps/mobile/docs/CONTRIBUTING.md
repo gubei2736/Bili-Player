@@ -1,6 +1,6 @@
-# 贡献指南 (Contributing Guide)
+﻿# 贡献指南 (Contributing Guide)
 
-欢迎来到 BBPlayer 项目！我们非常感谢你对开源社区的贡献。在开始之前，请花一点时间阅读以下指南，这将帮助你更高效地参与开发。
+欢迎来到 Bili Player 项目！我们非常感谢你对开源社区的贡献。在开始之前，请花一点时间阅读以下指南，这将帮助你更高效地参与开发。
 
 ## 🚀 快速开始 (Getting Started)
 

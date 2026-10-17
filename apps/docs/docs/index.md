@@ -1,8 +1,8 @@
----
+﻿---
 layout: home
 
 hero:
-  name: 'BBPlayer'
+  name: 'Bili Player'
   text: '更纯粹的 BiliBili 听歌方式'
   tagline: '轻量、开源、不妥协。让 B 站音频回归它应有的样子。'
   actions:

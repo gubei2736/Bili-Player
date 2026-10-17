@@ -31,3 +31,4 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tower-http = { version = "0.5", features = ["cors"] }
 mp4ameta = "0.11"
 log = "0.4"
+rfd = "0.15"

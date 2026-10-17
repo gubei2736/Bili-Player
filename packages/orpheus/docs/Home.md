@@ -1,8 +1,8 @@
-# 欢迎使用 Orpheus
+﻿# 欢迎使用 Orpheus
 
-**BBPlayer 内部音频模块**
+**Bili Player 内部音频模块**
 
-Orpheus 是一个为 BBPlayer 构建的高性能音频播放库，基于 Android Media3 (ExoPlayer) 和 AVFoundation。
+Orpheus 是一个为 Bili Player 构建的高性能音频播放库，基于 Android Media3 (ExoPlayer) 和 AVFoundation。
 
 ## 目录
 

@@ -1,6 +1,6 @@
 <div align="center">
 <img src="./apps/mobile/assets/images/icon_large.png" alt="logo" width="50" />
-<h1>BBPlayer</h1>
+<h1>Bili Player</h1>
 
 一款使用 React Native 构建的本地优先的 Bilibili 音频播放器。更轻量 & 舒服的听歌体验，远离臃肿卡顿的 Bilibili 客户端。
 
@@ -66,17 +66,18 @@
 
 ## 项目结构 (Monorepo)
 
-- **[apps/mobile](./apps/mobile)**: BBPlayer 移动端应用核心代码。
+- **[apps/desktop](./apps/desktop)**: Bili Player 桌面端 (Tauri v2 + React 18) 应用。
+- **[apps/mobile](./apps/mobile)**: Bili Player 移动端应用核心代码。
 - **[apps/backend](./apps/backend)**: 后端服务，提供歌单共享与软件更新查询（Cloudflare Worker）。
 - **[apps/docs](./apps/docs)**: 项目文档站点。
 - **[apps/update-publisher](./apps/update-publisher)**: 用于发布更新的工具。
 - **[packages/](./packages)**: 共享库与工具包。
   - **[@bbplayer/splash](./packages/splash)**: 歌词解析与转换核心库。
-  - **[@bbplayer/eslint-plugin](./packages/eslint-plugin)**: BBPlayer 专用 lint 规则（通过 oxlint jsPlugins 运行）。
+  - **[@bbplayer/eslint-plugin](./packages/eslint-plugin)**: Bili Player 专用 lint 规则（通过 oxlint jsPlugins 运行）。
   - **[@bbplayer/orpheus](./packages/orpheus)**: 基于 Media3 的音频播放引擎。
   - **[@bbplayer/logs](./packages/logs)**: 日志库。
   - **[@bbplayer/image-theme-colors](./packages/image-theme-colors)**: 封面颜色提取工具。
-  - **[@bbplayer/native](./packages/native)**: BBPlayer 原生能力集成模块。
+  - **[@bbplayer/native](./packages/native)**: Bili Player 原生能力集成模块。
   - **[@bbplayer/heatmap](./packages/heatmap)**: 基于 SVG 的日期热力图组件。
   - **[expo-wavy-slider](./packages/expo-wavy-slider)**: Jetpack Compose WavySlider 的 Expo 模块封装。
 
@@ -86,7 +87,7 @@
 
 ## 隐私与数据统计
 
-为了持续改进 BBPlayer，应用内集成了一套轻量级的匿名数据收集系统（包含 Firebase Analytics 和 Sentry）。
+为了持续改进 Bili Player，应用内集成了一套轻量级的匿名数据收集系统（包含 Firebase Analytics 和 Sentry）。
 
 ### 我们收集什么？
 
@@ -101,7 +102,7 @@
 
 ## 捐赠支持
 
-如果你觉得 BBPlayer 对你有所帮助，欢迎考虑捐赠支持，你的所有捐赠都将用于让 Roitium 吃顿疯狂星期四或是买一部 GalGame！
+如果你觉得 Bili Player 对你有所帮助，欢迎考虑捐赠支持，你的所有捐赠都将用于让 Roitium 吃顿疯狂星期四或是买一部 GalGame！
 
 <table>
 <tr>
@@ -137,11 +138,11 @@
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=bbplayer-app%2FBBPlayer&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=Bili Player-app%2FBili Player&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=bbplayer-app/BBPlayer&type=date&theme=dark&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=bbplayer-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=bbplayer-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Bili Player-app/BBPlayer&type=date&theme=dark&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Bili Player-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Bili Player-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
  </picture>
 </a>
 

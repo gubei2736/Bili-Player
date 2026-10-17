@@ -1,10 +1,10 @@
-# @bbplayer/mobile
+﻿# @bbplayer/mobile
 
-BBPlayer 移动端应用的主程序。
+Bili Player 移动端应用的主程序。
 
 ## 简介
 
-此目录包含 BBPlayer 移动端应用的核心源代码。基于 React Native 和 Expo 构建，旨在提供从 Bilibili 同步音频并在本地流畅播放的体验。
+此目录包含 Bili Player 移动端应用的核心源代码。基于 React Native 和 Expo 构建，旨在提供从 Bilibili 同步音频并在本地流畅播放的体验。
 
 ## Android 本地调试
 
@@ -15,7 +15,7 @@ mise -C apps/mobile run android
 ```
 
 此命令为 prebuild 和运行阶段统一设置 `APP_VARIANT=development`，使用开发包名
-`com.roitium.bbplayer.dev` 和 debug 签名，可以与正式版共存，数据各自独立。
+`com.roitium.Bili Player.dev` 和 debug 签名，可以与正式版共存，数据各自独立。
 单独启动 Metro 时使用 `mise -C apps/mobile run start`。
 任务和环境变量统一定义在 `mise.toml`；原有 pnpm Android / Metro 命令仅转发到 mise。
 在 `apps/mobile` 目录内执行时，可以省略 `-C apps/mobile`。

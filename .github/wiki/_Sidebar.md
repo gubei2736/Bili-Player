@@ -1,4 +1,4 @@
-### [BBPlayer Wiki](Home)
+﻿### [Bili Player Wiki](Home)
 
 ---
 

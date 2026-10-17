@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
-import { getStoredLyricOffset } from '../../services/lyricService'
+import { getStoredLyricOffset, getAutoMatchLyricsEnabled } from '../../services/lyricService'
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
 import { useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
 import { getQualityBadgeInfo } from '../../audio/audioSettings'
@@ -13,6 +13,7 @@ export interface ImmersiveLyricsViewProps {
 	onClose: () => void
 	track: Track | null
 	splContent?: string | null
+	isMatching?: boolean
 }
 
 const DEFAULT_SPL_SAMPLE = `[ti:Bili Player]
@@ -29,12 +30,24 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	onClose,
 	track,
 	splContent,
+	isMatching = false,
 }) => {
 	const [currentTime, setCurrentTime] = useState(() => desktopAudioEngine.getCurrentTime())
 	const [lyricOffsetSec, setLyricOffsetSec] = useState(0)
+	const [autoMatchEnabled, setAutoMatchEnabled] = useState(() => getAutoMatchLyricsEnabled())
 	const lyricsContainerRef = useRef<HTMLDivElement | null>(null)
 	const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 	const haloCanvasRef = useRef<HTMLCanvasElement | null>(null)
+
+	useEffect(() => {
+		const handleAutoMatchChange = (e: any) => {
+			setAutoMatchEnabled(e.detail?.enabled ?? getAutoMatchLyricsEnabled())
+		}
+		window.addEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
+		return () => {
+			window.removeEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
+		}
+	}, [])
 
 	useEffect(() => {
 		if (track) {
@@ -316,7 +329,11 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 										<span className="animate-pulse delay-300">♬</span>
 									</div>
 									<p className="text-sm font-medium tracking-wider text-white/50">
-										{splContent === '' ? '正在匹配歌词...' : '暂无歌词或纯音乐'}
+										{isMatching && autoMatchEnabled
+											? '正在匹配歌词...'
+											: !autoMatchEnabled
+											? '歌词自动匹配已关闭 (可手动搜索匹配)'
+											: '暂无歌词或纯音乐'}
 									</p>
 								</div>
 							) : (

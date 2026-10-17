@@ -136,3 +136,20 @@ pub async fn export_cached_track_to_m4a(
         file_size: meta.len(),
     })
 }
+
+#[tauri::command]
+pub async fn pick_export_path(
+    default_filename: String,
+    default_dir: Option<String>,
+) -> Result<Option<String>, String> {
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_file_name(&default_filename)
+        .add_filter("MPEG-4 音频 (*.m4a)", &["m4a"]);
+
+    if let Some(ref dir) = default_dir {
+        dialog = dialog.set_directory(dir);
+    }
+
+    let file = dialog.save_file().await;
+    Ok(file.map(|f| f.path().to_string_lossy().to_string()))
+}

@@ -1,4 +1,4 @@
-# BBPlayer OTA Design
+﻿# Bili Player OTA Design
 
 <!-- impeccable:direction-seed 3f4c3690; choice canon; user-pinned -->
 
@@ -16,7 +16,7 @@ Flat shadcn surfaces, quiet borders, and semantic muted layers. Cards group summ
 
 ## Ground
 
-Use only shadcn semantic tokens for backgrounds, foregrounds, borders, state, charts, selection, and scrollbars. The existing BBPlayer application icon and the “BBPlayer OTA” name provide the brand signal.
+Use only shadcn semantic tokens for backgrounds, foregrounds, borders, state, charts, selection, and scrollbars. The existing Bili Player application icon and the “Bili Player OTA” name provide the brand signal.
 
 ## Motion and Adaptation
 

@@ -1,6 +1,6 @@
-# @bbplayer/splash
+﻿# @bbplayer/splash
 
-BBPlayer 歌词解析与转换核心工具库。
+Bili Player 歌词解析与转换核心工具库。
 
 ## 简介
 

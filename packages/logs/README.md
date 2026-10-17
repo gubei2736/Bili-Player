@@ -1,10 +1,10 @@
-# @bbplayer/logs
+﻿# @bbplayer/logs
 
 为 React Native 和 Expo 优化的高性能日志管理库。
 
 ## 简介
 
-这是 `react-native-logs` 的一个分支版本，专门针对 BBPlayer 的需求进行了定制，特别是增加了对 `expo-file-system` **next** API 的支持，确保在现代 Expo 环境下拥有更佳的日志持久化性能。
+这是 `react-native-logs` 的一个分支版本，专门针对 Bili Player 的需求进行了定制，特别是增加了对 `expo-file-system` **next** API 的支持，确保在现代 Expo 环境下拥有更佳的日志持久化性能。
 
 ## 功能特性
 

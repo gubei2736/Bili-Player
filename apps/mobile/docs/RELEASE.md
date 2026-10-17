@@ -1,6 +1,6 @@
-# 发版流程 (Release Process)
+﻿# 发版流程 (Release Process)
 
-本文档描述了 BBPlayer 的版本发布流程。
+本文档描述了 Bili Player 的版本发布流程。
 
 ## 1. 准备版本
 

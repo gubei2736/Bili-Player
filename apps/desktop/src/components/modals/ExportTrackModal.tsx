@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, FileAudio, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { X, FileAudio, CheckCircle2, AlertCircle, Loader2, FolderOpen } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { desktopDir, downloadDir, join } from '@tauri-apps/api/path'
 import { bilibiliApi, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
@@ -22,6 +22,33 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 	const [exportSuccess, setExportSuccess] = useState(false)
 	const [outputPath, setOutputPath] = useState('')
 	const [error, setError] = useState<string | null>(null)
+
+	const handleBrowsePath = async () => {
+		if (!track) return
+		const defaultName = `${track.title} - ${
+			track.artist?.name || '未知歌手'
+		}.m4a`.replace(/[\\/:*?"<>|]/g, '_')
+
+		let defaultDirStr: string | undefined = undefined
+		if (outputPath) {
+			const lastSlash = Math.max(outputPath.lastIndexOf('/'), outputPath.lastIndexOf('\\'))
+			if (lastSlash > 0) {
+				defaultDirStr = outputPath.substring(0, lastSlash)
+			}
+		}
+
+		try {
+			const selected = await invoke<string | null>('pick_export_path', {
+				defaultFilename: defaultName,
+				defaultDir: defaultDirStr,
+			})
+			if (selected) {
+				setOutputPath(selected)
+			}
+		} catch (err) {
+			console.error('Failed to pick export path:', err)
+		}
+	}
 
 	useEffect(() => {
 		setExportSuccess(false)
@@ -213,13 +240,25 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 									</span>
 								)}
 							</div>
-							<input
-								type="text"
-								value={outputPath}
-								onChange={(e) => setOutputPath(e.target.value)}
-								className="w-full h-8 px-3 text-xs rounded-xl bg-white/5 border border-white/10 text-foreground outline-none font-mono"
-								placeholder="请输入或调整导出完整路径 (.m4a)"
-							/>
+							<div className="relative flex items-center">
+								<input
+									type="text"
+									value={outputPath}
+									onClick={handleBrowsePath}
+									onChange={(e) => setOutputPath(e.target.value)}
+									className="w-full h-8 pl-3 pr-20 text-xs rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-foreground outline-none font-mono cursor-pointer transition-colors"
+									placeholder="点击选择或输入保存路径 (.m4a)"
+								/>
+								<button
+									type="button"
+									onClick={handleBrowsePath}
+									className="absolute right-1 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white/10 hover:bg-white/20 text-foreground flex items-center gap-1 transition-colors"
+									title="选择导出目录与文件名"
+								>
+									<FolderOpen className="w-3.5 h-3.5 text-primary" />
+									<span>浏览</span>
+								</button>
+							</div>
 							<p className="text-[10px] text-muted-foreground">
 								将自动封装为标准 MPEG-4 (.m4a) 容器，并内嵌高清封面、歌曲名称、UP主信息及歌词元数据。
 							</p>

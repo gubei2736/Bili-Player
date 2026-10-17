@@ -1,10 +1,10 @@
----
+﻿---
 title: SPL 歌词规范
 editLink: true
 ---
 
 > [!NOTE]
-> 本文档转载自 [Moriafly Official | SPL 格式语法标准](https://moriafly.com/standards/spl.html)。BBPlayer 完美支持该规范，并建议所有歌词文件遵循此标准。
+> 本文档转载自 [Moriafly Official | SPL 格式语法标准](https://moriafly.com/standards/spl.html)。Bili Player 完美支持该规范，并建议所有歌词文件遵循此标准。
 
 ## SPL 格式（Salt Player Lyrics）语法标准
 

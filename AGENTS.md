@@ -1,6 +1,6 @@
-# BBPlayer
+﻿# Bili Player
 
-BBPlayer 是一个基于 React Native 开发的 BiliBili 流媒体音乐软件，整个仓库为 monorepo
+Bili Player 是一个基于 React Native 开发的 BiliBili 流媒体音乐软件，整个仓库为 monorepo
 
 ## 命令
 
@@ -43,7 +43,7 @@ pnpm type-check             # TypeScript type checking
 - heatmap — 基于 SVG 的日期热力图组件
 - image-theme-colors — 从图片中提取主题色的 Expo 原生模块
 - logs — React Native 日志库
-- native — BBPlayer 原生能力集成模块
-- orpheus — BBPlayer 核心音频播放引擎
+- native — Bili Player 原生能力集成模块
+- orpheus — Bili Player 核心音频播放引擎
 - react-native-bottom-tabs — 跨平台原生底部标签栏组件
 - splash — 歌词转换与解析库

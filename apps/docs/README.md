@@ -1,10 +1,10 @@
-# @bbplayer/docs
+﻿# @bbplayer/docs
 
-BBPlayer 官方文档站源代码。
+Bili Player 官方文档站源代码。
 
 ## 简介
 
-此目录包含基于 VitePress 构建的 BBPlayer 文档站点。它负责向用户提供安装、使用、歌词配置等全方位的指南。
+此目录包含基于 VitePress 构建的 Bili Player 文档站点。它负责向用户提供安装、使用、歌词配置等全方位的指南。
 
 ## 文档内容
 

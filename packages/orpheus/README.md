@@ -1,10 +1,10 @@
-# @bbplayer/orpheus
+﻿# @bbplayer/orpheus
 
-BBPlayer 高性能核心音频播放模块。
+Bili Player 高性能核心音频播放模块。
 
 ## 简介
 
-这是一个为 BBPlayer 项目定制的音频播放库，旨在替代第三方库以提供与 Android Media3 (ExoPlayer) 和 AVFoundation 更紧密的集成，并针对 Bilibili 音频流逻辑提供原生层支持。
+这是一个为 Bili Player 项目定制的音频播放库，旨在替代第三方库以提供与 Android Media3 (ExoPlayer) 和 AVFoundation 更紧密的集成，并针对 Bilibili 音频流逻辑提供原生层支持。
 
 ## 功能特性
 
@@ -31,7 +31,7 @@ BBPlayer 高性能核心音频播放模块。
 
 ## 声明
 
-该库主要供 BBPlayer 内部使用。虽然代码开源，但我们主要关注满足 BBPlayer 的功能需求。
+该库主要供 Bili Player 内部使用。虽然代码开源，但我们主要关注满足 Bili Player 的功能需求。
 
 ## 关于 Lyricon
 

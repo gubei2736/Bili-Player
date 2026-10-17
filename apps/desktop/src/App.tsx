@@ -70,6 +70,7 @@ export const App: React.FC = () => {
 	const [playlistImportOpen, setPlaylistImportOpen] = useState(false)
 	const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false)
 	const [activeSplContent, setActiveSplContent] = useState<string>('')
+	const [isMatchingLyrics, setIsMatchingLyrics] = useState(false)
 	const [exportModalTrack, setExportModalTrack] = useState<Track | null>(null)
 	const [fullscreenLyricsOpen, setFullscreenLyricsOpen] = useState(false)
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
@@ -172,16 +173,47 @@ export const App: React.FC = () => {
 		let cancelled = false
 		setActiveSplContent('')
 		if (currentTrack) {
-			lyricService.fetchLyricForTrack(currentTrack).then((res) => {
-				if (!cancelled) {
-					setActiveSplContent(res?.splContent || '')
-				}
-			})
+			const autoEnabled = lyricService.getAutoMatchLyricsEnabled()
+			const custom = lyricService.getStoredCustomLyric(currentTrack.uniqueKey)
+			if (autoEnabled || custom) {
+				setIsMatchingLyrics(true)
+			} else {
+				setIsMatchingLyrics(false)
+			}
+
+			lyricService
+				.fetchLyricForTrack(currentTrack)
+				.then((res) => {
+					if (!cancelled) {
+						setActiveSplContent(res?.splContent || '')
+						setIsMatchingLyrics(false)
+					}
+				})
+				.catch(() => {
+					if (!cancelled) {
+						setIsMatchingLyrics(false)
+					}
+				})
+		} else {
+			setIsMatchingLyrics(false)
 		}
 		return () => {
 			cancelled = true
 		}
 	}, [currentTrack?.uniqueKey])
+
+	useEffect(() => {
+		const handleAutoMatchChange = (e: any) => {
+			const enabled = e.detail?.enabled ?? lyricService.getAutoMatchLyricsEnabled()
+			if (!enabled && !activeSplContent) {
+				setIsMatchingLyrics(false)
+			}
+		}
+		window.addEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
+		return () => {
+			window.removeEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
+		}
+	}, [activeSplContent])
 
 	useEffect(() => {
 		const handleCustom = (e: any) => {
@@ -930,6 +962,7 @@ export const App: React.FC = () => {
 				onClose={() => setFullscreenLyricsOpen(false)}
 				track={currentTrack}
 				splContent={activeSplContent}
+				isMatching={isMatchingLyrics}
 			/>
 		</>
 	)

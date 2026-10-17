@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 项目的所有显著更改都将记录在这个文件中。
 
@@ -82,7 +82,7 @@
 - 清除歌词后无法编辑
 - 存在自定义 AppBar 背景时文字对比度不够
 - 桌面歌词/状态栏歌词无法更新
-- 修复 BBPLAYER-A2
+- 修复 Bili Player-A2
 
 ## [2.6.4] - 2026-08-08
 
@@ -419,7 +419,7 @@
 - 重构 `src/lib/api/bilibili/api.ts` 为 Class
 - 修复冷启动时 Deep Link 无法跳转的问题
 - 创建/修改歌曲或播放列表时，禁止使用重复的名称
-- 将 `app.bbplayer.roitium.com` 作为 Deep Link 的 host
+- 将 `app.Bili Player.roitium.com` 作为 Deep Link 的 host
 - 关闭 dolby / hires 音源
 - 启用 reanimated 的 Static Flags：`ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS`、`IOS_SYNCHRONOUSLY_UPDATE_UI_PROPS`、`USE_COMMIT_HOOK_ONLY_FOR_REACT_COMMITS`
 
@@ -461,7 +461,7 @@
 
 ### Fixed
 
-- BBPLAYER-5N
+- Bili Player-5N
 
 ### Changed
 

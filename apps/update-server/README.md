@@ -1,4 +1,4 @@
-# BBPlayer Update Server
+﻿# Bili Player Update Server
 
 自托管的 Expo Updates v1 服务。PostgreSQL 只保存分发状态、溯源信息与遥测数据；R2 保存所有不可变的 bundle、资源与 bsdiff 补丁。把 `.env.example` 复制到部署机的密钥存储处，并填好所有必填项。`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` 是 **R2 S3 API 凭据**，不是 Cloudflare API Token。`R2_PUBLIC_BASE_URL` 必须是 R2 存储桶上用于提供不可变对象的自定义域名。
 
@@ -10,14 +10,14 @@
 
 ```sh
 # 构建 Go 镜像（api / migrate / worker 共用）。
-docker build -t bbplayer-updates:VERSION apps/update-server
+docker build -t Bili Player-updates:VERSION apps/update-server
 
 # 构建 WebUI nginx 镜像。构建上下文是 monorepo 根目录：
 # 在 Dockerfile 内用 pnpm 构建 web 包。
-docker build -t bbplayer-updates-web:VERSION -f apps/update-server/web/Dockerfile .
+docker build -t Bili Player-updates-web:VERSION -f apps/update-server/web/Dockerfile .
 ```
 
-在服务器上把两个 tag 配为 `UPDATE_SERVER_IMAGE` / `UPDATE_SERVER_WEB_IMAGE`（见 [`.env.example`](.env.example)）；`dev` tag 对应本地直接 `docker build`、不经镜像仓库的开发流程。然后在一个 HTTPS 反向代理后面运行 `docker compose up -d`。PostgreSQL 与 nginx/API 通信位于 `internal` docker 网络；`api` 和 `worker` 还加入一个不发布端口的 `egress` 网络，以访问 Cloudflare R2 的公共 S3 endpoint。只有 `update-server-web` 发布一个宿主机端口——普通 compose 栈中是 `127.0.0.1:8080`——并且它是唯一入口：这个 nginx 服务对外提供管理后台，并把 `/admin/*`、`/api/*`、`/health` 经 internal 网络代理到 `api` 容器——UI 与 API 因此共享同一源（`PUBLIC_BASE_URL`，如 `https://updates.bbplayer.roitium.com`）。不可变的静态资源由 R2 自定义域名提供（`R2_PUBLIC_BASE_URL`，如 `https://assets-updates.bbplayer.roitium.com`）。一次性 `migrate` 服务使用内嵌的 Goose 迁移，用 PostgreSQL advisory lock 保护迁移过程，并且必须在 API 与补丁 worker 启动前完成。`worker` 刻意作为独立进程运行：bsdiff 的 CPU/内存开销很高，不能拖慢 manifest 响应。Docker 构建固定住 Expo 的 `bsdiff` 源码，若它无法产出其配套 `bspatch` 能逐字节还原的 `BSDIFF40` 补丁，构建就会失败。补丁认领（claim）有十分钟租约，因此被中断的 worker 不会让 channel 永久卡在 `processing`；在新的 worker 完成该任务之前，客户端会持续收到完整 bundle。
+在服务器上把两个 tag 配为 `UPDATE_SERVER_IMAGE` / `UPDATE_SERVER_WEB_IMAGE`（见 [`.env.example`](.env.example)）；`dev` tag 对应本地直接 `docker build`、不经镜像仓库的开发流程。然后在一个 HTTPS 反向代理后面运行 `docker compose up -d`。PostgreSQL 与 nginx/API 通信位于 `internal` docker 网络；`api` 和 `worker` 还加入一个不发布端口的 `egress` 网络，以访问 Cloudflare R2 的公共 S3 endpoint。只有 `update-server-web` 发布一个宿主机端口——普通 compose 栈中是 `127.0.0.1:8080`——并且它是唯一入口：这个 nginx 服务对外提供管理后台，并把 `/admin/*`、`/api/*`、`/health` 经 internal 网络代理到 `api` 容器——UI 与 API 因此共享同一源（`PUBLIC_BASE_URL`，如 `https://updates.Bili Player.roitium.com`）。不可变的静态资源由 R2 自定义域名提供（`R2_PUBLIC_BASE_URL`，如 `https://assets-updates.Bili Player.roitium.com`）。一次性 `migrate` 服务使用内嵌的 Goose 迁移，用 PostgreSQL advisory lock 保护迁移过程，并且必须在 API 与补丁 worker 启动前完成。`worker` 刻意作为独立进程运行：bsdiff 的 CPU/内存开销很高，不能拖慢 manifest 响应。Docker 构建固定住 Expo 的 `bsdiff` 源码，若它无法产出其配套 `bspatch` 能逐字节还原的 `BSDIFF40` 补丁，构建就会失败。补丁认领（claim）有十分钟租约，因此被中断的 worker 不会让 channel 永久卡在 `processing`；在新的 worker 完成该任务之前，客户端会持续收到完整 bundle。
 
 ### 共享反向代理之后的生产部署
 
@@ -30,7 +30,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 该 overlay 会移除 `127.0.0.1:8080:80` 的绑定，并把 `update-server-web` 加入名为 `proxy` 的外部网络；没有其他服务加入该网络。把代理指向该服务名即可——Caddy 经共享网络解析 `update-server-web:80`，终止 TLS，而 `update-server-web` 内的 nginx 继续把 `/admin/*`、`/api/*`、`/health` 经 internal 网络代理到 `api:8080`：
 
 ```caddyfile
-updates.bbplayer.roitium.com {
+updates.Bili Player.roitium.com {
 	reverse_proxy update-server-web:80
 }
 ```
@@ -71,9 +71,9 @@ pnpm hot-update
 校验其中的 `metadata.json`、写入当前公开 Expo 配置，然后直接归档上传。
 
 首次成功提供 URL 与 token 后，CLI 会把它们保存到项目的
-`.bbplayer-updates/credentials.json`（Git 已忽略，目录权限为仅当前用户）。后续会优先
-使用命令行参数，其次是 `BBPLAYER_UPDATE_SERVER_URL` /
-`BBPLAYER_UPDATE_SERVER_TOKEN`，最后才是该本地凭据文件。
+`.Bili Player-updates/credentials.json`（Git 已忽略，目录权限为仅当前用户）。后续会优先
+使用命令行参数，其次是 `Bili Player_UPDATE_SERVER_URL` /
+`Bili Player_UPDATE_SERVER_TOKEN`，最后才是该本地凭据文件。
 
 CI 以非交互方式使用完全相同的命令：
 
@@ -134,7 +134,7 @@ GET /admin/insights/groups/<group-id>/lifecycle?start=<RFC3339>&end=<RFC3339>
 
 管理后台从不内嵌 token。访问同源下的任何页面都会显示登录页；运维人员输入的 token 会先经 `GET /admin/session` 校验（与所有 `/admin` 路由一样位于同一 bearer 中间件之后），随后存入 `localStorage`，并在每次请求中以 `Authorization: Bearer <ADMIN_TOKEN>` 发送。任何 `401` 都会清掉它并回到登录页，因此轮换 `ADMIN_TOKEN` 会把活跃的浏览器登出。
 
-窗口化端点默认最近七天，最多接受 90 天。原始客户端生命周期事件保留 35 天；分钟级指标保留 90 天。worker 每天做保留期清理。活跃安装按安装 HMAC、channel、runtime、平台、客户端版本、更新与日期去重，供 channel 详情的活跃安装图表使用。`launch_succeeded` 或 `launch_healthy` 会为每次安装/更新创建一条 known launch 记录；`launch_failed` 或 `launch_crashed` 创建一条 known crash。客户端的活跃安装图表与这些保守的生命周期计数由移动端 OTA 集成上报。生产构建从 `https://updates.bbplayer.roitium.com/api/manifest` 请求 manifest，并把遥测上报到同一源的 `/api/events`；在发布这种构建之前，先把 API 部署到该源上。
+窗口化端点默认最近七天，最多接受 90 天。原始客户端生命周期事件保留 35 天；分钟级指标保留 90 天。worker 每天做保留期清理。活跃安装按安装 HMAC、channel、runtime、平台、客户端版本、更新与日期去重，供 channel 详情的活跃安装图表使用。`launch_succeeded` 或 `launch_healthy` 会为每次安装/更新创建一条 known launch 记录；`launch_failed` 或 `launch_crashed` 创建一条 known crash。客户端的活跃安装图表与这些保守的生命周期计数由移动端 OTA 集成上报。生产构建从 `https://updates.Bili Player.roitium.com/api/manifest` 请求 manifest，并把遥测上报到同一源的 `/api/events`；在发布这种构建之前，先把 API 部署到该源上。
 
 ## 集成验证
 
