@@ -101,6 +101,10 @@ if (isLyricsWindow || isMiniWindow || isTrayWindow) {
 	document.body.style.background = 'transparent'
 	document.body.style.border = 'none'
 	document.body.style.outline = 'none'
+	const rootEl = document.getElementById('root')
+	if (rootEl) {
+		rootEl.style.background = 'transparent'
+	}
 }
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

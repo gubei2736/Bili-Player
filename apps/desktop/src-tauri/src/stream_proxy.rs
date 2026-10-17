@@ -246,8 +246,14 @@ async fn proxy_handler(
 pub async fn start_proxy_server(
     cache_dir: std::path::PathBuf,
 ) -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
+    let client = Client::builder()
+        .no_proxy()
+        .connect_timeout(std::time::Duration::from_secs(6))
+        .build()
+        .unwrap_or_else(|_| Client::new());
+
     let state = Arc::new(ProxyState {
-        client: Client::builder().build()?,
+        client,
         cache_dir,
     });
 

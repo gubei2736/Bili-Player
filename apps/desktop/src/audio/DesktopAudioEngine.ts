@@ -380,6 +380,10 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		return !this.audio.paused && !this.audio.ended
 	}
 
+	public hasLoadedSource(): boolean {
+		return Boolean(this.audio.src && this.audio.src !== '' && this.audio.readyState > 0)
+	}
+
 	public getCurrentTrack(): Track | null {
 		return this.currentTrack
 	}

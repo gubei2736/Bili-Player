@@ -81,11 +81,15 @@ html.is-debug-mode *,
 	-webkit-user-select: text !important;
 }
 
-/* 确保桌面歌词窗口在任何情况下均无默认边框、无外边框、全透明底色与无阴影 */
+/* 确保透明窗口 (桌面歌词/迷你播放器/托盘菜单) 在任何情况下均无默认边框、无外边框、全透明底色与无原生阴影 */
 html.is-lyrics-window,
 body.is-lyrics-window,
 body.is-lyrics-window #root,
-.is-lyrics-window {
+.is-lyrics-window,
+html.is-transparent-window,
+body.is-transparent-window,
+body.is-transparent-window #root,
+.is-transparent-window {
 	background: transparent !important;
 	background-color: transparent !important;
 	border: none !important;

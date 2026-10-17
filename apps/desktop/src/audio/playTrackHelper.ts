@@ -340,12 +340,17 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 
 			biliTrack.bilibiliMetadata.bilibiliStreamUrl = streamData
 
-			// 3. Query local stream proxy port from Tauri backend (使用模块全局静态缓存)
+			// 3. Query local stream proxy port from Tauri backend (使用模块全局静态缓存，带异步就绪重试)
 			if (cachedProxyPort === null || cachedProxyPort <= 0) {
-				try {
-					cachedProxyPort = await invoke<number>('get_stream_proxy_port')
-				} catch {
-					cachedProxyPort = 0
+				for (let attempt = 0; attempt < 5; attempt++) {
+					try {
+						const p = await invoke<number>('get_stream_proxy_port')
+						if (p && p > 0) {
+							cachedProxyPort = p
+							break
+						}
+					} catch {}
+					await new Promise((r) => setTimeout(r, 80))
 				}
 			}
 
@@ -407,11 +412,6 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			}
 		}
 	} finally {
-		if (
-			currentLoadingTrackKey === inputTrack.uniqueKey ||
-			currentLoadingTrackKey === originalKey
-		) {
-			currentLoadingTrackKey = null
-		}
+		currentLoadingTrackKey = null
 	}
 }

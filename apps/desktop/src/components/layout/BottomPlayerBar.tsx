@@ -372,9 +372,12 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		if (isPlaying) {
 			desktopAudioEngine.pause()
 		} else {
+			const engineTrack = desktopAudioEngine.getCurrentTrack()
 			if (
 				currentTrack &&
-				currentTrack.uniqueKey !== desktopAudioEngine.getCurrentTrack()?.uniqueKey
+				(!engineTrack ||
+					currentTrack.uniqueKey !== engineTrack.uniqueKey ||
+					!desktopAudioEngine.hasLoadedSource())
 			) {
 				try {
 					await playTrackWithProxy(currentTrack)
@@ -382,7 +385,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					console.error('Failed to play track:', err)
 				}
 			} else {
-				await desktopAudioEngine.play()
+				try {
+					await desktopAudioEngine.play()
+				} catch {
+					if (currentTrack) {
+						await playTrackWithProxy(currentTrack).catch(() => {})
+					}
+				}
 			}
 		}
 	}

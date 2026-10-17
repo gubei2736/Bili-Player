@@ -409,10 +409,17 @@ export const App: React.FC = () => {
 			if (desktopAudioEngine.isPlaying()) {
 				desktopAudioEngine.pause()
 			} else {
-				if (!current && queueStore.queue.length > 0) {
+				const activeEngineTrack = desktopAudioEngine.getCurrentTrack()
+				if (current && (!activeEngineTrack || !desktopAudioEngine.hasLoadedSource())) {
+					playTrackWithProxy(current).catch(() => {})
+				} else if (!current && queueStore.queue.length > 0) {
 					playTrackWithProxy(queueStore.queue[0]!).catch(() => {})
 				} else {
-					desktopAudioEngine.play()
+					desktopAudioEngine.play().catch(() => {
+						if (current) {
+							playTrackWithProxy(current).catch(() => {})
+						}
+					})
 				}
 			}
 		} else if (action === 'prev_track') {
