@@ -16,6 +16,7 @@ import {
 	SlidersHorizontal,
 	X,
 	Check,
+	Search,
 } from 'lucide-react'
 import {
 	useAuthStore,
@@ -62,10 +63,21 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		}
 		return []
 	})
+	const [searchKeyword, setSearchKeyword] = useState('')
 	const [loadingTracks, setLoadingTracks] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [hiddenIds, setHiddenIds] = useState<number[]>(getHiddenFavoriteIds())
 	const [showManageModal, setShowManageModal] = useState(false)
+
+	const filteredTracks = tracks.filter((t) => {
+		if (!searchKeyword.trim()) return true
+		const kw = searchKeyword.toLowerCase().trim()
+		return (
+			t.title.toLowerCase().includes(kw) ||
+			(t.artist?.name || '').toLowerCase().includes(kw) ||
+			(t.bilibiliMetadata?.bvid || '').toLowerCase().includes(kw)
+		)
+	})
 
 	// Listen for hidden favorites change
 	useEffect(() => {
@@ -145,17 +157,17 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 	}
 
 	const handlePlayAll = async () => {
-		if (tracks.length === 0) return
-		setQueue(tracks, 0)
+		if (filteredTracks.length === 0) return
+		setQueue(filteredTracks, 0)
 		try {
-			await playTrackWithProxy(tracks[0]!)
+			await playTrackWithProxy(filteredTracks[0]!)
 		} catch (err) {
 			console.error('Failed to play all:', err)
 		}
 	}
 
 	const handlePlayTrack = async (track: BilibiliTrack, index: number) => {
-		setQueue(tracks, index)
+		setQueue(filteredTracks, index)
 		try {
 			await playTrackWithProxy(track)
 		} catch (err) {
@@ -217,7 +229,29 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 					</p>
 				</div>
 
-				<div className="flex items-center gap-2.5">
+				<div className="flex flex-wrap items-center gap-2.5">
+					{/* Search Bar in Favorites */}
+					{tracks.length > 0 && (
+						<div className="relative w-40 sm:w-56">
+							<Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+							<input
+								type="text"
+								placeholder="搜索当前收藏歌曲/UP主..."
+								value={searchKeyword}
+								onChange={(e) => setSearchKeyword(e.target.value)}
+								className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 transition-colors"
+							/>
+							{searchKeyword && (
+								<button
+									onClick={() => setSearchKeyword('')}
+									className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+								>
+									<X className="w-3.5 h-3.5" />
+								</button>
+							)}
+						</div>
+					)}
+
 					<button
 						onClick={() => setShowManageModal(true)}
 						className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-foreground transition-all duration-150"
@@ -245,13 +279,13 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 						<span>刷新同步</span>
 					</button>
 
-					{tracks.length > 0 && (
+					{filteredTracks.length > 0 && (
 						<button
 							onClick={handlePlayAll}
 							className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all duration-150"
 						>
 							<Play className="w-3.5 h-3.5 fill-current" />
-							<span>播放全部 ({tracks.length})</span>
+							<span>播放全部 ({filteredTracks.length})</span>
 						</button>
 					)}
 				</div>
@@ -272,7 +306,10 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 								}`}
 							>
 								<button
-									onClick={() => setSelectedPlaylistId(pl.id)}
+									onClick={() => {
+										setSelectedPlaylistId(pl.id)
+										setSearchKeyword('')
+									}}
 									className="px-3.5 py-1.5 text-xs font-medium whitespace-nowrap flex items-center gap-2"
 								>
 									<FolderHeart className="w-3.5 h-3.5" />
@@ -319,17 +356,33 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 						当前收藏夹暂无音频内容，去 B 站将喜欢的音乐收藏到该收藏夹吧
 					</p>
 				</div>
+			) : filteredTracks.length === 0 ? (
+				<div className="p-14 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground space-y-2">
+					<Search className="w-8 h-8 mx-auto opacity-30 text-primary" />
+					<p className="text-sm font-semibold text-foreground/80">未找到匹配歌曲</p>
+					<p className="text-xs text-muted-foreground">
+						当前收藏夹没有找到与 “{searchKeyword}” 相关的歌曲或UP主
+					</p>
+					<button
+						onClick={() => setSearchKeyword('')}
+						className="text-xs text-primary hover:underline mt-2 inline-block font-medium"
+					>
+						清空搜索关键词
+					</button>
+				</div>
 			) : (
 				<div className="space-y-1 rounded-2xl border border-white/5 bg-white/[0.02] p-2">
 					<div className="grid grid-cols-12 px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-white/5">
 						<span className="col-span-1 text-center">#</span>
-						<span className="col-span-7">歌曲标题</span>
+						<span className="col-span-7">
+							歌曲标题 {searchKeyword.trim() && `(匹配 ${filteredTracks.length} / 共 ${tracks.length} 首)`}
+						</span>
 						<span className="col-span-2">UP主</span>
 						<span className="col-span-2 text-right">时长 / 操作</span>
 					</div>
 
 					<div className="divide-y divide-white/[0.03]">
-						{tracks.map((track, idx) => {
+						{filteredTracks.map((track, idx) => {
 							const isCurrentPlaying = currentTrack?.uniqueKey === track.uniqueKey
 							return (
 								<div

@@ -11,6 +11,8 @@ import {
 	Sparkles,
 	MoreVertical,
 	Heart,
+	Search,
+	X,
 } from 'lucide-react'
 import {
 	useLocalPlaylistStore,
@@ -40,9 +42,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 }) => {
 	const { playlists, deletePlaylist, removeTrackFromPlaylist } = useLocalPlaylistStore()
 	const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null)
+	const [trackSearchKeyword, setTrackSearchKeyword] = useState('')
+	const [playlistSearchKeyword, setPlaylistSearchKeyword] = useState('')
 	const { setQueue } = useQueueStore()
 
 	const currentPlaylist = playlists.find((p) => p.id === activePlaylistId)
+
+	const filteredTracks = currentPlaylist
+		? currentPlaylist.tracks.filter((t) => {
+				if (!trackSearchKeyword.trim()) return true
+				const kw = trackSearchKeyword.toLowerCase().trim()
+				return (
+					t.title.toLowerCase().includes(kw) ||
+					(t.artist?.name || '').toLowerCase().includes(kw)
+				)
+		  })
+		: []
 
 	const handlePlayTrack = async (track: Track, tracks: Track[], index: number) => {
 		setQueue(tracks, index)
@@ -54,8 +69,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 	}
 
 	const handlePlayAll = () => {
-		if (currentPlaylist && currentPlaylist.tracks.length > 0) {
-			handlePlayTrack(currentPlaylist.tracks[0], currentPlaylist.tracks, 0)
+		if (filteredTracks.length > 0) {
+			handlePlayTrack(filteredTracks[0]!, filteredTracks, 0)
 		}
 	}
 
@@ -65,7 +80,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 			<div className="space-y-6">
 				{/* Top bar with back button */}
 				<button
-					onClick={() => setActivePlaylistId(null)}
+					onClick={() => {
+						setActivePlaylistId(null)
+						setTrackSearchKeyword('')
+					}}
 					className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
 				>
 					<ArrowLeft className="w-4 h-4" />
@@ -91,7 +109,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 						)}
 					</div>
 
-					<div className="flex-1 space-y-2">
+					<div className="flex-1 space-y-2 w-full">
 						<div className="flex items-center gap-2">
 							<span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
 								currentPlaylist.id === DEFAULT_FAVORITES_PLAYLIST_ID
@@ -101,7 +119,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 								{currentPlaylist.id === DEFAULT_FAVORITES_PLAYLIST_ID ? '默认歌单' : '本地歌单'}
 							</span>
 							<span className="text-xs text-muted-foreground">
-								共 {currentPlaylist.tracks.length} 首歌曲
+								{trackSearchKeyword.trim()
+									? `匹配 ${filteredTracks.length} / 共 ${currentPlaylist.tracks.length} 首歌曲`
+									: `共 ${currentPlaylist.tracks.length} 首歌曲`}
 							</span>
 						</div>
 						<h1 className="text-2xl font-bold text-foreground">
@@ -113,29 +133,55 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 							</p>
 						)}
 
-						<div className="flex items-center gap-3 pt-2">
-							<button
-								onClick={handlePlayAll}
-								disabled={currentPlaylist.tracks.length === 0}
-								className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
-							>
-								<Play className="w-4 h-4 fill-current" />
-								<span>播放全部</span>
-							</button>
-
-							{currentPlaylist.id !== DEFAULT_FAVORITES_PLAYLIST_ID && (
+						{/* Action toolbar & Search input */}
+						<div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+							<div className="flex items-center gap-2.5">
 								<button
-									onClick={() => {
-										if (window.confirm(`确定要删除歌单【${currentPlaylist.title}】吗？`)) {
-											deletePlaylist(currentPlaylist.id)
-											setActivePlaylistId(null)
-										}
-									}}
-									className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
-									title="删除歌单"
+									onClick={handlePlayAll}
+									disabled={filteredTracks.length === 0}
+									className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
 								>
-									<Trash2 className="w-4 h-4" />
+									<Play className="w-4 h-4 fill-current" />
+									<span>播放全部 {filteredTracks.length > 0 && `(${filteredTracks.length})`}</span>
 								</button>
+
+								{currentPlaylist.id !== DEFAULT_FAVORITES_PLAYLIST_ID && (
+									<button
+										onClick={() => {
+											if (window.confirm(`确定要删除歌单【${currentPlaylist.title}】吗？`)) {
+												deletePlaylist(currentPlaylist.id)
+												setActivePlaylistId(null)
+												setTrackSearchKeyword('')
+											}
+										}}
+										className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+										title="删除歌单"
+									>
+										<Trash2 className="w-4 h-4" />
+									</button>
+								)}
+							</div>
+
+							{/* Search input in Playlist Detail */}
+							{currentPlaylist.tracks.length > 0 && (
+								<div className="relative w-full sm:w-64">
+									<Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+									<input
+										type="text"
+										placeholder="搜索歌单内的歌曲、歌手..."
+										value={trackSearchKeyword}
+										onChange={(e) => setTrackSearchKeyword(e.target.value)}
+										className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 transition-colors"
+									/>
+									{trackSearchKeyword && (
+										<button
+											onClick={() => setTrackSearchKeyword('')}
+											className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+										>
+											<X className="w-3.5 h-3.5" />
+										</button>
+									)}
+								</div>
 							)}
 						</div>
 					</div>
@@ -157,13 +203,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 							</>
 						)}
 					</div>
+				) : filteredTracks.length === 0 ? (
+					<div className="py-16 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.01] text-muted-foreground space-y-2">
+						<Search className="w-8 h-8 mx-auto opacity-30 text-primary" />
+						<p className="text-sm font-semibold text-foreground/80">未找到匹配歌曲</p>
+						<p className="text-xs text-muted-foreground">没有找到与 “{trackSearchKeyword}” 相关的歌曲或歌手</p>
+						<button
+							onClick={() => setTrackSearchKeyword('')}
+							className="text-xs text-primary hover:underline mt-2 inline-block font-medium"
+						>
+							清空搜索关键词
+						</button>
+					</div>
 				) : (
 					<div className="rounded-xl border border-white/5 overflow-hidden bg-white/[0.01]">
 						<div className="divide-y divide-white/5">
-							{currentPlaylist.tracks.map((track, idx) => (
+							{filteredTracks.map((track, idx) => (
 								<div
 									key={track.uniqueKey || idx}
-									onClick={() => handlePlayTrack(track, currentPlaylist.tracks, idx)}
+									onClick={() => handlePlayTrack(track, filteredTracks, idx)}
 									className="group flex items-center justify-between p-3 hover:bg-white/5 transition-colors cursor-pointer text-xs"
 								>
 									<div className="flex items-center gap-3 flex-1 overflow-hidden mr-4">
@@ -232,23 +290,52 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 		)
 	}
 
+	const filteredPlaylists = playlists.filter((pl) => {
+		if (!playlistSearchKeyword.trim()) return true
+		const kw = playlistSearchKeyword.toLowerCase().trim()
+		return (
+			pl.title.toLowerCase().includes(kw) ||
+			(pl.intro || '').toLowerCase().includes(kw)
+		)
+	})
+
 	// 2. Playlists Grid View
 	return (
 		<div className="space-y-5">
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 				<div>
 					<h2 className="text-base font-bold text-foreground">我的音乐库</h2>
 					<p className="text-xs text-muted-foreground mt-0.5">
 						管理本地自建歌单与导入的专属曲库
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
+				<div className="flex flex-wrap items-center gap-2">
+					{playlists.length > 0 && (
+						<div className="relative w-44 sm:w-52">
+							<Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+							<input
+								type="text"
+								placeholder="搜索本地歌单..."
+								value={playlistSearchKeyword}
+								onChange={(e) => setPlaylistSearchKeyword(e.target.value)}
+								className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50 transition-colors"
+							/>
+							{playlistSearchKeyword && (
+								<button
+									onClick={() => setPlaylistSearchKeyword('')}
+									className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+								>
+									<X className="w-3.5 h-3.5" />
+								</button>
+							)}
+						</div>
+					)}
 					<button
 						onClick={onOpenImport}
 						className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs font-semibold transition-colors"
 					>
 						<Import className="w-3.5 h-3.5" />
-						<span>导入网易云/QQ歌单</span>
+						<span>导入歌单</span>
 					</button>
 					<button
 						onClick={onOpenCreate}
@@ -272,12 +359,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 						</p>
 					</div>
 				</div>
+			) : filteredPlaylists.length === 0 ? (
+				<div className="p-16 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground space-y-2">
+					<Search className="w-8 h-8 mx-auto opacity-30 text-primary" />
+					<p className="text-sm font-semibold text-foreground">未找到匹配歌单</p>
+					<p className="text-xs text-muted-foreground">没有找到与 “{playlistSearchKeyword}” 相关的歌单</p>
+					<button
+						onClick={() => setPlaylistSearchKeyword('')}
+						className="text-xs text-primary hover:underline mt-1 inline-block font-medium"
+					>
+						清空搜索
+					</button>
+				</div>
 			) : (
 				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-					{playlists.map((pl) => (
+					{filteredPlaylists.map((pl) => (
 						<div
 							key={pl.id}
-							onClick={() => setActivePlaylistId(pl.id)}
+							onClick={() => {
+								setActivePlaylistId(pl.id)
+								setTrackSearchKeyword('')
+							}}
 							className="group p-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/15 transition-all cursor-pointer flex flex-col justify-between space-y-3"
 						>
 							<div className="flex items-center justify-between">

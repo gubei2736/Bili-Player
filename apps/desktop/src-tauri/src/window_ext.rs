@@ -389,3 +389,52 @@ pub fn player_request_sync(app: AppHandle) {
         let _ = main_win.eval("if (typeof window.__bbplayer_broadcast_state === 'function') { window.__bbplayer_broadcast_state(); }");
     }
 }
+
+/// Tauri Command: Expand or collapse the mini player window size (e.g., 94px to 380px)
+#[tauri::command]
+pub fn set_mini_player_expanded(app: AppHandle, expanded: bool) -> Result<(), String> {
+    if let Some(mini_win) = app.get_webview_window("mini") {
+        let target_h = if expanded { 380.0 } else { 94.0 };
+        let target_w = 390.0;
+
+        // 检查位置以防窗口展开时超出屏幕下边缘
+        if expanded {
+            if let (Ok(Some(monitor)), Ok(pos), Ok(scale)) = (
+                mini_win.current_monitor(),
+                mini_win.outer_position(),
+                mini_win.scale_factor(),
+            ) {
+                let m_pos = monitor.position();
+                let m_size = monitor.size();
+                let max_phys_y = m_pos.y + m_size.height as i32 - 12;
+                let phys_target_h = (target_h * scale) as i32;
+                if pos.y + phys_target_h > max_phys_y {
+                    let new_y = (max_phys_y - phys_target_h).max(m_pos.y + 12);
+                    let _ = mini_win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                        x: pos.x,
+                        y: new_y,
+                    }));
+                }
+            }
+        }
+
+        let _ = mini_win.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: target_w,
+            height: target_h,
+        }));
+    }
+    Ok(())
+}
+
+/// Tauri Command: Play track at index in current queue from mini player
+#[tauri::command]
+pub fn play_queue_index(app: AppHandle, index: usize) {
+    if let Some(main_win) = app.get_webview_window("main") {
+        let script = format!(
+            "if (typeof window.__bbplayer_play_index === 'function') {{ window.__bbplayer_play_index({}); }}",
+            index
+        );
+        let _ = main_win.eval(&script);
+    }
+}
+

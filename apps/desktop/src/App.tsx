@@ -629,6 +629,14 @@ export const App: React.FC = () => {
 		const broadcastMiniPlayerState = () => {
 			const activeTrack =
 				desktopAudioEngine.getCurrentTrack() || currentTrackRef.current
+			const q = useQueueStore.getState()
+			const miniQueue = q.queue.map((t) => ({
+				uniqueKey: t.uniqueKey,
+				title: t.title,
+				artist: t.artist?.name || '未知歌手',
+				duration: t.duration || 0,
+				coverUrl: t.coverUrl || '',
+			}))
 			emit('mini-player-state-sync', {
 				title: activeTrack?.title || '',
 				artist: activeTrack?.artist?.name || '',
@@ -636,12 +644,25 @@ export const App: React.FC = () => {
 				currentTime: desktopAudioEngine.getCurrentTime() || 0,
 				duration: desktopAudioEngine.getDuration() || activeTrack?.duration || 0,
 				isPlaying: desktopAudioEngine.isPlaying(),
-				playMode: useQueueStore.getState().playMode,
+				playMode: q.playMode,
 				volume: desktopAudioEngine.getVolume(),
 				isMuted: desktopAudioEngine.isMuted(),
+				queue: miniQueue,
+				currentIndex: q.currentIndex,
 			}).catch(() => {})
 		}
 
+		;(window as any).__bbplayer_play_index = (index: number) => {
+			const q = useQueueStore.getState()
+			if (typeof index === 'number' && index >= 0 && index < q.queue.length) {
+				const track = q.queue[index]
+				if (track) {
+					q.setCurrentIndex(index)
+					playTrackWithProxy(track).catch(() => {})
+					broadcastMiniPlayerState()
+				}
+			}
+		}
 		;(window as any).__bbplayer_seek = (pos: number) => {
 			if (typeof pos === 'number' && !isNaN(pos)) {
 				desktopAudioEngine.seek(pos)
@@ -744,6 +765,7 @@ export const App: React.FC = () => {
 		)
 
 		return () => {
+			delete (window as any).__bbplayer_play_index
 			delete (window as any).__bbplayer_seek
 			delete (window as any).__bbplayer_toggle_mute
 			delete (window as any).__bbplayer_toggle_mode

@@ -46,6 +46,8 @@ pub fn run() {
             window_ext::player_toggle_mute,
             window_ext::player_toggle_mode,
             window_ext::player_request_sync,
+            window_ext::set_mini_player_expanded,
+            window_ext::play_queue_index,
             stream_proxy::get_stream_proxy_port,
             stream_proxy::get_cached_track_path,
             exporter::export_cached_track_to_m4a,
