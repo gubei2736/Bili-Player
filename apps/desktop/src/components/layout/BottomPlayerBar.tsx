@@ -20,6 +20,7 @@ import {
 	X,
 	Trash2,
 	Layers,
+	PictureInPicture2,
 } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -921,6 +922,21 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 						className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] transition-colors"
 					>
 						<Maximize2 className="w-4 h-4" />
+					</button>
+
+					{/* Mini Player Toggle */}
+					<button
+						onClick={async () => {
+							try {
+								await invoke('toggle_mini_player')
+							} catch (err) {
+								console.warn('Failed to toggle mini player:', err)
+							}
+						}}
+						title="切换至迷你播放器模式 (小窗常驻)"
+						className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-[#00AEEC] transition-colors"
+					>
+						<PictureInPicture2 className="w-4 h-4" />
 					</button>
 				</div>
 			</div>

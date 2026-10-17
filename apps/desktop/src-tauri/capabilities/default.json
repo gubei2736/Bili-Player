@@ -3,8 +3,11 @@
   "identifier": "default",
   "description": "Default permissions for Bili Player windows",
   "windows": [
+    "*",
     "main",
-    "lyrics"
+    "lyrics",
+    "mini",
+    "tray_menu"
   ],
   "permissions": [
     "core:default",

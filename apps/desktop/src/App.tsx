@@ -426,6 +426,12 @@ export const App: React.FC = () => {
 				playTrackWithProxy(nextTrack).catch(() => {})
 			}
 		}
+
+		setTimeout(() => {
+			if (typeof (window as any).__bbplayer_broadcast_state === 'function') {
+				;(window as any).__bbplayer_broadcast_state()
+			}
+		}, 50)
 	}, [])
 
 	// 3. Global Shortcuts IPC Event Listener & Eval Hook (Permanent mount)
@@ -607,16 +613,44 @@ export const App: React.FC = () => {
 			const activeTrack =
 				desktopAudioEngine.getCurrentTrack() || currentTrackRef.current
 			emit('mini-player-state-sync', {
-				title: activeTrack?.title || '暂无播放歌曲',
-				artist: activeTrack?.artist?.name || 'Bili Player',
+				title: activeTrack?.title || '',
+				artist: activeTrack?.artist?.name || '',
 				coverUrl: activeTrack?.coverUrl || '',
-				currentTime: desktopAudioEngine.getCurrentTime(),
+				currentTime: desktopAudioEngine.getCurrentTime() || 0,
 				duration: desktopAudioEngine.getDuration() || activeTrack?.duration || 0,
 				isPlaying: desktopAudioEngine.isPlaying(),
 				playMode: useQueueStore.getState().playMode,
 				volume: desktopAudioEngine.getVolume(),
 				isMuted: desktopAudioEngine.isMuted(),
 			}).catch(() => {})
+		}
+
+		;(window as any).__bbplayer_seek = (pos: number) => {
+			if (typeof pos === 'number' && !isNaN(pos)) {
+				desktopAudioEngine.seek(pos)
+				broadcastMiniPlayerState()
+			}
+		}
+		;(window as any).__bbplayer_toggle_mute = () => {
+			const nextMuted = !desktopAudioEngine.isMuted()
+			desktopAudioEngine.setMuted(nextMuted)
+			broadcastMiniPlayerState()
+		}
+		;(window as any).__bbplayer_toggle_mode = () => {
+			const q = useQueueStore.getState()
+			const nextMode =
+				q.playMode === 'sequential'
+					? 'repeat_all'
+					: q.playMode === 'repeat_all'
+					? 'repeat_one'
+					: q.playMode === 'repeat_one'
+					? 'shuffle'
+					: 'sequential'
+			q.setPlayMode(nextMode)
+			broadcastMiniPlayerState()
+		}
+		;(window as any).__bbplayer_broadcast_state = () => {
+			broadcastMiniPlayerState()
 		}
 
 		let lastSentMs = 0
@@ -644,9 +678,15 @@ export const App: React.FC = () => {
 				}).catch(() => {})
 
 				emit('mini-player-state-sync', {
+					title: activeTrack?.title || '',
+					artist: activeTrack?.artist?.name || '',
+					coverUrl: activeTrack?.coverUrl || '',
 					currentTime: event.currentTime,
-					duration: event.duration,
+					duration: event.duration || activeTrack?.duration || 0,
 					isPlaying,
+					playMode: useQueueStore.getState().playMode,
+					volume: desktopAudioEngine.getVolume(),
+					isMuted: desktopAudioEngine.isMuted(),
 				}).catch(() => {})
 
 				if (event.type === 'trackchange') {
@@ -682,6 +722,7 @@ export const App: React.FC = () => {
 		listen<number>('player-seek', (e) => {
 			if (typeof e.payload === 'number') {
 				desktopAudioEngine.seek(e.payload)
+				broadcastMiniPlayerState()
 			}
 		})
 			.then((fn) => {
@@ -692,7 +733,7 @@ export const App: React.FC = () => {
 		listen('player-toggle-mute', () => {
 			const nextMuted = !desktopAudioEngine.isMuted()
 			desktopAudioEngine.setMuted(nextMuted)
-			emit('mini-player-state-sync', { isMuted: nextMuted }).catch(() => {})
+			broadcastMiniPlayerState()
 		})
 			.then((fn) => {
 				unlistenMute = fn
@@ -710,7 +751,7 @@ export const App: React.FC = () => {
 					? 'shuffle'
 					: 'sequential'
 			q.setPlayMode(nextMode)
-			emit('mini-player-state-sync', { playMode: nextMode }).catch(() => {})
+			broadcastMiniPlayerState()
 		})
 			.then((fn) => {
 				unlistenMode = fn
@@ -727,6 +768,10 @@ export const App: React.FC = () => {
 		)
 
 		return () => {
+			delete (window as any).__bbplayer_seek
+			delete (window as any).__bbplayer_toggle_mute
+			delete (window as any).__bbplayer_toggle_mode
+			delete (window as any).__bbplayer_broadcast_state
 			unsubscribe()
 			if (unlistenInitSync) unlistenInitSync()
 			if (unlistenMiniSync) unlistenMiniSync()

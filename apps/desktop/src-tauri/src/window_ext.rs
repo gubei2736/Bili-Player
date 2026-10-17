@@ -269,3 +269,63 @@ pub fn show_tray_menu(app: AppHandle) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Tauri Command: Trigger playback actions from mini player / tray (play_pause, prev_track, next_track)
+#[tauri::command]
+pub fn trigger_player_action(app: AppHandle, action: String) {
+    let _ = app.emit("global-shortcut-event", &action);
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.emit("global-shortcut-event", &action);
+        if let Ok(json_id) = serde_json::to_string(&action) {
+            let script = format!(
+                "if (typeof window.__triggerGlobalShortcut === 'function') {{ window.__triggerGlobalShortcut({}); }}",
+                json_id
+            );
+            let _ = main_win.eval(&script);
+        }
+    }
+}
+
+/// Tauri Command: Seek player progress from mini player / UI
+#[tauri::command]
+pub fn player_seek(app: AppHandle, position: f64) {
+    let _ = app.emit("player-seek", position);
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.emit("player-seek", position);
+        let script = format!(
+            "if (typeof window.__bbplayer_seek === 'function') {{ window.__bbplayer_seek({}); }}",
+            position
+        );
+        let _ = main_win.eval(&script);
+    }
+}
+
+/// Tauri Command: Toggle player mute state
+#[tauri::command]
+pub fn player_toggle_mute(app: AppHandle) {
+    let _ = app.emit("player-toggle-mute", ());
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.emit("player-toggle-mute", ());
+        let _ = main_win.eval("if (typeof window.__bbplayer_toggle_mute === 'function') { window.__bbplayer_toggle_mute(); }");
+    }
+}
+
+/// Tauri Command: Toggle player repeat/shuffle mode
+#[tauri::command]
+pub fn player_toggle_mode(app: AppHandle) {
+    let _ = app.emit("player-toggle-mode", ());
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.emit("player-toggle-mode", ());
+        let _ = main_win.eval("if (typeof window.__bbplayer_toggle_mode === 'function') { window.__bbplayer_toggle_mode(); }");
+    }
+}
+
+/// Tauri Command: Request full player state sync to mini player
+#[tauri::command]
+pub fn player_request_sync(app: AppHandle) {
+    let _ = app.emit("mini-player-request-sync", ());
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.emit("mini-player-request-sync", ());
+        let _ = main_win.eval("if (typeof window.__bbplayer_broadcast_state === 'function') { window.__bbplayer_broadcast_state(); }");
+    }
+}
