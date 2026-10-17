@@ -11,6 +11,9 @@ export interface AudioEngineContract {
 	pause(): void
 	seek(timeInSeconds: number): void
 	setVolume(volume: number): void // 0.0 to 1.0
+	getVolume(): number
+	isMuted(): boolean
+	setMuted(muted: boolean): void
 	setLoudnessNormalization(enabled: boolean): void
 	getFrequencyData(buffer: Uint8Array): void
 	getCurrentTime(): number
@@ -258,7 +261,13 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	}
 
 	private emit(event: Parameters<PlaybackListener>[0]): void {
-		this.listeners.forEach((listener) => listener(event))
+		this.listeners.forEach((listener) => {
+			try {
+				listener(event)
+			} catch (err) {
+				logError('AudioEngine', 'PlaybackListener 监听器执行异常，已安全隔离以防止中断播放主链路', err)
+			}
+		})
 	}
 
 	public subscribe(listener: PlaybackListener): () => void {
@@ -405,6 +414,18 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	public setVolume(volume: number): void {
 		this.audio.volume = Math.max(0, Math.min(1, volume))
+	}
+
+	public getVolume(): number {
+		return this.audio.volume ?? 1
+	}
+
+	public isMuted(): boolean {
+		return this.audio.muted ?? false
+	}
+
+	public setMuted(muted: boolean): void {
+		this.audio.muted = muted
 	}
 
 	public setLoudnessNormalization(enabled: boolean): void {
