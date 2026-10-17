@@ -34,77 +34,139 @@ export class NeteaseApi {
 		id: number,
 		signal?: AbortSignal,
 	): ResultAsync<NeteaseLyricResponse, NeteaseApiError> {
-		const data = {
-			id,
-			lv: -1,
-			tv: -1,
-			rv: -1,
-			kv: -1,
-			yv: -1,
-			os: 'ios',
-			ver: 1,
-		}
-		const requestOptions: RequestOptions = createOption(
-			{
-				crypto: 'eapi',
-				cookie: {
-					os: 'ios',
-					appver: '8.7.01',
-					osver: '16.3',
-					deviceId: '265B59C3-C5DE-4876-8A33-FD52CD5C2960',
-				},
-			},
-			'eapi',
-		)
-		if (signal) {
-			requestOptions.signal = signal
-		}
-		if (this.client) {
-			requestOptions.client = this.client
-		}
-
-		return createRequest<object, NeteaseLyricResponse>(
-			'/api/song/lyric/v1',
-			data,
-			requestOptions,
-		)
-			.map((res) => res.body)
-			.orElse(() => {
-				// Fallback 到标准明文歌词接口，避免 eapi 二进制加密被破坏导致解密失败
-				return ResultAsync.fromPromise(
-					this.http
-						.fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=1&kv=1&tv=-1&rv=-1`, {
-							headers: {
-								Referer: 'https://music.163.com/',
-								'User-Agent':
-									'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
-							},
-							signal,
-						})
-						.then(async (res) => {
-							if (!res.ok) {
-								throw new Error(`Netease plaintext lyric error: ${res.statusText}`)
-							}
-							const json = await res.json()
-							return {
-								code: json.code || 200,
-								lrc: json.lrc,
-								klyric: json.klyric,
-								tlyric: json.tlyric,
-								romalrc: json.romalrc,
-							} as NeteaseLyricResponse
-						}),
-					(e) =>
-						new NeteaseApiError({
-							message: '获取网易云歌词失败',
-							type: 'RequestFailed',
-							cause: e,
-						}),
+		// 1. 优先使用极速稳定的官方明文歌词接口（自带主词、翻译与罗马音，防eapi风控阻断）
+		const plaintextFetch = ResultAsync.fromPromise(
+			this.http
+				.fetch(
+					`https://music.163.com/api/song/lyric?id=${id}&lv=1&kv=1&tv=-1&rv=-1`,
+					{
+						headers: {
+							Referer: 'https://music.163.com/',
+							'User-Agent':
+								'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+						},
+						signal,
+					},
 				)
-			})
+				.then(async (res) => {
+					if (!res.ok) {
+						throw new Error(`Netease plaintext lyric error: ${res.statusText}`)
+					}
+					const json = await res.json()
+					return {
+						code: json.code || 200,
+						lrc: json.lrc,
+						klyric: json.klyric,
+						tlyric: json.tlyric,
+						romalrc: json.romalrc,
+					} as NeteaseLyricResponse
+				}),
+			(e) =>
+				new NeteaseApiError({
+					message: '获取网易云明文歌词失败',
+					type: 'RequestFailed',
+					cause: e,
+				}),
+		)
+
+		return plaintextFetch.orElse(() => {
+			// 2. 回退到 eapi 加密接口
+			const data = {
+				id,
+				lv: -1,
+				tv: -1,
+				rv: -1,
+				kv: -1,
+				yv: -1,
+				os: 'ios',
+				ver: 1,
+			}
+			const requestOptions: RequestOptions = createOption(
+				{
+					crypto: 'eapi',
+					cookie: {
+						os: 'ios',
+						appver: '8.7.01',
+						osver: '16.3',
+						deviceId: '265B59C3-C5DE-4876-8A33-FD52CD5C2960',
+					},
+				},
+				'eapi',
+			)
+			if (signal) {
+				requestOptions.signal = signal
+			}
+			if (this.client) {
+				requestOptions.client = this.client
+			}
+
+			return createRequest<object, NeteaseLyricResponse>(
+				'/api/song/lyric/v1',
+				data,
+				requestOptions,
+			).map((res) => res.body)
+		})
 	}
 
 	search(
+		params: SearchParams,
+		signal?: AbortSignal,
+	): ResultAsync<LyricSearchResult, NeteaseApiError> {
+		const type = params.type ?? 1
+		const limit = params.limit ?? 30
+		const offset = params.offset ?? 0
+
+		// 1. 对于单曲检索，优先使用响应极速且免加密风控的 Web 开放搜索接口
+		if (type == 1) {
+			const webSearchUrl = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(
+				params.keywords,
+			)}&type=1&offset=${offset}&total=true&limit=${limit}`
+
+			const webSearchPromise = this.http
+				.fetch(webSearchUrl, {
+					headers: {
+						Referer: 'https://music.163.com/',
+						'User-Agent':
+							'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+					},
+					signal,
+				})
+				.then(async (res) => {
+					if (!res.ok) {
+						throw new Error(`Netease web search error: ${res.statusText}`)
+					}
+					const json = (await res.json()) as any
+					const songs = json?.result?.songs ?? []
+					return songs.map((song: any) => ({
+						source: 'netease' as const,
+						duration: (song.duration ?? song.dt ?? 0) / 1000,
+						title: song.name,
+						artist:
+							song.artists?.[0]?.name ??
+							song.ar?.[0]?.name ??
+							'Unknown',
+						remoteId: song.id,
+					})) as LyricSearchResult
+				})
+
+			return ResultAsync.fromPromise(
+				webSearchPromise,
+				(e) =>
+					new NeteaseApiError({
+						message: '网易云开放接口搜索失败',
+						type: 'RequestFailed',
+						cause: e,
+					}),
+			).orElse(() => {
+				// 若开放接口因网络异常失败，回退到 weapi 加密搜索
+				return this.searchViaWeapi(params, signal)
+			})
+		}
+
+		return this.searchViaWeapi(params, signal)
+	}
+
+	private searchViaWeapi(
 		params: SearchParams,
 		signal?: AbortSignal,
 	): ResultAsync<LyricSearchResult, NeteaseApiError> {
@@ -135,11 +197,11 @@ export class NeteaseApi {
 			requestOptions,
 		).map((res) => {
 			if (!res.body.result?.songs) return []
-			return res.body.result.songs.map((song) => ({
+			return res.body.result.songs.map((song: any) => ({
 				source: 'netease' as const,
-				duration: song.dt / 1000,
+				duration: (song.dt ?? song.duration ?? 0) / 1000,
 				title: song.name,
-				artist: song.ar[0]?.name ?? 'Unknown',
+				artist: song.ar?.[0]?.name ?? song.artists?.[0]?.name ?? 'Unknown',
 				remoteId: song.id,
 			}))
 		})

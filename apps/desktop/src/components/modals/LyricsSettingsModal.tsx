@@ -292,7 +292,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 									onChange={(e) => handleToggleTranslation(e.target.checked)}
 									className="w-3.5 h-3.5 rounded border-white/20 text-[#00AEEC] focus:ring-0 cursor-pointer accent-[#00AEEC]"
 								/>
-								<span className="text-[11px] font-medium">翻译歌词</span>
+								<span className="text-[11px] font-medium">歌词翻译</span>
 							</label>
 
 							<label className="flex items-center gap-1.5 cursor-pointer text-foreground hover:text-[#00AEEC] transition-colors select-none">
