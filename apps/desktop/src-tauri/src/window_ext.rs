@@ -95,15 +95,22 @@ pub fn exit_app(app: AppHandle) {
     app.exit(0);
 }
 
-/// Tauri Command: Append debug log message directly to disk
+/// Tauri Command: Append debug log message directly to disk (active only in debug mode)
 #[tauri::command]
 pub fn append_debug_log(message: String) {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-    if let Ok(mut path) = std::env::temp_dir().into_os_string().into_string() {
-        path.push_str("\\bbplayer_debug.log");
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-            let _ = writeln!(file, "{}", message);
+    #[cfg(debug_assertions)]
+    {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        if let Ok(mut path) = std::env::temp_dir().into_os_string().into_string() {
+            path.push_str("\\bbplayer_debug.log");
+            if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+                let _ = writeln!(file, "{}", message);
+            }
         }
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = message;
     }
 }

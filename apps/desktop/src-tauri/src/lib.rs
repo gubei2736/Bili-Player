@@ -43,9 +43,11 @@ pub fn run() {
             shortcuts::update_shortcuts,
         ])
         .setup(|app| {
+            #[cfg(debug_assertions)]
             eprintln!("[BBPlayer] setup closure invoked");
             // 1. Apply native window effects to main window & handle close requests
             if let Some(main_win) = app.get_webview_window("main") {
+                #[cfg(debug_assertions)]
                 eprintln!("[BBPlayer] main window found, setting up window effects");
                 window_ext::setup_window_effects(&main_win);
 
@@ -57,6 +59,7 @@ pub fn run() {
                     }
                 });
             } else {
+                #[cfg(debug_assertions)]
                 eprintln!("[BBPlayer] WARNING: main window NOT found in app.get_webview_window(\"main\")!");
             }
 

@@ -2,9 +2,12 @@ import { invoke } from '@tauri-apps/api/core'
 
 /**
  * 专用分 P 状态全链路追踪日志工具
- * 自动向浏览控制台输出，并通过 Tauri 本地命令追加写入 G:\Project\Gemini\BBPlayer\debug_multipart.log
+ * 仅在开发/Debug 模式下输出控制台与落盘追踪日志，Release 生产包彻底禁用
  */
 export function logMultipart(module: string, message: string, data?: any): void {
+	if (import.meta.env.PROD) {
+		return
+	}
 	const now = new Date()
 	const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now
 		.getMinutes()

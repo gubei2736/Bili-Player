@@ -5,8 +5,11 @@ import path from 'path'
 // @ts-expect-error process is node
 const host = process.env.TAURI_DEV_HOST
 
-export default defineConfig(async () => ({
+export default defineConfig(({ mode }) => ({
 	plugins: [react()],
+	esbuild: {
+		drop: mode === 'production' ? ['console', 'debugger'] : [],
+	},
 	resolve: {
 		alias: {
 			'@': path.resolve(__dirname, './src'),
