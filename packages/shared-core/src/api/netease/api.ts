@@ -165,6 +165,14 @@ export class NeteaseApi {
 						} catch {}
 					}
 				}
+				if (list.length === 0) {
+					try {
+						const weapiRes = await this.searchViaWeapi(params, signal)
+						if (weapiRes.isOk() && weapiRes.value.length > 0) {
+							list = weapiRes.value
+						}
+					} catch {}
+				}
 				return list
 			})()
 

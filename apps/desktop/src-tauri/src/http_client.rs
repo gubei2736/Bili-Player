@@ -23,20 +23,45 @@ pub struct NativeHttpResponse {
 }
 
 static DIRECT_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-static PROXY_CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
+static PROXY_CLIENT_7879: OnceLock<reqwest::Client> = OnceLock::new();
+static PROXY_CLIENT_ENV: OnceLock<Option<reqwest::Client>> = OnceLock::new();
 
 fn get_direct_client() -> &'static reqwest::Client {
     DIRECT_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
-            .timeout(Duration::from_secs(12))
+            .connect_timeout(Duration::from_millis(2000))
+            .timeout(Duration::from_secs(8))
+            .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .unwrap_or_else(|_| reqwest::Client::new())
     })
 }
 
-fn get_proxy_client() -> Option<&'static reqwest::Client> {
-    PROXY_CLIENT
+fn get_active_proxy_client() -> Option<&'static reqwest::Client> {
+    // 1. 动态检测本地代理端口 127.0.0.1:7879 是否在监听（探测耗时通常 <0.5ms）
+    let is_7879_active = std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], 7879)),
+        Duration::from_millis(50),
+    )
+    .is_ok();
+
+    if is_7879_active {
+        return Some(PROXY_CLIENT_7879.get_or_init(|| {
+            let proxy = reqwest::Proxy::all("http://127.0.0.1:7879")
+                .expect("valid static proxy string");
+            reqwest::Client::builder()
+                .connect_timeout(Duration::from_millis(2000))
+                .timeout(Duration::from_secs(8))
+                .proxy(proxy)
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new())
+        }));
+    }
+
+    // 2. 环境代理变量检测
+    PROXY_CLIENT_ENV
         .get_or_init(|| {
             let env_proxy = std::env::var("HTTP_PROXY")
                 .or_else(|_| std::env::var("http_proxy"))
@@ -47,31 +72,14 @@ fn get_proxy_client() -> Option<&'static reqwest::Client> {
             if let Some(ref p) = env_proxy {
                 if let Ok(proxy) = reqwest::Proxy::all(p) {
                     return reqwest::Client::builder()
-                        .timeout(Duration::from_secs(12))
-                        .redirect(reqwest::redirect::Policy::none())
+                        .connect_timeout(Duration::from_millis(2000))
+                        .timeout(Duration::from_secs(8))
                         .proxy(proxy)
+                        .redirect(reqwest::redirect::Policy::none())
                         .build()
                         .ok();
                 }
             }
-
-            // 检测本地代理端口 127.0.0.1:7879
-            if std::net::TcpStream::connect_timeout(
-                &std::net::SocketAddr::from(([127, 0, 0, 1], 7879)),
-                Duration::from_millis(100),
-            )
-            .is_ok()
-            {
-                if let Ok(proxy) = reqwest::Proxy::all("http://127.0.0.1:7879") {
-                    return reqwest::Client::builder()
-                        .timeout(Duration::from_secs(12))
-                        .redirect(reqwest::redirect::Policy::none())
-                        .proxy(proxy)
-                        .build()
-                        .ok();
-                }
-            }
-
             None
         })
         .as_ref()
@@ -218,18 +226,17 @@ async fn execute_request_on_client(
 
 #[tauri::command]
 pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHttpResponse, String> {
-    // 1. 优先尝试直连客户端请求
-    let direct_res = execute_request_on_client(get_direct_client(), &request).await;
-    match direct_res {
-        Ok(ref resp) if resp.ok || (resp.status > 0 && resp.status < 500) => Ok(direct_res.unwrap()),
-        _ => {
-            // 2. 若直连遭遇网络超时/Fake-IP黑洞/连接失败，自动无缝使用代理通道（如 127.0.0.1:7879）进行重试
-            if let Some(proxy_client) = get_proxy_client() {
-                if let Ok(proxy_res) = execute_request_on_client(proxy_client, &request).await {
-                    return Ok(proxy_res);
-                }
+    // 1. 若本地代理端口 127.0.0.1:7879 或环境变量代理可用（如 Clash 正在运行将域名劫持为 Fake-IP），
+    // 必须优先使用代理通道。Clash 内核在本地即可瞬间完成路由和请求（耗时约 50ms），
+    // 彻底杜绝直接向 Fake-IP 黑洞发包造成的长达数秒挂起超时！
+    if let Some(proxy_client) = get_active_proxy_client() {
+        if let Ok(proxy_res) = execute_request_on_client(proxy_client, &request).await {
+            if proxy_res.ok || (proxy_res.status > 0 && proxy_res.status < 500) {
+                return Ok(proxy_res);
             }
-            direct_res
         }
     }
+
+    // 2. 直连通道（代理未开启、或代理请求失败时执行）
+    execute_request_on_client(get_direct_client(), &request).await
 }

@@ -533,10 +533,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 					)}
 
 					{/* Background Line */}
-					<div className="w-full h-[3px] group-hover/progress:h-[4px] rounded-full bg-white/10 group-hover/progress:bg-white/15 transition-all duration-150 overflow-hidden relative">
+					<div className="w-full h-[3px] group-hover/progress:h-[4px] rounded-full bg-white/10 group-hover/progress:bg-white/15 transition-[height,background-color] duration-150 overflow-hidden relative">
 						{/* Played Themed Progress Line */}
 						<div
-							className="h-full rounded-full transition-all duration-75"
+							className="h-full rounded-full"
 							style={{
 								width: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
 								backgroundColor: primaryColor,
@@ -544,9 +544,9 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 						/>
 					</div>
 
-					{/* Thumb circle: 缩小并隐藏，鼠标 hover 在进度条或拖拽时显现 */}
+					{/* Thumb circle: 缩小并隐藏，鼠标 hover 在进度条或拖拽时显现，位移严格同帧同步 */}
 					<div
-						className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-white border border-white/80 pointer-events-none transition-all duration-150 ${
+						className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-white border border-white/80 pointer-events-none transition-[opacity,transform] duration-150 ${
 							isDragging
 								? 'opacity-100 scale-125'
 								: 'opacity-0 group-hover/progress:opacity-100 group-hover/progress:scale-110'

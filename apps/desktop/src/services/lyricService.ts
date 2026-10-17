@@ -608,7 +608,7 @@ export class LyricService {
 				const nRes = await Promise.race([
 					neteaseApi.search({ keywords: cleanKw, limit: sourceFilter === 'netease' ? 12 : 8 }),
 					new Promise<never>((_, reject) =>
-						setTimeout(() => reject(new Error('Netease search timeout')), 6000),
+						setTimeout(() => reject(new Error('Netease search timeout')), 12000),
 					),
 				])
 				if (nRes.isOk()) {
