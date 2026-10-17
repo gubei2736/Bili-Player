@@ -1,151 +1,120 @@
 <div align="center">
-<img src="./apps/mobile/assets/images/icon_large.png" alt="logo" width="50" />
+<img src="./apps/desktop/public/icon.png" alt="logo" width="64" />
 <h1>Bili Player</h1>
 
-一款使用 React Native 构建的本地优先的 Bilibili 音频播放器。更轻量 & 舒服的听歌体验，远离臃肿卡顿的 Bilibili 客户端。
+一款基于 **Tauri v2 + React 18 + Rust** 构建的高性能、轻量级本地优先 Bilibili PC 桌面音乐播放器。<br/>
+提供纯粹、高音质、无冗余干扰的沉浸式听歌体验。
 
-[![GitHub Release](https://img.shields.io/github/v/release/yanyao2333/bbplayer?style=flat-square)](https://github.com/bbplayer-app/bbplayer/releases)
-![React Native](https://img.shields.io/badge/React%20Native-20232A?style=flat-square&logo=react&logoColor=sky)
-[![Website](https://img.shields.io/badge/Website-bbplayer.roitium.com-blue?style=flat-square)](https://bbplayer.roitium.com)
+[![Version](https://img.shields.io/badge/version-v1.1.0-blue?style=flat-square)](https://github.com/bbplayer-app/bbplayer)
+![Tauri v2](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
+![React 18](https://img.shields.io/badge/React-18-20232A?style=flat-square&logo=react&logoColor=sky)
+![Rust](https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&logo=rust&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 </div>
 
 ---
 
-**[前往官网查看更多详情和上手指南 ➔](https://bbplayer.roitium.com)**
+## 🌟 核心特性
 
-## 屏幕截图
+### 🎧 极致播放体验
+- **Bilibili 账号互通**：支持二维码扫码极速登录，无缝读取并同步个人收藏夹、合集订阅与追更列表。
+- **Hi-Fi 级音频引擎**：基于 Web Audio API 深度调优，内置动态响度均衡（GainNode 自动补偿音量落差），呈现平滑细腻的高保真听感。
+- **双模块智能搜索**：支持全网音视频搜索（精准识别 BV/AV 号与 b23.tv 短链解析），并提供个人收藏夹与媒体库实时快速检索。
+- **内置迷你播放器**：支持一键开启画中画独立迷你悬浮窗，内置抽屉式播放队列展开、随心切歌与音量快速微调。
 
-|                  首页                  |                   播放器                   |                    播放列表                    |                    歌词页                    |                    库页面                    |
-| :------------------------------------: | :----------------------------------------: | :--------------------------------------------: | :------------------------------------------: | :------------------------------------------: |
-| ![home](./assets/screenshots/home.jpg) | ![player](./assets/screenshots/player.jpg) | ![playlist](./assets/screenshots/playlist.jpg) | ![download](./assets/screenshots/lyrics.jpg) | ![library](./assets/screenshots/library.jpg) |
+### 📜 专业歌词系统
+- **SPL 逐字动态歌词**：支持 SPL 规范逐字渲染、罗马音注音与翻译双行对照，亚像素级丝滑滚动显示。
+- **桌面穿透悬浮歌词**：极简毛玻璃美学设计，支持窗口锁定、鼠标事件穿透、全屏应用自动规避与置顶切换。
+- **多源智能匹配**：自动匹配多平台精校歌词，支持手动调整时间轴毫秒级偏移量。
 
-## 主要功能
+### 💾 本地化与音频导出
+- **元数据无损导出**：支持一键将曲目导出为带高清专辑封面、ID3 元数据、内嵌歌词的 `.m4a` 音频文件。
+- **自定义导出目录**：可在设置中心配置默认导出保存位置，并在导出弹窗中即时选择与持久化记忆。
+- **100% 本地优先（Local-First）**：内置 SQLite 数据库，离线缓存、偏好配置、历史记录均存储于本地，启动迅速，零外部依赖。
 
-### 核心播放体验
+### 🖥️ 桌面系统集成
+- **原生系统托盘**：常驻 Windows 托盘，提供播放/暂停、切歌、显示主窗体及快速开关桌面歌词。
+- **全局快捷键**：支持自定义全局系统级热键，游戏中或专注办公时无需切换窗口即可盲操控制。
 
-- **Bilibili 登录**: 支持通过**扫码**、**手机号（短信验证码）**或手动设置 Cookie 登录。
-- **播放源**: 自由添加本地播放列表，登录账号后也可直接访问账号内收藏夹、订阅合集等，兼顾快速与方便。
-- **导入外部歌单**: 支持从 **网易云音乐** 和 **QQ 音乐** 的歌单自动匹配到 B 站视频并保存为播放列表。
-- **全功能播放器**: 提供播放/暂停、循环、随机、播放队列、响度均衡、断点续播、启动自动播放等功能。
-- **搜索**: 智能搜索，支持 BV/AV 号、b23.tv 短链解析。同时提供收藏夹和本地播放列表内搜索。
+---
 
-### 歌词系统
+## 🛠️ 技术栈与架构
 
-- **支持 SPL**: 基于 [SPL 规范](https://bbplayer.roitium.com/SPL)，支持**逐字进度**、**罗马音注音**及**翻译歌词**展示。
-- **智能获取**: 支持自动匹配歌词（网易云/QQ 音乐/酷狗音乐），并支持手动搜索、粘贴 LRC/SPL 文本及偏移量调整。
-- **多样展示**: 支持桌面歌词（悬浮窗）、状态栏歌词。
+- **桌面运行时**：[Tauri v2](https://v2.tauri.app/) (基于 Rust 驱动的高性能桌面框架)
+- **前端视图**：React 18 + TypeScript + Vite + TailwindCSS
+- **图标与动效**：Lucide Icons
+- **本地数据库**：SQLite (通过 `@tauri-apps/plugin-sql` 驱动)
+- **状态管理**：Zustand
+- **原生能力扩展**：Rust（文件对话框 `rfd`、音频导出封装、全局快捷键、托盘管理）
 
-### 主题系统
+---
 
-可以在软件内搜索并应用**任意**b 站主题装扮，支持：
+## 📂 项目结构 (Monorepo)
 
-- 导航栏
-- 开屏动画
-- 进度条拖拽图标
-- 点赞动画
-- 页面头部背景
-- 头像框
+```text
+Bili Player/
+├── apps/
+│   └── desktop/           # PC 桌面端核心 (Tauri v2 + React 18 + Rust)
+├── packages/
+│   ├── shared-core/       # 跨平台共享核心类型定义与 Bilibili 基础工具库
+│   └── splash/            # SPL 逐字歌词与 LRC 歌词解析转换核心库
+├── package.json           # 根目录工作区定义
+├── pnpm-workspace.yaml    # pnpm monorepo 配置
+└── README.md
+```
 
-### 其他特性
+---
 
-- **下载与导出**: 支持缓存歌曲并离线播放，提供简单实用的下载管理。同时支持将已缓存的歌曲导出为带封面、元数据、内嵌歌词的 `.m4a` 文件到本地存储。
-- **UI**: 支持浅色/深色模式，UI 深度适配 Material Design 3 且支持莫奈取色。
-- **实用工具**: 提供定时关闭、播放历史统计（排行榜）等功能。
+## 🚀 开发与编译指南
 
-还有更多功能和惊喜，欢迎到[官网](https://bbplayer.roitium.com)查看喵！
+### 前置环境需求
+1. **Node.js** >= 18.0.0
+2. **pnpm** >= 9.0.0
+3. **Rust** 工具链（建议 1.75+，Windows 环境需包含 MSVC 工具链，如 Visual Studio Build Tools）
 
-## 技术栈
+### 安装依赖
+```bash
+pnpm install
+```
 
-- **框架**: React Native, Expo
-- **状态管理**: Zustand
-- **数据请求**: React Query
-- **UI**: Material Design 3 (React Native Paper + ExpoUI)
-- **播放库**: [@bbplayer/orpheus](./packages/orpheus) (基于 Media3)
-- **ORM**: Drizzle ORM
+### 启动桌面端开发调试
+```bash
+pnpm --filter desktop tauri dev
+```
 
-## 项目结构 (Monorepo)
+### 构建生产环境可执行文件
+```bash
+pnpm --filter desktop tauri build
+```
+编译产物将输出至：
+`apps/desktop/src-tauri/target/release/Bili Player.exe`
 
-- **[apps/desktop](./apps/desktop)**: Bili Player 桌面端 (Tauri v2 + React 18) 应用。
-- **[apps/mobile](./apps/mobile)**: Bili Player 移动端应用核心代码。
-- **[apps/backend](./apps/backend)**: 后端服务，提供歌单共享与软件更新查询（Cloudflare Worker）。
-- **[apps/docs](./apps/docs)**: 项目文档站点。
-- **[apps/update-publisher](./apps/update-publisher)**: 用于发布更新的工具。
-- **[packages/](./packages)**: 共享库与工具包。
-  - **[@bbplayer/splash](./packages/splash)**: 歌词解析与转换核心库。
-  - **[@bbplayer/eslint-plugin](./packages/eslint-plugin)**: Bili Player 专用 lint 规则（通过 oxlint jsPlugins 运行）。
-  - **[@bbplayer/orpheus](./packages/orpheus)**: 基于 Media3 的音频播放引擎。
-  - **[@bbplayer/logs](./packages/logs)**: 日志库。
-  - **[@bbplayer/image-theme-colors](./packages/image-theme-colors)**: 封面颜色提取工具。
-  - **[@bbplayer/native](./packages/native)**: Bili Player 原生能力集成模块。
-  - **[@bbplayer/heatmap](./packages/heatmap)**: 基于 SVG 的日期热力图组件。
-  - **[expo-wavy-slider](./packages/expo-wavy-slider)**: Jetpack Compose WavySlider 的 Expo 模块封装。
+---
 
-## IOS 支持
+## 🔒 隐私与数据安全
 
-曾经对 IOS 进行了基础适配，但现在重心依旧在 Android 端上，IOS 端没有同步开发，不保证可以编译成功。
+Bili Player 是一款 **100% 本地优先、零数据上报、零遥测（No Telemetry）** 的纯净开源播放器：
+- ❌ **无第三方数据收集**：移除了所有第三方统计与分析平台（无 Firebase Analytics、无 Sentry 追踪）。
+- 🔒 **本地私密存储**：账号登录凭证（Cookies）、收藏夹数据、播放记录及设置配置均存储于本地 SQLite 数据库与用户本地设备中。
+- 🌐 **直接点对点交互**：所有网络交互均仅在客户端与 Bilibili 官方服务器之间点对点通信，无任何第三方服务器中转。
 
-## 隐私与数据统计
+更多细节请查阅 [PRIVACY.md](file:///G:/Project/Gemini/Bili%20Player/PRIVACY.md)。
 
-为了持续改进 Bili Player，应用内集成了一套轻量级的匿名数据收集系统（包含 Firebase Analytics 和 Sentry）。
+---
 
-### 我们收集什么？
+## ❤️ 致敬与感谢
 
-1. **使用数据**：功能使用频率、播放会话时长等。
-2. **崩溃报告**：应用崩溃时的堆栈信息，帮助我们修复 Bug。
-
-### 隐私承诺
-
-- **匿名**：所有数据均**不包含个人身份信息**。
-- **透明**：我们不会收集任何与账号隐私相关的信息（如 Cookie 内容、浏览历史明细等）。所有统计代码均开源可见。
-- **控制权**：你可以随时在「设置 -> 通用设置」中关闭「分享数据（崩溃报告 & 匿名统计）」开关，完全停止数据上传。
-
-## 捐赠支持
-
-如果你觉得 Bili Player 对你有所帮助，欢迎考虑捐赠支持，你的所有捐赠都将用于让 Roitium 吃顿疯狂星期四或是买一部 GalGame！
-
-<table>
-<tr>
-<td align="center">
-<details>
-<summary>微信支付</summary>
-<br />
-<img src="./apps/mobile/assets/images/wechat.png" alt="WeChat Donation" width="200" />
-</details>
-</td>
-<td align="center">
-<details>
-<summary>支付宝</summary>
-<br />
-<img src="./apps/mobile/assets/images/alipay.jpg" alt="Alipay Donation" width="200" />
-</details>
-</td>
-</tr>
-</table>
-
-## 感谢
-
-本项目开发过程中很多功能和设计的灵感都来自前辈们，包括但不限于：
-
+本项目的设计与实现离不开开源社区与前辈项目的启发，特别感谢：
 - [AzusaPlayer](https://github.com/lovegaoshi/azusa-player-mobile)
 - [BiliSound](https://github.com/bilisound/client-mobile)
 - [Salt Player](https://github.com/Moriafly/SaltPlayerSource)
 - [Spotify](https://spotify.com)
+- [Bilibili](https://www.bilibili.com/)
 
-以及最重要的：[Bilibili](https://www.bilibili.com/)
+---
 
-在此表示感谢！（鞠躬）
+## 📄 开源许可证
 
-## Star History
-
-<a href="https://www.star-history.com/?repos=Bili Player-app%2FBili Player&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Bili Player-app/BBPlayer&type=date&theme=dark&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Bili Player-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Bili Player-app/BBPlayer&type=date&legend=top-left&sealed_token=dX4uwZ7hHGaVsselUSXuc8sw1gVheSsQ-1WqJT_RWHZlQlGbnnxQ0tbT5Cmw8kJqwylH9pIZvI0AtnFj7rG3t3XxSUKCAuCK4AiBmKAmkksc1v9-hczB1ogKJEVVF_MrHS0DXPODyp_ZSG9fddCPA-oWZ_1zFWAGIwQSOQ6t3r-SLvzhHujJB-n7GJQ3" />
- </picture>
-</a>
-
-## 开源许可
-
-本项目采用 MIT 许可。
+本项目基于 [MIT License](file:///G:/Project/Gemini/Bili%20Player/LICENSE) 许可开源。

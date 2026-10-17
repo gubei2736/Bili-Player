@@ -52,6 +52,7 @@ pub fn run() {
             stream_proxy::get_cached_track_path,
             exporter::export_cached_track_to_m4a,
             exporter::pick_export_path,
+            exporter::pick_export_dir,
             http_client::native_http_request,
             shortcuts::get_shortcuts,
             shortcuts::get_shortcut_statuses,

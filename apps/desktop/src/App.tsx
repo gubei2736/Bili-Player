@@ -6,7 +6,9 @@ import {
 	Sparkles,
 	CheckCircle2,
 	Download,
+	FolderOpen,
 } from 'lucide-react'
+import { desktopDir } from '@tauri-apps/api/path'
 import { MainLayout } from './components/layout/MainLayout'
 import type { NavTab } from './components/layout/Sidebar'
 import { LoginModal } from './components/modals/LoginModal'
@@ -90,6 +92,45 @@ export const App: React.FC = () => {
 		)
 	})
 	const [debugError, setDebugError] = useState<{ module: string; message: string; error?: string } | null>(null)
+	const [customExportDir, setCustomExportDir] = useState<string>(
+		() => localStorage.getItem('bili_player_export_dir') || '',
+	)
+	const [defaultDesktopPath, setDefaultDesktopPath] = useState<string>('')
+
+	useEffect(() => {
+		desktopDir()
+			.then((p) => setDefaultDesktopPath(p))
+			.catch(() => {})
+
+		const handleExportDirChange = (e: any) => {
+			setCustomExportDir(e.detail || localStorage.getItem('bili_player_export_dir') || '')
+		}
+		window.addEventListener('bbplayer:export-dir-change', handleExportDirChange)
+		return () => {
+			window.removeEventListener('bbplayer:export-dir-change', handleExportDirChange)
+		}
+	}, [])
+
+	const handlePickExportDir = async () => {
+		try {
+			const selected = await invoke<string | null>('pick_export_dir', {
+				defaultDir: customExportDir || defaultDesktopPath || undefined,
+			})
+			if (selected) {
+				setCustomExportDir(selected)
+				localStorage.setItem('bili_player_export_dir', selected)
+				window.dispatchEvent(new CustomEvent('bbplayer:export-dir-change', { detail: selected }))
+			}
+		} catch (e) {
+			console.error('Failed to pick export dir:', e)
+		}
+	}
+
+	const handleResetExportDir = () => {
+		setCustomExportDir('')
+		localStorage.removeItem('bili_player_export_dir')
+		window.dispatchEvent(new CustomEvent('bbplayer:export-dir-change', { detail: '' }))
+	}
 
 	useEffect(() => {
 		const handleDebugError = (e: any) => {
@@ -1041,6 +1082,42 @@ export const App: React.FC = () => {
 											</p>
 										</div>
 										<CheckCircle2 className="w-4 h-4 text-emerald-400" />
+									</div>
+								</div>
+
+								{/* Export Directory Preference Card */}
+								<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs space-y-3">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="font-semibold text-foreground">
+												默认音频导出目录
+											</p>
+											<p className="text-[11px] text-muted-foreground mt-0.5">
+												单曲导出为 .m4a 时的默认保存路径（可在导出弹窗中即时更改）
+											</p>
+										</div>
+										<FolderOpen className="w-4 h-4 text-[#00AEEC]" />
+									</div>
+
+									<div className="flex items-center gap-2 pt-1">
+										<div className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-foreground font-mono text-[11px] truncate select-text" title={customExportDir || defaultDesktopPath || '默认系统桌面'}>
+											{customExportDir || defaultDesktopPath || '默认系统桌面'}
+										</div>
+										<button
+											onClick={handlePickExportDir}
+											className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl text-xs whitespace-nowrap transition-colors shadow-sm"
+										>
+											更改目录
+										</button>
+										{customExportDir && (
+											<button
+												onClick={handleResetExportDir}
+												className="px-3 py-2 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-xl text-xs whitespace-nowrap transition-colors"
+												title="恢复为系统默认桌面路径"
+											>
+												重置默认
+											</button>
+										)}
 									</div>
 								</div>
 

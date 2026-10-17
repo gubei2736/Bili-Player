@@ -153,3 +153,15 @@ pub async fn pick_export_path(
     let file = dialog.save_file().await;
     Ok(file.map(|f| f.path().to_string_lossy().to_string()))
 }
+
+/// Tauri Command: Pick an export folder directory
+#[tauri::command]
+pub async fn pick_export_dir(default_dir: Option<String>) -> Result<Option<String>, String> {
+    let mut dialog = rfd::AsyncFileDialog::new().set_title("选择默认音频导出目录");
+    if let Some(ref dir) = default_dir {
+        dialog = dialog.set_directory(dir);
+    }
+    let folder = dialog.pick_folder().await;
+    Ok(folder.map(|f| f.path().to_string_lossy().to_string()))
+}
+

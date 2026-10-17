@@ -44,6 +44,12 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 			})
 			if (selected) {
 				setOutputPath(selected)
+				const lastSlash = Math.max(selected.lastIndexOf('/'), selected.lastIndexOf('\\'))
+				if (lastSlash > 0) {
+					const newDir = selected.substring(0, lastSlash)
+					localStorage.setItem('bili_player_export_dir', newDir)
+					window.dispatchEvent(new CustomEvent('bbplayer:export-dir-change', { detail: newDir }))
+				}
 			}
 		} catch (err) {
 			console.error('Failed to pick export path:', err)
@@ -58,17 +64,25 @@ export const ExportTrackModal: React.FC<ExportTrackModalProps> = ({
 				track.artist?.name || '未知歌手'
 			}.m4a`.replace(/[\\/:*?"<>|]/g, '_')
 
-			desktopDir()
-				.catch(() => downloadDir())
-				.then(async (baseDir) => {
-					const fullPath = baseDir
-						? await join(baseDir, defaultName)
-						: defaultName
-					setOutputPath(fullPath)
-				})
-				.catch(() => {
-					setOutputPath(defaultName)
-				})
+			const savedExportDir = localStorage.getItem('bili_player_export_dir')
+
+			if (savedExportDir && savedExportDir.trim()) {
+				join(savedExportDir.trim(), defaultName)
+					.then((fullPath) => setOutputPath(fullPath))
+					.catch(() => setOutputPath(`${savedExportDir.trim()}\\${defaultName}`))
+			} else {
+				desktopDir()
+					.catch(() => downloadDir())
+					.then(async (baseDir) => {
+						const fullPath = baseDir
+							? await join(baseDir, defaultName)
+							: defaultName
+						setOutputPath(fullPath)
+					})
+					.catch(() => {
+						setOutputPath(defaultName)
+					})
+			}
 
 			if (track.source === 'bilibili') {
 				const bili = track as BilibiliTrack
