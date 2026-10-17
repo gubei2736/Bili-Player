@@ -57,7 +57,7 @@
         "title": "Bili Player - 菜单",
         "url": "index.html#tray",
         "width": 210,
-        "height": 330,
+        "height": 360,
         "resizable": false,
         "decorations": false,
         "transparent": true,

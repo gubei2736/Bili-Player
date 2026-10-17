@@ -74,7 +74,7 @@ export const TrayMenuApp: React.FC = () => {
 	}
 
 	return (
-		<div className="w-full h-full p-2.5 bg-[#0e121e]/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-2xl flex flex-col justify-between text-xs select-none text-white">
+		<div className="w-full h-full p-2 bg-[#0e121e]/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-2xl flex flex-col justify-between text-xs select-none text-white overflow-hidden">
 			{/* Brand Header */}
 			<div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-white/[0.04] border border-white/5">
 				<div className="w-5 h-5 rounded-lg bg-gradient-to-br from-[#00AEEC] to-[#FB7299] flex items-center justify-center shadow-sm">

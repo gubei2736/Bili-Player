@@ -724,9 +724,6 @@ export const App: React.FC = () => {
 
 		// 当迷你播放器打开或请求同步时，补发迷你播放器状态
 		let unlistenMiniSync: (() => void) | undefined
-		let unlistenSeek: (() => void) | undefined
-		let unlistenMute: (() => void) | undefined
-		let unlistenMode: (() => void) | undefined
 
 		listen('mini-player-request-sync', () => {
 			broadcastMiniPlayerState()
@@ -736,44 +733,6 @@ export const App: React.FC = () => {
 			})
 			.catch(() => {})
 
-		listen<number>('player-seek', (e) => {
-			if (typeof e.payload === 'number') {
-				desktopAudioEngine.seek(e.payload)
-				broadcastMiniPlayerState()
-			}
-		})
-			.then((fn) => {
-				unlistenSeek = fn
-			})
-			.catch(() => {})
-
-		listen('player-toggle-mute', () => {
-			const nextMuted = !desktopAudioEngine.isMuted()
-			desktopAudioEngine.setMuted(nextMuted)
-			broadcastMiniPlayerState()
-		})
-			.then((fn) => {
-				unlistenMute = fn
-			})
-			.catch(() => {})
-
-		listen('player-toggle-mode', () => {
-			const q = useQueueStore.getState()
-			const nextMode =
-				q.playMode === 'sequential'
-					? 'repeat_all'
-					: q.playMode === 'repeat_all'
-					? 'repeat_one'
-					: q.playMode === 'repeat_one'
-					? 'shuffle'
-					: 'sequential'
-			q.setPlayMode(nextMode)
-			broadcastMiniPlayerState()
-		})
-			.then((fn) => {
-				unlistenMode = fn
-			})
-			.catch(() => {})
 
 		// 当用户在设置抽屉中微调了歌词时间偏移量，立即同步给桌面歌词
 		const handleOffsetImmediate = () => {
@@ -792,9 +751,6 @@ export const App: React.FC = () => {
 			unsubscribe()
 			if (unlistenInitSync) unlistenInitSync()
 			if (unlistenMiniSync) unlistenMiniSync()
-			if (unlistenSeek) unlistenSeek()
-			if (unlistenMute) unlistenMute()
-			if (unlistenMode) unlistenMode()
 			window.removeEventListener(
 				'bbplayer:lyric-offset-change',
 				handleOffsetImmediate,

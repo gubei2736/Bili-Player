@@ -186,6 +186,16 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [queueOpen, setQueueOpen] = useState(false)
 	const [partsModalOpen, setPartsModalOpen] = useState(false)
 
+	// Listen for queue drawer open requests from Mini Player
+	useEffect(() => {
+		const unlistenPromise = listen('open-queue-drawer', () => {
+			setQueueOpen(true)
+		})
+		return () => {
+			unlistenPromise.then((unlisten) => unlisten())
+		}
+	}, [])
+
 	// Linear Progress Bar drag & hover states
 	const [isDragging, setIsDragging] = useState(false)
 	const [dragProgress, setDragProgress] = useState(0)

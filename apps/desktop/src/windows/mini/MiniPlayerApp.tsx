@@ -85,13 +85,26 @@ export const MiniPlayerApp: React.FC = () => {
 	}
 
 	const handleToggleMute = () => {
+		setState((prev) => ({ ...prev, isMuted: !prev.isMuted }))
 		invoke('player_toggle_mute').catch(() => {})
-		emit('player-toggle-mute').catch(() => {})
 	}
 
 	const handleToggleMode = () => {
+		const nextMode =
+			state.playMode === 'sequential'
+				? 'repeat_all'
+				: state.playMode === 'repeat_all'
+				? 'repeat_one'
+				: state.playMode === 'repeat_one'
+				? 'shuffle'
+				: 'sequential'
+		setState((prev) => ({ ...prev, playMode: nextMode }))
 		invoke('player_toggle_mode').catch(() => {})
-		emit('player-toggle-mode').catch(() => {})
+	}
+
+	const handleOpenQueue = () => {
+		invoke('restore_main_from_mini').catch(() => {})
+		emit('open-queue-drawer').catch(() => {})
 	}
 
 	const handleRestoreMain = () => {
@@ -106,9 +119,8 @@ export const MiniPlayerApp: React.FC = () => {
 			Math.min(1, (e.clientX - rect.left) / rect.width),
 		)
 		const targetSec = clickPct * state.duration
-		invoke('player_seek', { position: targetSec }).catch(() => {})
-		emit('player-seek', targetSec).catch(() => {})
 		setState((prev) => ({ ...prev, currentTime: targetSec }))
+		invoke('player_seek', { position: targetSec }).catch(() => {})
 	}
 
 	const displayTime = isDraggingSeek && seekTime !== null ? seekTime : state.currentTime
@@ -215,28 +227,34 @@ export const MiniPlayerApp: React.FC = () => {
 
 						<button
 							onClick={handleToggleMode}
-							title={
+							title={`播放模式: ${
 								state.playMode === 'repeat_one'
 									? '单曲循环'
+									: state.playMode === 'repeat_all'
+									? '列表循环'
 									: state.playMode === 'shuffle'
 									? '随机播放'
-									: '列表循环'
-							}
-							className="p-1 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+									: '顺序播放'
+							}`}
+							className={`p-1 rounded-full transition-colors ${
+								state.playMode !== 'sequential'
+									? 'text-[#00AEEC] hover:text-[#00AEEC] hover:bg-[#00AEEC]/10'
+									: 'text-white/40 hover:text-white hover:bg-white/10'
+							}`}
 						>
 							{state.playMode === 'repeat_one' ? (
-								<Repeat1 className="w-3.5 h-3.5 text-[#00AEEC]" />
+								<Repeat1 className="w-3.5 h-3.5" />
 							) : state.playMode === 'shuffle' ? (
-								<Shuffle className="w-3.5 h-3.5 text-[#00AEEC]" />
+								<Shuffle className="w-3.5 h-3.5" />
 							) : (
 								<Repeat className="w-3.5 h-3.5" />
 							)}
 						</button>
 
 						<button
-							onClick={handleRestoreMain}
-							title="展开完整主界面"
-							className="p-1 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+							onClick={handleOpenQueue}
+							title="查看列表"
+							className="p-1 rounded-full text-white/50 hover:text-[#00AEEC] hover:bg-white/10 transition-colors"
 						>
 							<ListMusic className="w-3.5 h-3.5" />
 						</button>

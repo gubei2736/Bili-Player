@@ -303,10 +303,34 @@ pub fn show_tray_menu(app: AppHandle) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
             let (cx, cy) = get_cursor_pos();
-            let win_w = 210;
-            let win_h = 330;
-            let x = (cx - win_w / 2).max(10);
-            let y = (cy - win_h - 8).max(10);
+            let scale_factor = tray_win.scale_factor().unwrap_or(1.0);
+            let phys_size = tray_win.outer_size().unwrap_or_else(|_| {
+                tauri::PhysicalSize {
+                    width: (210.0 * scale_factor) as u32,
+                    height: (360.0 * scale_factor) as u32,
+                }
+            });
+            let phys_w = phys_size.width as i32;
+            let phys_h = phys_size.height as i32;
+
+            let mut x = cx - phys_w / 2;
+            let mut y = cy - phys_h - 12;
+
+            if let Ok(Some(monitor)) = tray_win.current_monitor() {
+                let m_pos = monitor.position();
+                let m_size = monitor.size();
+                let min_x = m_pos.x + 10;
+                let max_x = m_pos.x + m_size.width as i32 - phys_w - 10;
+                let min_y = m_pos.y + 10;
+                let max_y = m_pos.y + m_size.height as i32 - phys_h - 10;
+
+                x = x.clamp(min_x, max_x);
+                y = y.clamp(min_y, max_y);
+            } else {
+                x = x.max(10);
+                y = y.max(10);
+            }
+
             let _ = tray_win.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
         }
 
@@ -319,9 +343,7 @@ pub fn show_tray_menu(app: AppHandle) -> Result<(), String> {
 /// Tauri Command: Trigger playback actions from mini player / tray (play_pause, prev_track, next_track)
 #[tauri::command]
 pub fn trigger_player_action(app: AppHandle, action: String) {
-    let _ = app.emit("global-shortcut-event", &action);
     if let Some(main_win) = app.get_webview_window("main") {
-        let _ = main_win.emit("global-shortcut-event", &action);
         if let Ok(json_id) = serde_json::to_string(&action) {
             let script = format!(
                 "if (typeof window.__triggerGlobalShortcut === 'function') {{ window.__triggerGlobalShortcut({}); }}",
@@ -335,9 +357,7 @@ pub fn trigger_player_action(app: AppHandle, action: String) {
 /// Tauri Command: Seek player progress from mini player / UI
 #[tauri::command]
 pub fn player_seek(app: AppHandle, position: f64) {
-    let _ = app.emit("player-seek", position);
     if let Some(main_win) = app.get_webview_window("main") {
-        let _ = main_win.emit("player-seek", position);
         let script = format!(
             "if (typeof window.__bbplayer_seek === 'function') {{ window.__bbplayer_seek({}); }}",
             position
@@ -349,9 +369,7 @@ pub fn player_seek(app: AppHandle, position: f64) {
 /// Tauri Command: Toggle player mute state
 #[tauri::command]
 pub fn player_toggle_mute(app: AppHandle) {
-    let _ = app.emit("player-toggle-mute", ());
     if let Some(main_win) = app.get_webview_window("main") {
-        let _ = main_win.emit("player-toggle-mute", ());
         let _ = main_win.eval("if (typeof window.__bbplayer_toggle_mute === 'function') { window.__bbplayer_toggle_mute(); }");
     }
 }
@@ -359,9 +377,7 @@ pub fn player_toggle_mute(app: AppHandle) {
 /// Tauri Command: Toggle player repeat/shuffle mode
 #[tauri::command]
 pub fn player_toggle_mode(app: AppHandle) {
-    let _ = app.emit("player-toggle-mode", ());
     if let Some(main_win) = app.get_webview_window("main") {
-        let _ = main_win.emit("player-toggle-mode", ());
         let _ = main_win.eval("if (typeof window.__bbplayer_toggle_mode === 'function') { window.__bbplayer_toggle_mode(); }");
     }
 }
@@ -369,9 +385,7 @@ pub fn player_toggle_mode(app: AppHandle) {
 /// Tauri Command: Request full player state sync to mini player
 #[tauri::command]
 pub fn player_request_sync(app: AppHandle) {
-    let _ = app.emit("mini-player-request-sync", ());
     if let Some(main_win) = app.get_webview_window("main") {
-        let _ = main_win.emit("mini-player-request-sync", ());
         let _ = main_win.eval("if (typeof window.__bbplayer_broadcast_state === 'function') { window.__bbplayer_broadcast_state(); }");
     }
 }
