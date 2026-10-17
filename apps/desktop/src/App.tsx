@@ -43,6 +43,7 @@ import {
 } from '@bbplayer/shared-core'
 import { desktopAudioEngine } from './audio/DesktopAudioEngine'
 import { playTrackWithProxy } from './audio/playTrackHelper'
+import { openDebugLogFile, toggleDevTools } from './utils/debugLogger'
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen } from '@tauri-apps/api/event'
 
@@ -88,6 +89,15 @@ export const App: React.FC = () => {
 			'tray'
 		)
 	})
+	const [debugError, setDebugError] = useState<{ module: string; message: string; error?: string } | null>(null)
+
+	useEffect(() => {
+		const handleDebugError = (e: any) => {
+			setDebugError(e.detail)
+		}
+		window.addEventListener('bbplayer:debug-error', handleDebugError)
+		return () => window.removeEventListener('bbplayer:debug-error', handleDebugError)
+	}, [])
 	const [featuredTracks, setFeaturedTracks] = useState<Track[]>([
 		{
 			id: 1,
@@ -1065,6 +1075,49 @@ export const App: React.FC = () => {
 					</div>
 				)}
 			</MainLayout>
+
+			{/* Debug Mode Audio Error Notification Toast */}
+			{debugError && (
+				<div className="fixed top-12 right-6 z-50 max-w-md bg-rose-950/95 text-rose-100 border border-rose-500/40 rounded-xl p-4 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-4 select-text">
+					<div className="flex items-start justify-between gap-3">
+						<div className="flex-1 min-w-0">
+							<div className="flex items-center gap-2 mb-1.5">
+								<span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+								<span className="text-xs font-bold text-rose-300">播放异常捕获 [{debugError.module}]</span>
+							</div>
+							<p className="text-xs leading-relaxed text-rose-100 font-medium">
+								{debugError.message}
+							</p>
+							{debugError.error && (
+								<p className="text-[11px] font-mono text-rose-300/80 mt-1.5 p-1.5 bg-black/40 rounded border border-rose-800/30 overflow-x-auto whitespace-pre-wrap break-all">
+									{debugError.error}
+								</p>
+							)}
+						</div>
+						<button
+							onClick={() => setDebugError(null)}
+							className="text-rose-400 hover:text-white p-1 rounded-md text-sm shrink-0"
+							title="关闭提示"
+						>
+							✕
+						</button>
+					</div>
+					<div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-rose-800/40">
+						<button
+							onClick={() => openDebugLogFile()}
+							className="px-3 py-1 text-xs bg-rose-600/40 hover:bg-rose-600/70 border border-rose-400/30 rounded-md text-white font-medium transition-colors"
+						>
+							打开详细日志文件
+						</button>
+						<button
+							onClick={() => toggleDevTools()}
+							className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-md text-white transition-colors"
+						>
+							控制台调试 (F12)
+						</button>
+					</div>
+				</div>
+			)}
 
 			<LoginModal
 				isOpen={loginModalOpen}

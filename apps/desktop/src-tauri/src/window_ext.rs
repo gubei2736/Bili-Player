@@ -176,23 +176,69 @@ pub fn exit_app(app: AppHandle) {
     app.exit(0);
 }
 
-/// Tauri Command: Append debug log message directly to disk (active only in debug mode)
-#[tauri::command]
-pub fn append_debug_log(message: String) {
+pub fn get_log_file_path() -> std::path::PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let path = parent.join("bili_player_debug.log");
+            if std::fs::OpenOptions::new().create(true).write(true).open(&path).is_ok() {
+                return path;
+            }
+        }
+    }
+    std::env::temp_dir().join("bili_player_debug.log")
+}
+
+pub fn write_log_line(message: &str) {
     #[cfg(debug_assertions)]
     {
+        eprintln!("{}", message);
         use std::fs::OpenOptions;
         use std::io::Write;
-        if let Ok(mut path) = std::env::temp_dir().into_os_string().into_string() {
-            path.push_str("\\bbplayer_debug.log");
-            if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-                let _ = writeln!(file, "{}", message);
-            }
+        let path = get_log_file_path();
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(file, "{}", message);
         }
     }
     #[cfg(not(debug_assertions))]
     {
         let _ = message;
+    }
+}
+
+/// Tauri Command: Append debug log message directly to console and disk (active only in debug mode)
+#[tauri::command]
+pub fn append_debug_log(message: String) {
+    write_log_line(&format!("[UI] {}", message));
+}
+
+/// Tauri Command: Get current debug log file absolute path
+#[tauri::command]
+pub fn get_debug_log_path() -> String {
+    get_log_file_path().to_string_lossy().to_string()
+}
+
+/// Tauri Command: Open debug log file with system default editor
+#[tauri::command]
+pub fn open_debug_log_file() {
+    let path = get_log_file_path();
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("notepad.exe")
+            .arg(&path)
+            .spawn();
+    }
+}
+
+/// Tauri Command: Toggle DevTools on the main window (F12 or debug helper)
+#[tauri::command]
+pub fn toggle_devtools(app: AppHandle) {
+    #[cfg(debug_assertions)]
+    if let Some(win) = app.get_webview_window("main") {
+        if win.is_devtools_open() {
+            win.close_devtools();
+        } else {
+            win.open_devtools();
+        }
     }
 }
 

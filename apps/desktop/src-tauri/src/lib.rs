@@ -38,6 +38,9 @@ pub fn run() {
             window_ext::restore_main_from_mini,
             window_ext::show_tray_menu,
             window_ext::append_debug_log,
+            window_ext::get_debug_log_path,
+            window_ext::open_debug_log_file,
+            window_ext::toggle_devtools,
             window_ext::trigger_player_action,
             window_ext::player_seek,
             window_ext::player_toggle_mute,
@@ -54,7 +57,13 @@ pub fn run() {
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
-            eprintln!("[BBPlayer] setup closure invoked");
+            {
+                let log_path = window_ext::get_log_file_path();
+                window_ext::write_log_line(&format!("======================================================"));
+                window_ext::write_log_line(&format!("[Bili Player] Debug mode active! Process ID: {}", std::process::id()));
+                window_ext::write_log_line(&format!("[Bili Player] Debug log file located at: {:?}", log_path));
+                window_ext::write_log_line(&format!("======================================================"));
+            }
             // 1. Apply native window effects to main window & handle close requests
             if let Some(main_win) = app.get_webview_window("main") {
                 #[cfg(debug_assertions)]

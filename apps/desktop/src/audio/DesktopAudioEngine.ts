@@ -1,5 +1,5 @@
 import type { Track } from '@bbplayer/shared-core'
-import { logMultipart } from '../utils/debugLogger'
+import { logDebug, logError, logMultipart } from '../utils/debugLogger'
 
 export interface AudioEngineContract {
 	loadAndPlay(
@@ -93,6 +93,49 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	}
 
 	private setupEventListeners(): void {
+		this.audio.addEventListener('loadstart', () => {
+			logDebug('AudioEngine', `[HTMLAudioEvent: loadstart] 开始请求音频资源`, {
+				src: this.audio.src.substring(0, 100),
+				networkState: this.audio.networkState,
+			})
+		})
+
+		this.audio.addEventListener('loadedmetadata', () => {
+			logDebug('AudioEngine', `[HTMLAudioEvent: loadedmetadata] 元数据已加载`, {
+				duration: this.audio.duration,
+				readyState: this.audio.readyState,
+			})
+			this.emit({
+				type: 'loadedmetadata',
+				currentTime: this.getCurrentTime(),
+				duration: this.getDuration(),
+				track: this.currentTrack,
+			})
+		})
+
+		this.audio.addEventListener('canplay', () => {
+			logDebug('AudioEngine', `[HTMLAudioEvent: canplay] 音频数据就绪可播放`, {
+				readyState: this.audio.readyState,
+				duration: this.audio.duration,
+			})
+		})
+
+		this.audio.addEventListener('playing', () => {
+			logDebug('AudioEngine', `[HTMLAudioEvent: playing] 音频正在出声播放`, {
+				currentTime: this.audio.currentTime,
+			})
+		})
+
+		this.audio.addEventListener('waiting', () => {
+			logDebug('AudioEngine', `[HTMLAudioEvent: waiting] 正在缓冲后续数据帧...`)
+		})
+
+		this.audio.addEventListener('stalled', () => {
+			logDebug('AudioEngine', `[HTMLAudioEvent: stalled] 网络流暂停/停滞`, {
+				networkState: this.audio.networkState,
+			})
+		})
+
 		this.audio.addEventListener('play', () => {
 			if ('mediaSession' in navigator) {
 				navigator.mediaSession.playbackState = 'playing'
@@ -146,16 +189,21 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			})
 		})
 
-		this.audio.addEventListener('loadedmetadata', () => {
-			this.emit({
-				type: 'loadedmetadata',
-				currentTime: this.getCurrentTime(),
-				duration: this.getDuration(),
-				track: this.currentTrack,
-			})
-		})
-
 		this.audio.addEventListener('error', () => {
+			const err = this.audio.error
+			const errMap: Record<number, string> = {
+				1: 'MEDIA_ERR_ABORTED (用户或程序中止获取)',
+				2: 'MEDIA_ERR_NETWORK (网络连接中断或代理阻断)',
+				3: 'MEDIA_ERR_DECODE (媒体解码失败，格式或编码损坏)',
+				4: 'MEDIA_ERR_SRC_NOT_SUPPORTED (音频格式不受支持或资源不可达 403/404/502)',
+			}
+			const reason = err ? (errMap[err.code] || `Error Code ${err.code}`) : 'Unknown Error'
+			logError('AudioEngine', `HTMLAudioElement 播放发生致命错误: ${reason} (code: ${err?.code}, msg: ${err?.message || '无详情'})`, {
+				src: this.audio.src,
+				networkState: this.audio.networkState,
+				readyState: this.audio.readyState,
+				trackTitle: this.currentTrack?.title,
+			})
 			this.emit({
 				type: 'error',
 				currentTime: this.getCurrentTime(),
@@ -282,7 +330,18 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		this.applyLoudnessGain()
 		this.updateMediaSession(track)
 
-		await this.audio.play()
+		try {
+			logDebug('AudioEngine', '正在调用 audio.play()...', {
+				src: this.audio.src.substring(0, 100),
+				networkState: this.audio.networkState,
+				readyState: this.audio.readyState,
+			})
+			await this.audio.play()
+			logDebug('AudioEngine', 'audio.play() 调用成功，播放器进入播放状态')
+		} catch (playErr: any) {
+			logError('AudioEngine', `audio.play() Promise 被拒绝: ${playErr?.name || 'Error'} - ${playErr?.message || playErr}`, playErr)
+			throw playErr
+		}
 	}
 
 	private applyLoudnessGain(): void {

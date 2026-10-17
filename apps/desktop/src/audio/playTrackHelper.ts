@@ -8,7 +8,7 @@ import {
 import { desktopAudioEngine } from './DesktopAudioEngine'
 import { getAudioQualityPreference } from './audioSettings'
 import { invoke } from '@tauri-apps/api/core'
-import { logMultipart } from '../utils/debugLogger'
+import { logDebug, logError, logMultipart } from '../utils/debugLogger'
 
 interface CachedStreamInfo {
 	streamData: any
@@ -315,7 +315,7 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 					pageIndex: biliTrack.bilibiliMetadata.pageIndex,
 				})
 			} else {
-				logMultipart('playTrackHelper', '开始请求音频流', { bvid, cid })
+				logDebug('playTrackHelper', '开始向 B 站 API 获取音频流 (getAudioStream)', { bvid, cid, audioQuality, enableDolby, enableHiRes })
 				const streamRes = await bilibiliApi.getAudioStream({
 					bvid,
 					cid: cid!,
@@ -325,13 +325,25 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 					preferDolbyFirst,
 				})
 
-				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
+				if (requestId !== latestPlayRequestId) {
+					logDebug('playTrackHelper', '请求已被后续切歌取代，忽略本次响应', { bvid, cid })
+					return
+				}
 
 				if (streamRes.isErr()) {
+					logError('playTrackHelper', `获取 B 站音频流 API 返回错误: ${streamRes.error.message}`, streamRes.error)
 					throw new Error(`获取 B 站音频流失败: ${streamRes.error.message}`)
 				}
 
 				streamData = streamRes.value
+				logDebug('playTrackHelper', '成功获取 B 站原始音频流数据', {
+					type: streamData.type,
+					quality: streamData.quality,
+					bandwidth: streamData.bandwidth,
+					codecs: streamData.codecs,
+					urlSample: streamData.url?.substring(0, 80) + '...',
+				})
+
 				streamCache.set(cacheKey, {
 					streamData,
 					expireAt: Date.now() + 30 * 60 * 1000,
@@ -349,10 +361,14 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 							cachedProxyPort = p
 							break
 						}
-					} catch {}
+					} catch (portErr) {
+						logDebug('playTrackHelper', `查询本地代理端口尝试 ${attempt + 1}/5 异常`, portErr)
+					}
 					await new Promise((r) => setTimeout(r, 80))
 				}
 			}
+
+			logDebug('playTrackHelper', `本地流媒体代理端口确认: ${cachedProxyPort}`)
 
 			if (requestId !== latestPlayRequestId) return
 
@@ -361,6 +377,8 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				proxyUrl = `http://127.0.0.1:${cachedProxyPort}/proxy?url=${encodeURIComponent(
 					streamData.url,
 				)}&bvid=${bvid}&cid=${cid}`
+			} else {
+				logError('playTrackHelper', '警告：本地代理端口不可用，降级为直连 CDN（可能受限于防盗链与 CORS）')
 			}
 
 			// 4. Calculate loudness normalization gain (dB)
@@ -370,18 +388,18 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			}
 
 			// 5. 优先切歌出声：第一时间送入音频引擎播放（必须传入具有最新 title 与 pageIndex 的 biliTrack！）
-			logMultipart('playTrackHelper', '即将进入 loadAndPlay', {
+			logDebug('playTrackHelper', '即将进入 desktopAudioEngine.loadAndPlay', {
 				title: biliTrack.title,
 				pageIndex: biliTrack.bilibiliMetadata.pageIndex,
 				cid: biliTrack.bilibiliMetadata.cid,
-				proxyUrl: proxyUrl.substring(0, 80) + '...',
+				proxyUrl: proxyUrl.substring(0, 100) + '...',
 			})
 			await desktopAudioEngine.loadAndPlay(biliTrack, proxyUrl, loudnessDeltaDb)
 
 			if (requestId !== latestPlayRequestId) return
 
 			// 6. 播放成功后再次同步包含音质规格的完整 biliTrack 到 Store
-			logMultipart('playTrackHelper', 'loadAndPlay 成功，执行最终同步', {
+			logDebug('playTrackHelper', 'loadAndPlay 执行完毕，同步状态到 QueueStore 与 HistoryStore', {
 				title: biliTrack.title,
 				pageIndex: biliTrack.bilibiliMetadata.pageIndex,
 			})
@@ -411,6 +429,9 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				useHistoryStore.getState().addRecord(inputTrack)
 			}
 		}
+	} catch (err: any) {
+		logError('playTrackHelper', `播放音轨发生异常: "${inputTrack.title}" (${(inputTrack as any)?.bilibiliMetadata?.bvid || inputTrack.uniqueKey})`, err)
+		throw err
 	} finally {
 		currentLoadingTrackKey = null
 	}

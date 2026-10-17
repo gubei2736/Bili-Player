@@ -11,12 +11,15 @@ import { invoke } from '@tauri-apps/api/core'
 // Route all API requests through Rust native HTTP engine (CORS & Set-Cookie safe)
 setDefaultHttpClient(new DesktopTauriHttpClient())
 
+import { logError, logDebug } from './utils/debugLogger'
+
 // 检查是否为 Debug 构建模式
 invoke<boolean>('is_debug_mode')
 	.then((isDebug) => {
 		if (isDebug) {
 			document.body.classList.add('is-debug-mode')
 			document.documentElement.classList.add('is-debug-mode')
+			logDebug('AppInit', 'Debug mode initialized. Press F12 to toggle DevTools.')
 		} else {
 			// 仅在真正的 Release 模式下禁用默认右键菜单
 			document.addEventListener('contextmenu', (e) => {
@@ -32,12 +35,19 @@ invoke<boolean>('is_debug_mode')
 		}
 	})
 
+// F12 快捷键切换开发者工具 (DevTools)
+window.addEventListener('keydown', (e) => {
+	if (e.key === 'F12') {
+		invoke('toggle_devtools').catch(() => {})
+	}
+})
+
 window.addEventListener('error', (e) => {
-	console.error('[Global Window Error]:', e.error || e.message)
+	logError('GlobalWindow', e.message, e.error)
 })
 
 window.addEventListener('unhandledrejection', (e) => {
-	console.error('[Global Unhandled Rejection]:', e.reason)
+	logError('UnhandledRejection', String(e.reason), e.reason)
 })
 
 class GlobalErrorBoundary extends React.Component<

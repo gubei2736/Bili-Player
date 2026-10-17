@@ -45,7 +45,8 @@ pub async fn get_cached_track_path(
 
 #[derive(Clone)]
 pub struct ProxyState {
-    client: Client,
+    direct_client: Client,
+    proxy_client: Option<Client>,
     pub cache_dir: std::path::PathBuf,
 }
 
@@ -60,6 +61,7 @@ async fn serve_cached_file(
     file_path: std::path::PathBuf,
     range_header: Option<&axum::http::HeaderValue>,
 ) -> Result<Response, (StatusCode, String)> {
+    crate::window_ext::write_log_line(&format!("[StreamProxy Cache] Serving from disk: {:?}", file_path));
     let mut file = File::open(&file_path)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -126,6 +128,13 @@ async fn proxy_handler(
     headers: HeaderMap,
     Query(params): Query<ProxyParams>,
 ) -> Result<Response, (StatusCode, String)> {
+    crate::window_ext::write_log_line(&format!(
+        "[StreamProxy] >>> GET /proxy | bvid={:?}, cid={:?}, Range={:?}",
+        params.bvid,
+        params.cid,
+        headers.get(header::RANGE).and_then(|v| v.to_str().ok())
+    ));
+
     let cache_dir = state.cache_dir.join("audio_cache");
     let target_cache_file = if let Some(ref bvid) = params.bvid {
         let cid_val = params.cid.unwrap_or(0);
@@ -138,27 +147,76 @@ async fn proxy_handler(
         None
     };
 
-    let mut req = state
-        .client
-        .get(&params.url)
-        .header(header::REFERER, "https://www.bilibili.com/")
-        .header(
-            header::USER_AGENT,
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        );
+    let send_upstream = |client: &Client| {
+        let mut req = client
+            .get(&params.url)
+            .header(header::REFERER, "https://www.bilibili.com/")
+            .header(
+                header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            );
+        if let Some(range) = headers.get(header::RANGE) {
+            req = req.header(header::RANGE, range);
+        }
+        req.send()
+    };
 
-    // Forward Range header if present (for seeking / 206 Partial Content)
-    if let Some(range) = headers.get(header::RANGE) {
-        req = req.header(header::RANGE, range);
-    }
-
-    let upstream = req
-        .send()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
+    let upstream = match send_upstream(&state.direct_client).await {
+        Ok(res) if res.status().is_success() || res.status().as_u16() == 206 => res,
+        Ok(res) => {
+            crate::window_ext::write_log_line(&format!(
+                "[StreamProxy WARNING] Direct request returned status {}. Checking proxy fallback...",
+                res.status()
+            ));
+            if let Some(ref p_client) = state.proxy_client {
+                if let Ok(p_res) = send_upstream(p_client).await {
+                    if p_res.status().is_success() || p_res.status().as_u16() == 206 {
+                        crate::window_ext::write_log_line("[StreamProxy] Proxy fallback succeeded!");
+                        p_res
+                    } else {
+                        res
+                    }
+                } else {
+                    res
+                }
+            } else {
+                res
+            }
+        }
+        Err(e) => {
+            crate::window_ext::write_log_line(&format!(
+                "[StreamProxy ERROR] Direct upstream request failed: {}. Trying proxy fallback...",
+                e
+            ));
+            if let Some(ref p_client) = state.proxy_client {
+                match send_upstream(p_client).await {
+                    Ok(p_res) => {
+                        crate::window_ext::write_log_line("[StreamProxy] Proxy fallback request succeeded!");
+                        p_res
+                    }
+                    Err(p_err) => {
+                        crate::window_ext::write_log_line(&format!(
+                            "[StreamProxy ERROR] Proxy fallback also failed: {}",
+                            p_err
+                        ));
+                        return Err((StatusCode::BAD_GATEWAY, format!("All upstream attempts failed: direct={}, proxy={}", e, p_err)));
+                    }
+                }
+            } else {
+                return Err((StatusCode::BAD_GATEWAY, e.to_string()));
+            }
+        }
+    };
 
     let status = StatusCode::from_u16(upstream.status().as_u16())
         .unwrap_or(StatusCode::OK);
+
+    crate::window_ext::write_log_line(&format!(
+        "[StreamProxy] <<< Upstream responded: HTTP {} | Content-Length: {:?} | Content-Type: {:?}",
+        status,
+        upstream.headers().get(header::CONTENT_LENGTH).and_then(|v| v.to_str().ok()),
+        upstream.headers().get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()),
+    ));
 
     let mut response_builder = Response::builder()
         .status(status)
@@ -242,6 +300,7 @@ async fn proxy_handler(
 }
 
 async fn options_handler() -> Response {
+    crate::window_ext::write_log_line("[StreamProxy] >>> OPTIONS /proxy (PNA preflight request received)");
     Response::builder()
         .status(StatusCode::NO_CONTENT)
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
@@ -257,14 +316,40 @@ async fn options_handler() -> Response {
 pub async fn start_proxy_server(
     cache_dir: std::path::PathBuf,
 ) -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
-    let client = Client::builder()
+    let direct_client = Client::builder()
         .no_proxy()
         .connect_timeout(std::time::Duration::from_secs(6))
         .build()
         .unwrap_or_else(|_| Client::new());
 
+    let is_7879_active = std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], 7879)),
+        std::time::Duration::from_millis(50),
+    )
+    .is_ok();
+
+    let proxy_client = if is_7879_active {
+        if let Ok(proxy) = reqwest::Proxy::all("http://127.0.0.1:7879") {
+            Client::builder()
+                .proxy(proxy)
+                .connect_timeout(std::time::Duration::from_secs(6))
+                .build()
+                .ok()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    crate::window_ext::write_log_line(&format!(
+        "[StreamProxy] Initializing Axum proxy. Direct client ready, 7879 proxy available: {}",
+        proxy_client.is_some()
+    ));
+
     let state = Arc::new(ProxyState {
-        client,
+        direct_client,
+        proxy_client,
         cache_dir,
     });
 
@@ -277,9 +362,14 @@ pub async fn start_proxy_server(
     let port = listener.local_addr()?.port();
     PROXY_PORT.store(port, Ordering::Relaxed);
 
+    crate::window_ext::write_log_line(&format!(
+        "[StreamProxy] Local streaming proxy successfully bound to http://127.0.0.1:{}",
+        port
+    ));
+
     tokio::spawn(async move {
         if let Err(err) = axum::serve(listener, app).await {
-            log::error!("Proxy server error: {}", err);
+            crate::window_ext::write_log_line(&format!("[StreamProxy Server Error] {}", err));
         }
     });
 
