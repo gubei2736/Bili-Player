@@ -188,9 +188,6 @@ export const ShortcutsSettingsView: React.FC = () => {
 						<Keyboard className="w-4 h-4 text-primary" />
 						<span>自定义全局快捷键</span>
 					</h3>
-					<p className="text-[11px] text-muted-foreground mt-0.5">
-						点击右侧键位按钮直接按下组合键录制（后台全局热键需包含 Ctrl / Alt / Shift 修饰键）
-					</p>
 				</div>
 				<button
 					onClick={handleReset}

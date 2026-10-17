@@ -165,7 +165,7 @@ export const AudioQualitySettingsCard: React.FC = () => {
 							</span>
 						</p>
 						<p className="text-[11px] text-muted-foreground leading-relaxed">
-							基于 EBU R128 标准与 Web Audio 动态增益，自动均衡不同歌曲的响度差异，保持曲目间音量统一、防止忽大忽小与突发爆音。
+							自动均衡不同歌曲的响度差异，保持曲目间音量统一、防止忽大忽小与突发爆音。
 						</p>
 					</div>
 

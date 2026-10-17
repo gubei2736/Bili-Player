@@ -20,7 +20,10 @@ export class MemoryStateStorage implements StateStorage {
 	}
 }
 
-let defaultStateStorage: StateStorage = new MemoryStateStorage()
+let defaultStateStorage: StateStorage =
+	typeof window !== 'undefined' && window.localStorage
+		? window.localStorage
+		: new MemoryStateStorage()
 
 export function setDefaultStateStorage(storage: StateStorage): void {
 	defaultStateStorage = storage

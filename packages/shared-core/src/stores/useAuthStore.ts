@@ -114,6 +114,14 @@ export const useAuthStore = create<AuthState>()(
 				userInfo: state.userInfo,
 				bilibiliCookie: state.bilibiliCookie,
 			}),
+			onRehydrateStorage: () => (state) => {
+				if (state?.bilibiliCookie) {
+					const provider = getDefaultCookieProvider()
+					if (provider.setCookie) {
+						provider.setCookie(state.bilibiliCookie)
+					}
+				}
+			},
 		},
 	),
 )

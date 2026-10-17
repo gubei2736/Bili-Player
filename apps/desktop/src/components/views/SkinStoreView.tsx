@@ -405,15 +405,10 @@ export const SkinStoreView: React.FC = () => {
 
 							{/* UI 面板专属模糊度与暗度（解决自定义背景看不太清内容的问题） */}
 							<div className="p-3.5 rounded-xl bg-primary/[0.04] border border-primary/15 space-y-3">
-								<div className="flex items-center justify-between">
-									<div className="flex items-center gap-1.5">
-										<Sparkles className="w-3.5 h-3.5 text-primary" />
-										<span className="text-xs font-semibold text-foreground">
-											UI 界面通透与清晰度调节
-										</span>
-									</div>
-									<span className="text-[10px] text-muted-foreground">
-										调大模糊或暗度可使背景图下的文字列表更加清晰醒目
+								<div className="flex items-center gap-1.5">
+									<Sparkles className="w-3.5 h-3.5 text-primary" />
+									<span className="text-xs font-semibold text-foreground">
+										UI 界面通透与清晰度调节
 									</span>
 								</div>
 
