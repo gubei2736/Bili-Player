@@ -15,7 +15,7 @@
   <sub><b>Author & Maintainer: <a href="https://github.com/gubei2736">gubei2736</a></b></sub>
 </p>
 
-[![Release](https://img.shields.io/badge/Release-v1.1.0-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.1-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
 [![Maintainer](https://img.shields.io/badge/Maintainer-gubei2736-EA4AAA?style=flat-square&logo=github&logoColor=white)](https://github.com/gubei2736)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/gubei2736/Bili-Player)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://v2.tauri.app/)
@@ -122,9 +122,9 @@ pnpm --filter desktop tauri build
 ```
 
 编译产物将输出至：
-- 安装版：`apps/desktop/src-tauri/target/release/Bili Player-Setup-1.1.0.exe`
-- 便携版：`apps/desktop/src-tauri/target/release/Bili Player-Portable-1.1.0.exe`
-- 绿色压缩包：`apps/desktop/src-tauri/target/release/Bili Player-Setup-1.1.0-win.zip`
+- 安装版：`apps/desktop/src-tauri/target/release/Bili Player-Setup-1.1.1.exe`
+- 便携版：`apps/desktop/src-tauri/target/release/Bili Player-Portable-1.1.1.exe`
+- 绿色压缩包：`apps/desktop/src-tauri/target/release/Bili Player-Setup-1.1.1-win.zip`
 
 ---
 

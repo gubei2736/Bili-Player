@@ -4,7 +4,6 @@ import {
 	Sliders,
 	HardDrive,
 	AppWindow,
-	Keyboard,
 	Music,
 	Sparkles,
 } from 'lucide-react'
@@ -202,7 +201,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 										Bili Player
 									</span>
 									<span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold border border-primary/30">
-										V1.1.0
+										V1.1.1
 									</span>
 								</div>
 								<p className="text-[11px] text-muted-foreground mt-0.5">
@@ -220,13 +219,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 			</div>
 
 			{/* Section 4: 全局快捷键 */}
-			<div className="space-y-3">
-				<div className="flex items-center gap-2 text-xs font-semibold text-foreground/90">
-					<Keyboard className="w-4 h-4 text-emerald-400" />
-					<span>全局快捷键设置</span>
-				</div>
-				<ShortcutsSettingsView />
-			</div>
+			<ShortcutsSettingsView />
 		</div>
 	)
 }
