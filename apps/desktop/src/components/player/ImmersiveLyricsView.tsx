@@ -231,6 +231,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	}, [activeIndex, isOpen])
 
 	// Audio Halo Visualizer on Left Cover
+	// ⚡ 性能优化：改用 ResizeObserver 仅在实际缩放时重置显存纹理，杜绝每帧重复分配显存，并支持后台休眠
 	useEffect(() => {
 		if (!isOpen) return
 		const canvas = haloCanvasRef.current
@@ -241,7 +242,27 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		let animId: number
 		const freqBuffer = new Uint8Array(128)
 
+		let currentW = (canvas.width = canvas.offsetWidth || 300)
+		let currentH = (canvas.height = canvas.offsetHeight || 300)
+
+		const ro = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				const { width, height } = entry.contentRect
+				if (width > 0 && height > 0) {
+					currentW = canvas.width = Math.round(width)
+					currentH = canvas.height = Math.round(height)
+				}
+			}
+		})
+		ro.observe(canvas)
+
 		const renderHalo = () => {
+			// 后台/最小化休眠
+			if (document.hidden) {
+				animId = requestAnimationFrame(renderHalo)
+				return
+			}
+
 			desktopAudioEngine.getFrequencyData(freqBuffer)
 			let sum = 0
 			for (let i = 0; i < 32; i++) {
@@ -249,8 +270,8 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 			}
 			const avgEnergy = sum / 32 / 255 // 0.0 to 1.0
 
-			const w = (canvas.width = canvas.offsetWidth)
-			const h = (canvas.height = canvas.offsetHeight)
+			const w = currentW
+			const h = currentH
 			ctx.clearRect(0, 0, w, h)
 
 			const cx = w / 2
@@ -272,7 +293,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		}
 
 		animId = requestAnimationFrame(renderHalo)
-		return () => cancelAnimationFrame(animId)
+		return () => {
+			ro.disconnect()
+			cancelAnimationFrame(animId)
+		}
 	}, [isOpen])
 
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)

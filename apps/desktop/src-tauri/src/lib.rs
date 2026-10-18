@@ -1,5 +1,6 @@
 pub mod exporter;
 pub mod http_client;
+pub mod local_scanner;
 pub mod shortcuts;
 pub mod stream_proxy;
 pub mod window_ext;
@@ -54,6 +55,8 @@ pub fn run() {
             exporter::export_cached_track_to_m4a,
             exporter::pick_export_path,
             exporter::pick_export_dir,
+            local_scanner::pick_local_music_dir,
+            local_scanner::scan_local_music_dir,
             http_client::native_http_request,
             shortcuts::get_shortcuts,
             shortcuts::get_shortcut_statuses,

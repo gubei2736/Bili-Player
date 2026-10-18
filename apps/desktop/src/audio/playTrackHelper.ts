@@ -416,13 +416,39 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				}
 			}
 		} else {
-			// Local track fallback
+			// 本地音频播放：无需匹配 B 站音源，直接通过本地流媒体代理服务器播放
 			const localTrack = inputTrack as any
+			const localPath = localTrack.localMetadata?.localPath || ''
+			if (!localPath) {
+				throw new Error('本地歌曲文件路径为空')
+			}
+
+			if (cachedProxyPort === null || cachedProxyPort <= 0) {
+				for (let attempt = 0; attempt < 5; attempt++) {
+					try {
+						const p = await invoke<number>('get_stream_proxy_port')
+						if (p && p > 0) {
+							cachedProxyPort = p
+							break
+						}
+					} catch (portErr) {
+						logDebug('playTrackHelper', `查询本地代理端口尝试 ${attempt + 1}/5 异常`, portErr)
+					}
+					await new Promise((r) => setTimeout(r, 80))
+				}
+			}
+
+			let streamUrl = ''
+			if (cachedProxyPort && cachedProxyPort > 0) {
+				streamUrl = `http://127.0.0.1:${cachedProxyPort}/local_file?path=${encodeURIComponent(localPath)}`
+			} else {
+				// 兜底使用 file:/// 路径
+				streamUrl = localPath.startsWith('file://') ? localPath : `file:///${localPath.replace(/\\/g, '/')}`
+			}
+
 			desktopAudioEngine.setActiveTrack(inputTrack)
-			await desktopAudioEngine.loadAndPlay(
-				inputTrack,
-				localTrack.localMetadata?.localPath || '',
-			)
+			await desktopAudioEngine.loadAndPlay(inputTrack, streamUrl, 0)
+
 			if (requestId === latestPlayRequestId) {
 				window.dispatchEvent(
 					new CustomEvent('bbplayer:track-updated', { detail: inputTrack }),

@@ -34,6 +34,11 @@ export const FluidBackground: React.FC<FluidBackgroundProps> = ({
 
 		// 4 fluid orb centers oscillating on low-frequency sine paths
 		const render = () => {
+			if (document.hidden) {
+				animationFrameRef.current = requestAnimationFrame(render)
+				return
+			}
+
 			timeRef.current += 0.006
 			const t = timeRef.current
 

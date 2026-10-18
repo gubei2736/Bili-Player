@@ -100,9 +100,23 @@ async fn serve_cached_file(
     let stream = tokio_util::io::ReaderStream::new(file.take(content_len));
     let body = Body::from_stream(stream);
 
+    let mime_type = match file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("mp3") => "audio/mpeg",
+        Some("flac") => "audio/flac",
+        Some("wav") => "audio/wav",
+        Some("ogg") => "audio/ogg",
+        Some("aac") => "audio/aac",
+        _ => "audio/mp4",
+    };
+
     let mut builder = Response::builder()
         .status(status)
-        .header(header::CONTENT_TYPE, "audio/mp4")
+        .header(header::CONTENT_TYPE, mime_type)
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
         .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
@@ -121,6 +135,22 @@ async fn serve_cached_file(
     builder
         .body(body)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+#[derive(Deserialize)]
+pub struct LocalFileParams {
+    pub path: String,
+}
+
+async fn local_file_handler(
+    headers: HeaderMap,
+    Query(params): Query<LocalFileParams>,
+) -> Result<Response, (StatusCode, String)> {
+    let p = std::path::PathBuf::from(&params.path);
+    if !p.exists() || !p.is_file() {
+        return Err((StatusCode::NOT_FOUND, "本地音频文件不存在".to_string()));
+    }
+    serve_cached_file(p, headers.get(header::RANGE)).await
 }
 
 async fn proxy_handler(
@@ -355,6 +385,7 @@ pub async fn start_proxy_server(
 
     let app = Router::new()
         .route("/proxy", get(proxy_handler).options(options_handler))
+        .route("/local_file", get(local_file_handler).options(options_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
