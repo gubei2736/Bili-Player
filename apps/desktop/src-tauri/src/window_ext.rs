@@ -459,3 +459,103 @@ pub fn play_queue_index(app: AppHandle, index: usize) {
     }
 }
 
+fn calculate_dir_size(path: &std::path::Path) -> u64 {
+    let mut size = 0;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                size += calculate_dir_size(&p);
+            } else if let Ok(meta) = entry.metadata() {
+                size += meta.len();
+            }
+        }
+    }
+    size
+}
+
+/// Tauri Command: Get total cache size in bytes (EBWebView Cache + audio_cache)
+#[tauri::command]
+pub fn get_app_cache_size(app: AppHandle) -> Result<u64, String> {
+    use tauri::Manager;
+    let mut total_size: u64 = 0;
+
+    // 1. EBWebView/Default/Cache & components
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let eb_cache = std::path::PathBuf::from(local_app_data)
+            .join("com.biliplayer.desktop")
+            .join("EBWebView")
+            .join("Default")
+            .join("Cache");
+        if eb_cache.exists() {
+            total_size += calculate_dir_size(&eb_cache);
+        }
+    }
+
+    // 2. stream_proxy audio_cache
+    if let Ok(cache_dir) = app.path().app_cache_dir() {
+        let audio_cache = cache_dir.join("audio_cache");
+        if audio_cache.exists() {
+            total_size += calculate_dir_size(&audio_cache);
+        }
+    }
+
+    Ok(total_size)
+}
+
+/// Tauri Command: Clear temporary caches (audio cache + EBWebView cache)
+#[tauri::command]
+pub fn clear_app_cache(app: AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    // 1. Clear stream_proxy audio_cache
+    if let Ok(cache_dir) = app.path().app_cache_dir() {
+        let audio_cache = cache_dir.join("audio_cache");
+        if audio_cache.exists() {
+            let _ = std::fs::remove_dir_all(&audio_cache);
+            let _ = std::fs::create_dir_all(&audio_cache);
+        }
+    }
+
+    // 2. Clear EBWebView Cache files (delete files inside EBWebView/Default/Cache)
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let base_dir = std::path::PathBuf::from(local_app_data);
+        let eb_cache = base_dir
+            .join("com.biliplayer.desktop")
+            .join("EBWebView")
+            .join("Default")
+            .join("Cache");
+        if eb_cache.exists() {
+            if let Ok(entries) = std::fs::read_dir(&eb_cache) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() {
+                        let _ = std::fs::remove_dir_all(&p);
+                    } else {
+                        let _ = std::fs::remove_file(&p);
+                    }
+                }
+            }
+        }
+
+        // Also prune any leftover junk components
+        let ebwebview = base_dir
+            .join("com.biliplayer.desktop")
+            .join("EBWebView");
+        let junk_dirs = [
+            "component_crx_cache",
+            "WidevineCdm",
+            "Subresource Filter",
+            "Speech Recognition",
+        ];
+        for junk in junk_dirs {
+            let p = ebwebview.join(junk);
+            if p.exists() {
+                let _ = std::fs::remove_dir_all(p);
+            }
+        }
+    }
+
+    Ok(())
+}
+

@@ -31,6 +31,7 @@ import { CollectionsView } from './components/views/CollectionsView'
 import { LibraryView } from './components/views/LibraryView'
 import { AudioQualitySettingsCard } from './components/views/AudioQualitySettingsCard'
 import { LyricsSettingsCard } from './components/views/LyricsSettingsCard'
+import { CacheSettingsCard } from './components/views/CacheSettingsCard'
 import { initDesktopDatabase } from './db/desktopDb'
 import { loginQrService } from './services/loginQrService'
 import {
@@ -1104,6 +1105,9 @@ export const App: React.FC = () => {
 												</div>
 											</div>
 										</div>
+
+										{/* Cache & Storage Management Card */}
+										<CacheSettingsCard />
 									</div>
 								</div>
 

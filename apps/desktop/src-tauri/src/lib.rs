@@ -61,6 +61,8 @@ pub fn run() {
             shortcuts::get_shortcuts,
             shortcuts::get_shortcut_statuses,
             shortcuts::update_shortcuts,
+            window_ext::get_app_cache_size,
+            window_ext::clear_app_cache,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

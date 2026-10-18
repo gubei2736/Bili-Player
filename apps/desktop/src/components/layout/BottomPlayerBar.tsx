@@ -384,29 +384,33 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		})
 	}, [next, prev])
 
-	// 5.1 60fps / 120fps 高频动画帧循环：平滑推进进度条，彻底消除每秒 3-4 次 timeupdate 带来的顿挫感
+	// 5.1 30fps 平滑推进进度条，彻底消除每秒 3-4 次 timeupdate 带来的顿挫感，同时防止高刷屏（144Hz/180Hz/240Hz）上过载重排
 	// ⚡ 解耦优化：动画帧只操作 DOM style 与秒级文本，不再每帧触发 setCurrentTime 重构组件树
 	useEffect(() => {
 		if (!isPlaying || isDragging) return
 
 		let animId: number
-		const updateProgress = () => {
+		let lastUpdate = 0
+		const updateProgress = (now: number) => {
 			if (!isDragging) {
-				const cur = desktopAudioEngine.getCurrentTime()
-				if (duration > 0) {
-					const pct = Math.max(0, Math.min(100, (cur / duration) * 100))
-					if (progressBarFillRef.current) {
-						progressBarFillRef.current.style.width = `${pct}%`
+				if (now - lastUpdate >= 33) {
+					lastUpdate = now
+					const cur = desktopAudioEngine.getCurrentTime()
+					if (duration > 0) {
+						const pct = Math.max(0, Math.min(100, (cur / duration) * 100))
+						if (progressBarFillRef.current) {
+							progressBarFillRef.current.style.width = `${pct}%`
+						}
+						if (progressThumbRef.current) {
+							progressThumbRef.current.style.left = `${pct}%`
+						}
 					}
-					if (progressThumbRef.current) {
-						progressThumbRef.current.style.left = `${pct}%`
-					}
-				}
-				const curSec = Math.floor(cur)
-				if (curSec !== lastDisplaySecRef.current) {
-					lastDisplaySecRef.current = curSec
-					if (timeTextSpanRef.current) {
-						timeTextSpanRef.current.textContent = formatTime(cur)
+					const curSec = Math.floor(cur)
+					if (curSec !== lastDisplaySecRef.current) {
+						lastDisplaySecRef.current = curSec
+						if (timeTextSpanRef.current) {
+							timeTextSpanRef.current.textContent = formatTime(cur)
+						}
 					}
 				}
 			}

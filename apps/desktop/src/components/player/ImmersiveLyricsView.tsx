@@ -176,9 +176,13 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		})
 
 		let animId: number
-		const updateLoop = () => {
-			if (desktopAudioEngine.isPlaying()) {
-				setCurrentTime(desktopAudioEngine.getCurrentTime())
+		let lastUpdate = 0
+		const updateLoop = (now: number) => {
+			if (now - lastUpdate >= 33) {
+				lastUpdate = now
+				if (desktopAudioEngine.isPlaying()) {
+					setCurrentTime(desktopAudioEngine.getCurrentTime())
+				}
 			}
 			animId = requestAnimationFrame(updateLoop)
 		}
@@ -240,6 +244,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		if (!ctx) return
 
 		let animId: number
+		let lastHalo = 0
 		const freqBuffer = new Uint8Array(128)
 
 		let currentW = (canvas.width = canvas.offsetWidth || 300)
@@ -256,38 +261,42 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		})
 		ro.observe(canvas)
 
-		const renderHalo = () => {
+		const renderHalo = (now: number) => {
 			// 后台/最小化休眠
 			if (document.hidden) {
 				animId = requestAnimationFrame(renderHalo)
 				return
 			}
 
-			desktopAudioEngine.getFrequencyData(freqBuffer)
-			let sum = 0
-			for (let i = 0; i < 32; i++) {
-				sum += freqBuffer[i]!
+			// ⚡ 限制音频光晕为 30FPS，防止高刷屏下重绘损耗 GPU
+			if (now - lastHalo >= 33) {
+				lastHalo = now
+				desktopAudioEngine.getFrequencyData(freqBuffer)
+				let sum = 0
+				for (let i = 0; i < 32; i++) {
+					sum += freqBuffer[i]!
+				}
+				const avgEnergy = sum / 32 / 255 // 0.0 to 1.0
+
+				const w = currentW
+				const h = currentH
+				ctx.clearRect(0, 0, w, h)
+
+				const cx = w / 2
+				const cy = h / 2
+				const baseR = Math.min(w, h) * 0.42
+				const pulseR = baseR + avgEnergy * 28
+
+				const grad = ctx.createRadialGradient(cx, cy, baseR * 0.8, cx, cy, pulseR)
+				grad.addColorStop(0, 'rgba(0, 174, 236, 0.4)')
+				grad.addColorStop(0.5, 'rgba(255, 46, 147, 0.3)')
+				grad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+
+				ctx.fillStyle = grad
+				ctx.beginPath()
+				ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
+				ctx.fill()
 			}
-			const avgEnergy = sum / 32 / 255 // 0.0 to 1.0
-
-			const w = currentW
-			const h = currentH
-			ctx.clearRect(0, 0, w, h)
-
-			const cx = w / 2
-			const cy = h / 2
-			const baseR = Math.min(w, h) * 0.42
-			const pulseR = baseR + avgEnergy * 28
-
-			const grad = ctx.createRadialGradient(cx, cy, baseR * 0.8, cx, cy, pulseR)
-			grad.addColorStop(0, 'rgba(0, 174, 236, 0.4)')
-			grad.addColorStop(0.5, 'rgba(255, 46, 147, 0.3)')
-			grad.addColorStop(1, 'rgba(0, 0, 0, 0)')
-
-			ctx.fillStyle = grad
-			ctx.beginPath()
-			ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
-			ctx.fill()
 
 			animId = requestAnimationFrame(renderHalo)
 		}

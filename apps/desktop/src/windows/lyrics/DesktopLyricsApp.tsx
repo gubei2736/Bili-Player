@@ -155,16 +155,20 @@ export const DesktopLyricsApp: React.FC = () => {
 		return lyricsData.lines[0] || null
 	}, [lyricsData, displayTimeMs])
 
-	// 60FPS / 144FPS 本地平滑插值循环：仅在播放中且存在歌词时运行
+	// 60FPS 本地平滑插值循环：仅在播放中且存在歌词时运行，限制最高 60FPS 消除高刷屏（180Hz/240Hz）多余重绘与 DWM 混色开销
 	useEffect(() => {
 		if (!isPlaying || !lyricsData || lyricsData.lines.length === 0) return
 
 		let rafId: number
-		const tick = () => {
-			const { baseTimeMs, perfNow, isPlaying: playing } = syncAnchorRef.current
-			if (playing) {
-				const elapsed = performance.now() - perfNow
-				setDisplayTimeMs(baseTimeMs + elapsed)
+		let lastTick = 0
+		const tick = (now: number) => {
+			if (now - lastTick >= 16) {
+				lastTick = now
+				const { baseTimeMs, perfNow, isPlaying: playing } = syncAnchorRef.current
+				if (playing) {
+					const elapsed = performance.now() - perfNow
+					setDisplayTimeMs(baseTimeMs + elapsed)
+				}
 			}
 			rafId = requestAnimationFrame(tick)
 		}
