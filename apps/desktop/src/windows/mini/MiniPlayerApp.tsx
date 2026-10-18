@@ -57,6 +57,8 @@ export const MiniPlayerApp: React.FC = () => {
 
 	const [isExpanded, setIsExpanded] = useState(false)
 	const progressRef = useRef<HTMLDivElement>(null)
+	const queueListRef = useRef<HTMLDivElement>(null)
+	const currentTrackRef = useRef<HTMLDivElement>(null)
 	const [isDraggingSeek, setIsDraggingSeek] = useState(false)
 	const [seekTime, setSeekTime] = useState<number | null>(null)
 
@@ -76,6 +78,16 @@ export const MiniPlayerApp: React.FC = () => {
 			unlistenSyncPromise.then((unlisten) => unlisten())
 		}
 	}, [])
+
+	// 当列表展开或当前曲目变更时，自动平滑滚动到当前曲目视口
+	useEffect(() => {
+		if (isExpanded && currentTrackRef.current) {
+			currentTrackRef.current.scrollIntoView({
+				behavior: 'smooth',
+				block: 'nearest',
+			})
+		}
+	}, [isExpanded, state.currentIndex])
 
 	const formatTime = (secs: number) => {
 		if (!isFinite(secs) || secs < 0) return '0:00'
@@ -157,23 +169,19 @@ export const MiniPlayerApp: React.FC = () => {
 
 	return (
 		// Mini Player Root: seamless zero-padding card without outer black shadows
-		<div
-			data-tauri-drag-region
-			className="w-full h-full p-0 flex flex-col items-center justify-start bg-transparent select-none cursor-move"
-		>
+		<div className="w-full h-full max-h-full p-0 flex flex-col bg-transparent select-none overflow-hidden">
 			{/* Rounded Pill Card: Clean border, solid dark background, zero outer shadows */}
 			<div
-				data-tauri-drag-region
 				style={{
 					transform: 'translateZ(0)',
 					backfaceVisibility: 'hidden',
 				}}
-				className="w-full h-full bg-[#0c101c] text-white rounded-2xl px-3.5 py-2.5 flex flex-col border border-white/15 relative overflow-hidden"
+				className="w-full h-full max-h-full bg-[#0c101c] text-white rounded-2xl px-3.5 py-2.5 flex flex-col border border-white/15 relative overflow-hidden"
 			>
 				{/* Top Controls Bar */}
 				<div
 					data-tauri-drag-region
-					className="flex items-center justify-between w-full gap-2.5 flex-shrink-0"
+					className="flex items-center justify-between w-full gap-2.5 flex-shrink-0 cursor-move"
 				>
 					{/* Track Cover & Meta */}
 					<div
@@ -328,10 +336,16 @@ export const MiniPlayerApp: React.FC = () => {
 
 				{/* Expanded In-Window Play Queue Drawer */}
 				{isExpanded && (
-					<div className="flex-1 flex flex-col min-h-0 pt-2.5 mt-2 border-t border-white/10">
-						{/* Header row */}
-						<div className="flex items-center justify-between pb-1.5 px-1 flex-shrink-0 text-white/70">
-							<div className="flex items-center gap-1.5 text-[11px] font-medium text-white/90">
+					<div className="flex-1 flex flex-col min-h-0 pt-2 mt-2 border-t border-white/10 overflow-hidden">
+						{/* Header row - draggable */}
+						<div
+							data-tauri-drag-region
+							className="flex items-center justify-between pb-1.5 px-1 flex-shrink-0 text-white/70 cursor-move"
+						>
+							<div
+								data-tauri-drag-region
+								className="flex items-center gap-1.5 text-[11px] font-medium text-white/90"
+							>
 								<Disc3 className="w-3.5 h-3.5 text-[#00AEEC] animate-[spin_6s_linear_infinite]" />
 								<span>当前播放队列</span>
 								<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-white/60">
@@ -356,12 +370,23 @@ export const MiniPlayerApp: React.FC = () => {
 								<p className="text-[10px] text-white/30 mt-0.5">请在主界面添加歌曲播放</p>
 							</div>
 						) : (
-							<div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-mini-scrollbar">
+							<div
+								ref={queueListRef}
+								onWheel={(e) => {
+									e.stopPropagation()
+									if (queueListRef.current) {
+										queueListRef.current.scrollTop += e.deltaY
+									}
+								}}
+								className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 pb-1.5 custom-mini-scrollbar select-none cursor-default"
+								style={{ overscrollBehavior: 'contain' }}
+							>
 								{currentQueue.map((item, idx) => {
 									const isCurrent = idx === state.currentIndex
 									return (
 										<div
 											key={item.uniqueKey || idx}
+											ref={isCurrent ? currentTrackRef : undefined}
 											onClick={() => handlePlayIndex(idx)}
 											className={`group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${
 												isCurrent
@@ -390,9 +415,11 @@ export const MiniPlayerApp: React.FC = () => {
 												)}
 
 												<div className="min-w-0 flex-1 leading-tight">
-													<p className={`truncate font-medium text-[11px] ${
-														isCurrent ? 'text-[#00AEEC] font-semibold' : 'text-white/90'
-													}`}>
+													<p
+														className={`truncate font-medium text-[11px] ${
+															isCurrent ? 'text-[#00AEEC] font-semibold' : 'text-white/90'
+														}`}
+													>
 														{item.title}
 													</p>
 													<p className="text-[9px] text-white/40 truncate">
