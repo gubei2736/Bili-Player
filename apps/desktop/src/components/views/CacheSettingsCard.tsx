@@ -72,14 +72,14 @@ export const CacheSettingsCard: React.FC = () => {
 					<ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
 					<div className="truncate">
 						<p className="text-foreground/90 font-medium truncate">磁盘缓存上限</p>
-						<p className="text-[10px] text-muted-foreground">硬锁 50MB</p>
+						<p className="text-[10px] text-muted-foreground">硬锁 100MB (LRU)</p>
 					</div>
 				</div>
 				<div className="bg-black/20 border border-white/5 rounded-lg p-2 flex items-center gap-2">
 					<ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
 					<div className="truncate">
 						<p className="text-foreground/90 font-medium truncate">媒体缓存上限</p>
-						<p className="text-[10px] text-muted-foreground">硬锁 20MB</p>
+						<p className="text-[10px] text-muted-foreground">硬锁 50MB (LRU)</p>
 					</div>
 				</div>
 				<div className="bg-black/20 border border-white/5 rounded-lg p-2 flex items-center gap-2">
@@ -93,7 +93,7 @@ export const CacheSettingsCard: React.FC = () => {
 
 			<div className="flex items-center justify-between pt-1 border-t border-white/5">
 				<p className="text-[10px] text-muted-foreground/80 max-w-sm">
-					启动已配置自动淘汰策略，杜绝 AppData 膨胀至几百 MB。
+					严格锁死在 100MB 磁盘网络缓存与 50MB 流媒体缓存以内，超额自动 LRU 淘汰。
 				</p>
 				<button
 					onClick={handleClearCache}

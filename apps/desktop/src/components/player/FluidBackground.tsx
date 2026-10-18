@@ -41,8 +41,8 @@ export const FluidBackground: React.FC<FluidBackgroundProps> = ({
 				return
 			}
 
-			// ⚡ 性能优化：限制流体背景为 30FPS，在 180Hz/240Hz 高刷屏下压降 80% 以上 GPU 算力
-			if (timestamp - lastRenderTime >= 33) {
+			// ⚡ 性能优化：限制流体背景为 60FPS，在 180Hz/240Hz 高刷屏下压降 66% 以上 GPU 算力
+			if (timestamp - lastRenderTime >= 16) {
 				lastRenderTime = timestamp
 				timeRef.current += 0.008
 				const t = timeRef.current

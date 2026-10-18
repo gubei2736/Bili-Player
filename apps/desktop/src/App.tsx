@@ -25,13 +25,10 @@ import {
 import { SkinStoreView, applyFontColorToDom } from './components/views/SkinStoreView'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
-import { ShortcutsSettingsView } from './components/views/ShortcutsSettingsView'
 import { FavoritesView } from './components/views/FavoritesView'
 import { CollectionsView } from './components/views/CollectionsView'
 import { LibraryView } from './components/views/LibraryView'
-import { AudioQualitySettingsCard } from './components/views/AudioQualitySettingsCard'
-import { LyricsSettingsCard } from './components/views/LyricsSettingsCard'
-import { CacheSettingsCard } from './components/views/CacheSettingsCard'
+import { SettingsView } from './components/views/SettingsView'
 import { initDesktopDatabase } from './db/desktopDb'
 import { loginQrService } from './services/loginQrService'
 import {
@@ -975,171 +972,14 @@ export const App: React.FC = () => {
 						{tab === 'skins' && <SkinStoreView />}
 
 						{tab === 'settings' && (
-							<div className="space-y-5 w-full max-w-5xl pb-10">
-								<div>
-									<h2 className="text-base font-bold text-foreground">
-										偏好设置
-									</h2>
-									<p className="text-xs text-muted-foreground mt-0.5">
-										个性化音质表现、歌词呈现、窗口行为与全局快捷键
-									</p>
-								</div>
-
-								{/* Audio & Lyrics Preferences Responsive Grid */}
-								<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-									<AudioQualitySettingsCard />
-									<div className="space-y-4">
-										<LyricsSettingsCard />
-
-										{/* Window Close Behavior Card */}
-										<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs space-y-3">
-											<div>
-												<p className="font-semibold text-foreground">
-													窗口关闭行为
-												</p>
-											</div>
-											<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-												<button
-													onClick={() => {
-														setCloseAction('tray')
-														localStorage.setItem('bili_player_close_action', 'tray')
-														localStorage.setItem('bbplayer_close_action', 'tray')
-													}}
-													className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
-														closeAction === 'tray'
-															? 'bg-[#00AEEC]/15 border-[#00AEEC]/40 text-foreground shadow-sm'
-															: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/5'
-													}`}
-												>
-													<div
-														className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
-															closeAction === 'tray'
-																? 'border-[#00AEEC]'
-																: 'border-white/30'
-														}`}
-													>
-														{closeAction === 'tray' && (
-															<div className="w-1.5 h-1.5 rounded-full bg-[#00AEEC]" />
-														)}
-													</div>
-													<p
-														className={`font-semibold ${
-															closeAction === 'tray' ? 'text-[#00AEEC]' : ''
-														}`}
-													>
-														隐藏到系统托盘
-													</p>
-												</button>
-
-												<button
-													onClick={() => {
-														setCloseAction('exit')
-														localStorage.setItem('bili_player_close_action', 'exit')
-														localStorage.setItem('bbplayer_close_action', 'exit')
-													}}
-													className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
-														closeAction === 'exit'
-															? 'bg-[#00AEEC]/15 border-[#00AEEC]/40 text-foreground shadow-sm'
-															: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/5'
-													}`}
-												>
-													<div
-														className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
-															closeAction === 'exit'
-																? 'border-[#00AEEC]'
-																: 'border-white/30'
-														}`}
-													>
-														{closeAction === 'exit' && (
-															<div className="w-1.5 h-1.5 rounded-full bg-[#00AEEC]" />
-														)}
-													</div>
-													<p
-														className={`font-semibold ${
-															closeAction === 'exit' ? 'text-[#00AEEC]' : ''
-														}`}
-													>
-														直接关闭应用
-													</p>
-												</button>
-											</div>
-										</div>
-
-										{/* Export Directory Preference Card */}
-										<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs space-y-3">
-											<div className="flex items-center justify-between">
-												<div>
-													<p className="font-semibold text-foreground">
-														默认音频导出目录
-													</p>
-													<p className="text-[11px] text-muted-foreground mt-0.5">
-														单曲导出为 .m4a 时的默认保存路径
-													</p>
-												</div>
-												<FolderOpen className="w-4 h-4 text-[#00AEEC]" />
-											</div>
-
-											<div className="flex flex-wrap items-center gap-2 pt-1">
-												<div
-													className="flex-1 min-w-[160px] bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-foreground font-mono text-[11px] truncate select-text"
-													title={customExportDir || defaultDesktopPath || '默认系统桌面'}
-												>
-													{customExportDir || defaultDesktopPath || '默认系统桌面'}
-												</div>
-												<div className="flex items-center gap-1.5 shrink-0">
-													<button
-														onClick={handlePickExportDir}
-														className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl text-xs whitespace-nowrap transition-colors shadow-sm"
-													>
-														更改目录
-													</button>
-													{customExportDir && (
-														<button
-															onClick={handleResetExportDir}
-															className="px-3 py-2 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-xl text-xs whitespace-nowrap transition-colors"
-															title="恢复为系统默认桌面路径"
-														>
-															重置默认
-														</button>
-													)}
-												</div>
-											</div>
-										</div>
-
-										{/* Cache & Storage Management Card */}
-										<CacheSettingsCard />
-									</div>
-								</div>
-
-								{/* Customizable Shortcuts Settings */}
-								<div className="pt-1">
-									<ShortcutsSettingsView />
-								</div>
-
-								{/* About & Version Card */}
-								<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs flex flex-wrap items-center justify-between gap-3">
-									<div className="flex items-center gap-3">
-										<div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#00A1D6] to-[#00AEEC] flex items-center justify-center text-white shadow-md shrink-0">
-											<Music className="w-5 h-5 fill-white" />
-										</div>
-										<div>
-											<div className="flex items-center gap-2">
-												<span className="font-bold text-foreground text-sm">Bili Player</span>
-												<span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold border border-primary/30">
-													V1.1.0
-												</span>
-											</div>
-											<p className="text-[11px] text-muted-foreground mt-0.5">
-												基于 Bilibili 音视频生态的沉浸式桌面 Hi-Fi 播放器
-											</p>
-										</div>
-									</div>
-									<div className="text-right text-[11px] text-muted-foreground shrink-0">
-										<p>Windows x64 / Tauri 2.0</p>
-										<p className="text-[10px] opacity-60 mt-0.5">最新版本</p>
-									</div>
-								</div>
-							</div>
+							<SettingsView
+								customExportDir={customExportDir}
+								defaultDesktopPath={defaultDesktopPath}
+								onPickExportDir={handlePickExportDir}
+								onResetExportDir={handleResetExportDir}
+								closeAction={closeAction}
+								onSetCloseAction={setCloseAction}
+							/>
 						)}
 					</div>
 				)}

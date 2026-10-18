@@ -178,7 +178,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		let animId: number
 		let lastUpdate = 0
 		const updateLoop = (now: number) => {
-			if (now - lastUpdate >= 33) {
+			if (now - lastUpdate >= 16) {
 				lastUpdate = now
 				if (desktopAudioEngine.isPlaying()) {
 					setCurrentTime(desktopAudioEngine.getCurrentTime())
@@ -268,8 +268,8 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 				return
 			}
 
-			// ⚡ 限制音频光晕为 30FPS，防止高刷屏下重绘损耗 GPU
-			if (now - lastHalo >= 33) {
+			// ⚡ 限制音频光晕为 60FPS，防止高刷屏下过量重绘损耗 GPU
+			if (now - lastHalo >= 16) {
 				lastHalo = now
 				desktopAudioEngine.getFrequencyData(freqBuffer)
 				let sum = 0

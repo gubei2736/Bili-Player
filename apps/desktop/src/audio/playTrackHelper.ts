@@ -15,20 +15,45 @@ interface CachedStreamInfo {
 	expireAt: number
 }
 const streamCache = new Map<string, CachedStreamInfo>()
+export const pageListCache = new Map<string, any[]>()
 
 /**
- * 后台静默预加载分 P 音频流缓存，使点击该分 P 时实现 0ms 秒播
+ * 后台静默预加载音频流缓存（支持清晰度偏好智能匹配），使切歌时实现 0ms 秒播
  */
 export function prefetchPartStream(bvid: string, cid: number): void {
 	const cacheKey = `${bvid}_${cid}`
 	if (streamCache.has(cacheKey)) return
+
+	const qualityPref = getAudioQualityPreference()
+	let audioQuality = 30280
+	let enableHiRes = false
+	let enableDolby = false
+	let preferDolbyFirst = false
+
+	if (qualityPref === 'auto_highest' || (qualityPref as any) === 'auto_hires') {
+		audioQuality = 30280
+		enableHiRes = true
+		enableDolby = true
+		preferDolbyFirst = false
+	} else if (qualityPref === 'hires_lossless') {
+		audioQuality = 30280
+		enableHiRes = true
+	} else if (qualityPref === 'dolby_atmos') {
+		audioQuality = 30280
+		enableDolby = true
+		preferDolbyFirst = true
+	} else {
+		audioQuality = 30232
+	}
+
 	bilibiliApi
 		.getAudioStream({
 			bvid,
 			cid,
-			audioQuality: 30280,
-			enableDolby: false,
-			enableHiRes: false,
+			audioQuality,
+			enableDolby,
+			enableHiRes,
+			preferDolbyFirst,
 		})
 		.then((res) => {
 			if (res.isOk()) {
@@ -36,9 +61,49 @@ export function prefetchPartStream(bvid: string, cid: number): void {
 					streamData: res.value,
 					expireAt: Date.now() + 30 * 60 * 1000,
 				})
-				logMultipart('playTrackHelper', '分 P 音频流预热成功', { bvid, cid })
+				logMultipart('playTrackHelper', '分 P / 下一首音频流预热成功', { bvid, cid })
 			}
 		})
+		.catch(() => {})
+}
+
+/**
+ * 智能预热下一首：当前歌曲进入稳定播放后，异步静默预解析队列中下一首歌曲的 CID 与音频流
+ */
+let prefetchTimer: any = null
+export function schedulePrefetchNextTrack(): void {
+	if (prefetchTimer) clearTimeout(prefetchTimer)
+	prefetchTimer = setTimeout(async () => {
+		try {
+			const { queue, currentIndex } = useQueueStore.getState()
+			if (currentIndex < 0 || currentIndex >= queue.length - 1) return
+			const nextTrack = queue[currentIndex + 1]
+			if (!nextTrack || nextTrack.source !== 'bilibili') return
+
+			const bt = nextTrack as BilibiliTrack
+			const bvid = bt.bilibiliMetadata.bvid
+			let cid = bt.bilibiliMetadata.cid
+
+			if (!cid && pageListCache.has(bvid)) {
+				const pages = pageListCache.get(bvid)!
+				cid = pages[0]?.cid
+			}
+
+			if (!cid) {
+				const res = await bilibiliApi.getPageList({ bvid })
+				if (res.isOk() && res.value.length > 0) {
+					pageListCache.set(bvid, res.value)
+					cid = res.value[0]?.cid
+				}
+			}
+
+			if (cid) {
+				prefetchPartStream(bvid, cid)
+			}
+		} catch (err) {
+			logDebug('playTrackHelper', '下一首静默预热捕获异常', err)
+		}
+	}, 1000)
 }
 
 let currentLoadingTrackKey: string | null = null
@@ -168,6 +233,9 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 	currentLoadingTrackKey = inputTrack.uniqueKey
 	const requestId = ++latestPlayRequestId
 
+	// ⚡ 核心修复：切歌瞬间立即暂停上一首音频并广播状态，彻底消灭“4秒切歌期间还在播放旧歌”的问题！
+	desktopAudioEngine.prepareTrackSwitch(inputTrack)
+
 	try {
 		if (inputTrack.source === 'bilibili') {
 			// 克隆独立副本，避免直接修改入参导致引用脏检查问题
@@ -181,17 +249,24 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			let cid = biliTrack.bilibiliMetadata.cid
 			const explicitPageIndex = biliTrack.bilibiliMetadata.pageIndex
 
-			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID
-			if (!biliTrack.bilibiliMetadata.pages || biliTrack.bilibiliMetadata.pages.length === 0 || !cid) {
+			// 1.1 获取视频分 P 列表，识别多分 P 信息与当前目标 CID（优先命中内存缓存）
+			let pages = biliTrack.bilibiliMetadata.pages
+			if ((!pages || pages.length === 0) && pageListCache.has(bvid)) {
+				pages = pageListCache.get(bvid)
+				biliTrack.bilibiliMetadata.pages = pages
+			}
+
+			if (!pages || pages.length === 0 || !cid) {
 				const pageListRes = await bilibiliApi.getPageList({ bvid })
 				if (requestId !== latestPlayRequestId) return // 已被新切歌请求取代
 				if (pageListRes.isOk() && pageListRes.value.length > 0) {
-					const pages = pageListRes.value.map((p) => ({
+					pages = pageListRes.value.map((p) => ({
 						cid: p.cid,
 						page: p.page,
 						part: p.part || `第${p.page}部分`,
 						duration: p.duration,
 					}))
+					pageListCache.set(bvid, pages)
 
 					const isMulti = pages.length > 1
 					// 核心修复：优先匹配显式传入的 cid 或 explicitPageIndex，绝不使用 || 1 短路回退到 P1！
@@ -407,7 +482,8 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 			syncTrackToQueueStore(biliTrack, originalKey)
 			useHistoryStore.getState().addRecord(biliTrack)
 
-			// 7. 预加载相邻分 P 流：如果是多 P 视频，后台静默预热下一 P，彻底消除切歌等待
+			// 7. 预加载相邻分 P 流与队列下一首：后台静默预热，彻底消除切歌等待
+			schedulePrefetchNextTrack()
 			if (biliTrack.bilibiliMetadata.pages && biliTrack.bilibiliMetadata.pages.length > 1) {
 				const curPage = biliTrack.bilibiliMetadata.pageIndex || 1
 				const nextPart = biliTrack.bilibiliMetadata.pages.find((p) => Number(p.page) === Number(curPage + 1))
