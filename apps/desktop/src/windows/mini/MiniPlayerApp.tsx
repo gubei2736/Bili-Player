@@ -156,19 +156,19 @@ export const MiniPlayerApp: React.FC = () => {
 	const currentQueue = state.queue || []
 
 	return (
-		// Outer transparent padding container to prevent window edges from clipping rounded corners and shadows
+		// Mini Player Root: seamless zero-padding card without outer black shadows
 		<div
 			data-tauri-drag-region
-			className="w-full h-full p-1.5 flex flex-col items-center justify-start bg-transparent select-none cursor-move"
+			className="w-full h-full p-0 flex flex-col items-center justify-start bg-transparent select-none cursor-move"
 		>
-			{/* Rounded Pill Card: Default Dark theme with anti-aliasing buffer and clean curves */}
+			{/* Rounded Pill Card: Clean border, solid dark background, zero outer shadows */}
 			<div
 				data-tauri-drag-region
 				style={{
 					transform: 'translateZ(0)',
 					backfaceVisibility: 'hidden',
 				}}
-				className="w-full h-full bg-[#0c101c] text-white rounded-[22px] px-3 py-2.5 flex flex-col shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.65)] border border-white/10 relative overflow-hidden"
+				className="w-full h-full bg-[#0c101c] text-white rounded-2xl px-3.5 py-2.5 flex flex-col border border-white/15 relative overflow-hidden"
 			>
 				{/* Top Controls Bar */}
 				<div

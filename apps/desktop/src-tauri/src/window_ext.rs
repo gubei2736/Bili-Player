@@ -73,6 +73,11 @@ pub fn setup_lyrics_window(window: &WebviewWindow) {
     let _ = window.set_shadow(false);
 }
 
+/// Configure mini player window to be completely borderless with no shadow
+pub fn setup_mini_window(window: &WebviewWindow) {
+    let _ = window.set_shadow(false);
+}
+
 /// Apply native window effects (Shadow, Win11 Mica, macOS Vibrancy)
 pub fn setup_window_effects(window: &WebviewWindow) {
     // 1. Set window shadow (Tauri v2 native method)
@@ -279,12 +284,14 @@ pub fn toggle_mini_player(app: AppHandle) -> Result<bool, String> {
         let is_mini_visible = mini_win.is_visible().unwrap_or(false);
         if is_mini_visible {
             let _ = mini_win.hide();
+            let _ = main_win.unminimize();
             let _ = main_win.show();
             let _ = main_win.set_focus();
             let _ = app.emit("mini-player-visibility-change", false);
             Ok(false)
         } else {
             let _ = main_win.hide();
+            setup_mini_window(&mini_win);
             let _ = mini_win.show();
             let _ = mini_win.set_focus();
             let _ = app.emit("mini-player-visibility-change", true);
@@ -299,14 +306,14 @@ pub fn toggle_mini_player(app: AppHandle) -> Result<bool, String> {
 /// Tauri Command: Restore main window from Mini Player
 #[tauri::command]
 pub fn restore_main_from_mini(app: AppHandle) -> Result<(), String> {
-    if let (Some(main_win), Some(mini_win)) = (
-        app.get_webview_window("main"),
-        app.get_webview_window("mini"),
-    ) {
+    if let Some(mini_win) = app.get_webview_window("mini") {
         let _ = mini_win.hide();
+        let _ = app.emit("mini-player-visibility-change", false);
+    }
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.unminimize();
         let _ = main_win.show();
         let _ = main_win.set_focus();
-        let _ = app.emit("mini-player-visibility-change", false);
     }
     Ok(())
 }

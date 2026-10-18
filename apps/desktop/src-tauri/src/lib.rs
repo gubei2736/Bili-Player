@@ -14,11 +14,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(
             tauri_plugin_single_instance::init(|app, _args, _cwd| {
-                if let Some(win) = app.get_webview_window("main") {
-                    let _ = win.unminimize();
-                    let _ = win.show();
-                    let _ = win.set_focus();
-                }
+                let _ = window_ext::restore_main_from_mini(app.clone());
             }),
         )
         .plugin(
@@ -104,6 +100,11 @@ pub fn run() {
                 window_ext::setup_lyrics_window(&lyrics_win);
             }
 
+            // Setup mini player window effects and remove borders/shadow
+            if let Some(mini_win) = app.get_webview_window("mini") {
+                window_ext::setup_mini_window(&mini_win);
+            }
+
             // 3. Setup focus loss handler for tray_menu window
             if let Some(tray_win) = app.get_webview_window("tray_menu") {
                 let tray_win_clone = tray_win.clone();
@@ -126,10 +127,7 @@ pub fn run() {
                         {
                             let app = tray.app_handle();
                             if button == tauri::tray::MouseButton::Left {
-                                if let Some(win) = app.get_webview_window("main") {
-                                    let _ = win.show();
-                                    let _ = win.set_focus();
-                                }
+                                let _ = window_ext::restore_main_from_mini(app.clone());
                             } else if button == tauri::tray::MouseButton::Right {
                                 let _ = window_ext::show_tray_menu(app.clone());
                             }
