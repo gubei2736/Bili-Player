@@ -24,6 +24,14 @@
 </div>
 
 ---
+## 应用截图
+<img width="1563" height="1000" alt="6" src="https://github.com/user-attachments/assets/501ab1d7-7157-425d-bff9-b8742445a391" />
+<img width="1561" height="998" alt="5" src="https://github.com/user-attachments/assets/066eb86f-67ee-442f-b337-bc806ff3d1cb" />
+<img width="1564" height="999" alt="4" src="https://github.com/user-attachments/assets/3ce228cc-c866-4796-86d1-dbd2f65c2a97" />
+<img width="1561" height="999" alt="3" src="https://github.com/user-attachments/assets/d82171ae-6b5b-4d73-adcb-a520ba8f975d" />
+<img width="1564" height="996" alt="2" src="https://github.com/user-attachments/assets/edd2c8e1-fd20-4166-a1a4-fbdd0cceb546" />
+<img width="1565" height="1004" alt="1" src="https://github.com/user-attachments/assets/b2177daa-d55b-4a9f-9d78-1d0551754f3a" />
+
 
 ## 功能特性
 
