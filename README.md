@@ -25,12 +25,12 @@
 
 ---
 ## 应用截图
-<img width="1563" height="1000" alt="6" src="https://github.com/user-attachments/assets/501ab1d7-7157-425d-bff9-b8742445a391" />
-<img width="1561" height="998" alt="5" src="https://github.com/user-attachments/assets/066eb86f-67ee-442f-b337-bc806ff3d1cb" />
-<img width="1564" height="999" alt="4" src="https://github.com/user-attachments/assets/3ce228cc-c866-4796-86d1-dbd2f65c2a97" />
-<img width="1561" height="999" alt="3" src="https://github.com/user-attachments/assets/d82171ae-6b5b-4d73-adcb-a520ba8f975d" />
-<img width="1564" height="996" alt="2" src="https://github.com/user-attachments/assets/edd2c8e1-fd20-4166-a1a4-fbdd0cceb546" />
-<img width="1565" height="1004" alt="1" src="https://github.com/user-attachments/assets/b2177daa-d55b-4a9f-9d78-1d0551754f3a" />
+<img width="1565" height="1004" alt="1" src="https://github.com/user-attachments/assets/ec37ec6c-8427-46cd-82cf-82ae9491912f" />
+<img width="1564" height="996" alt="2" src="https://github.com/user-attachments/assets/a64775de-e371-450d-bac8-6ede1dca5c62" />
+<img width="1564" height="999" alt="4" src="https://github.com/user-attachments/assets/5752ab68-c0e4-4444-b487-61480cabc447" />
+<img width="1561" height="999" alt="3" src="https://github.com/user-attachments/assets/52246cb0-1be1-4d78-9d8c-0da4272321ac" />
+<img width="1561" height="998" alt="5" src="https://github.com/user-attachments/assets/ae8fa648-6c3d-455a-96fe-a6e5d1502e48" />
+<img width="1563" height="1000" alt="6" src="https://github.com/user-attachments/assets/b93a266a-356a-48ac-ad31-f63355615030" />
 
 
 ## 功能特性
