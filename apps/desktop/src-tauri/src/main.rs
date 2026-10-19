@@ -29,11 +29,11 @@ fn main() {
 
   // 2. 优化 WebView2 启动参数：
   // - 解除自动播放与后台定时器限制
-  // - 限制磁盘网络缓存（100MB）与流媒体缓存（50MB）上限，超额自动 LRU 淘汰，杜绝无节制膨胀
+  // - 限制磁盘网络缓存（300MB）与流媒体缓存（150MB）上限，超额自动 LRU 淘汰，杜绝无节制膨胀
   // - 禁用组件热更新（--disable-component-update），彻底防止后台偷偷下载几十兆 Widevine 等无关插件
   std::env::set_var(
     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-    "--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --autoplay-policy=no-user-gesture-required --disable-features=BlockInsecurePrivateNetworkRequests --disk-cache-size=104857600 --media-cache-size=52428800 --disable-component-update",
+    "--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --autoplay-policy=no-user-gesture-required --disable-features=BlockInsecurePrivateNetworkRequests --disk-cache-size=314572800 --media-cache-size=157286400 --disable-component-update",
   );
   bili_player_lib::run();
 }

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Maximize2, Minimize2 } from 'lucide-react'
+import { X, Maximize2, Minimize2, FileText, Volume2, VolumeX } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
@@ -16,6 +16,7 @@ import {
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
 import { useSkinStore, type Track, type BilibiliTrack } from '@bbplayer/shared-core'
 import { getQualityBadgeInfo } from '../../audio/audioSettings'
+import { LyricsSettingsModal } from '../modals/LyricsSettingsModal'
 
 export interface ImmersiveLyricsViewProps {
 	isOpen: boolean
@@ -23,6 +24,7 @@ export interface ImmersiveLyricsViewProps {
 	track: Track | null
 	splContent?: string | null
 	isMatching?: boolean
+	onLyricsUpdated?: (splContent: string) => void
 }
 
 const DEFAULT_SPL_SAMPLE = `[ti:Bili Player]
@@ -40,12 +42,18 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	track,
 	splContent,
 	isMatching = false,
+	onLyricsUpdated,
 }) => {
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
+	const customBgType = useSkinStore((s) => s.customBgType)
 	const customBgOpacity = useSkinStore((s) => s.customBgOpacity)
 	const customBgBlur = useSkinStore((s) => s.customBgBlur)
+	const themeColors = useSkinStore((s) => s.themeColors)
+	const primaryColor = themeColors?.color || '#00AEEC'
 
+	const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 	const [currentTime, setCurrentTime] = useState(() => desktopAudioEngine.getCurrentTime())
+	const [duration, setDuration] = useState(() => desktopAudioEngine.getDuration() || track?.duration || 0)
 	const [lyricOffsetSec, setLyricOffsetSec] = useState(0)
 	const [autoMatchEnabled, setAutoMatchEnabled] = useState(() => getAutoMatchLyricsEnabled())
 	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
@@ -54,6 +62,23 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 	const haloCanvasRef = useRef<HTMLCanvasElement | null>(null)
 	const [isWindowFullscreen, setIsWindowFullscreen] = useState(false)
+	const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
+
+	// Volume states & refs
+	const [volume, setVolume] = useState(() => desktopAudioEngine.getVolume())
+	const [isMuted, setIsMuted] = useState(false)
+	const [prevVolume, setPrevVolume] = useState(() => desktopAudioEngine.getVolume() || 0.5)
+	const [isDraggingVolume, setIsDraggingVolume] = useState(false)
+	const volumeBarRef = useRef<HTMLDivElement | null>(null)
+
+	// Progress states & refs
+	const [isDraggingProgress, setIsDraggingProgress] = useState(false)
+	const [dragProgress, setDragProgress] = useState(0)
+	const [hoverProgress, setHoverProgress] = useState<number | null>(null)
+	const progressBarRef = useRef<HTMLDivElement | null>(null)
+	const progressBarFillRef = useRef<HTMLDivElement | null>(null)
+	const progressThumbRef = useRef<HTMLDivElement | null>(null)
+	const timeTextSpanRef = useRef<HTMLSpanElement | null>(null)
 
 	// 监听歌词字体色彩变更
 	useEffect(() => {
@@ -250,6 +275,177 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		}
 	}, [isOpen, onClose])
 
+	// 监听歌曲总时长变化
+	useEffect(() => {
+		setDuration(desktopAudioEngine.getDuration() || track?.duration || 0)
+		const unsubscribe = desktopAudioEngine.subscribe((event) => {
+			if (event.type === 'durationchange' || event.type === 'loadedmetadata') {
+				setDuration(desktopAudioEngine.getDuration() || track?.duration || 0)
+			}
+		})
+		return () => {
+			unsubscribe()
+		}
+	}, [track?.uniqueKey])
+
+	// 视频壁纸后台暂停、前台自动恢复
+	useEffect(() => {
+		const video = immersiveVideoRef.current
+		if (!video || customBgType !== 'video' || !isOpen) return
+
+		const handleVisibility = () => {
+			if (document.hidden) {
+				video.pause()
+			} else {
+				video.play().catch(() => {})
+			}
+		}
+
+		const handleBlur = () => {
+			video.pause()
+		}
+
+		const handleFocus = () => {
+			if (!document.hidden) {
+				video.play().catch(() => {})
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibility)
+		window.addEventListener('blur', handleBlur)
+		window.addEventListener('focus', handleFocus)
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibility)
+			window.removeEventListener('blur', handleBlur)
+			window.removeEventListener('focus', handleFocus)
+		}
+	}, [isOpen, customBgUrl, customBgType])
+
+	const formatTime = (secs: number) => {
+		if (isNaN(secs) || secs < 0) return '0:00'
+		const m = Math.floor(secs / 60)
+		const s = Math.floor(secs % 60)
+		return `${m}:${s < 10 ? '0' : ''}${s}`
+	}
+
+	const toggleMute = () => {
+		if (isMuted) {
+			const target = prevVolume > 0 ? prevVolume : 0.5
+			setVolume(target)
+			setIsMuted(false)
+			desktopAudioEngine.setVolume(target)
+		} else {
+			setPrevVolume(volume)
+			setIsMuted(true)
+			desktopAudioEngine.setVolume(0)
+		}
+	}
+
+	const calcVolumeFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+		const bar = volumeBarRef.current
+		if (!bar) return 0
+		const rect = bar.getBoundingClientRect()
+		const ratio = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+		return Math.round(ratio * 100) / 100
+	}
+
+	const handleVolumePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+		e.currentTarget.setPointerCapture(e.pointerId)
+		setIsDraggingVolume(true)
+		const v = calcVolumeFromPointer(e)
+		setVolume(v)
+		if (isMuted) setIsMuted(false)
+		desktopAudioEngine.setVolume(v)
+		try {
+			localStorage.setItem('bbplayer_volume', String(v))
+		} catch {}
+	}
+
+	const handleVolumePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+		if (!isDraggingVolume) return
+		const v = calcVolumeFromPointer(e)
+		setVolume(v)
+		if (isMuted) setIsMuted(false)
+		desktopAudioEngine.setVolume(v)
+		try {
+			localStorage.setItem('bbplayer_volume', String(v))
+		} catch {}
+	}
+
+	const handleVolumePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+		if (isDraggingVolume) {
+			const v = calcVolumeFromPointer(e)
+			setVolume(v)
+			if (isMuted) setIsMuted(false)
+			desktopAudioEngine.setVolume(v)
+			try {
+				localStorage.setItem('bbplayer_volume', String(v))
+			} catch {}
+			setIsDraggingVolume(false)
+		}
+		try {
+			e.currentTarget.releasePointerCapture(e.pointerId)
+		} catch {}
+	}
+
+	const calculateProgressFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+		const bar = progressBarRef.current
+		if (!bar) return 0
+		const rect = bar.getBoundingClientRect()
+		const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+		return rect.width > 0 ? x / rect.width : 0
+	}
+
+	const handleProgressPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+		e.currentTarget.setPointerCapture(e.pointerId)
+		setIsDraggingProgress(true)
+		const p = calculateProgressFromPointer(e)
+		setDragProgress(p)
+		if (timeTextSpanRef.current) {
+			timeTextSpanRef.current.textContent = formatTime(p * duration)
+		}
+		if (progressBarFillRef.current) {
+			progressBarFillRef.current.style.width = `${p * 100}%`
+		}
+		if (progressThumbRef.current) {
+			progressThumbRef.current.style.left = `${p * 100}%`
+		}
+	}
+
+	const handleProgressPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+		const p = calculateProgressFromPointer(e)
+		setHoverProgress(p)
+		if (isDraggingProgress) {
+			setDragProgress(p)
+			if (timeTextSpanRef.current) {
+				timeTextSpanRef.current.textContent = formatTime(p * duration)
+			}
+			if (progressBarFillRef.current) {
+				progressBarFillRef.current.style.width = `${p * 100}%`
+			}
+			if (progressThumbRef.current) {
+				progressThumbRef.current.style.left = `${p * 100}%`
+			}
+		}
+	}
+
+	const handleProgressPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+		if (isDraggingProgress) {
+			const p = calculateProgressFromPointer(e)
+			setIsDraggingProgress(false)
+			if (duration > 0) {
+				desktopAudioEngine.seek(p * duration)
+			}
+		}
+		try {
+			e.currentTarget.releasePointerCapture(e.pointerId)
+		} catch {}
+	}
+
+	const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0
+	const effectiveProgress = isDraggingProgress ? dragProgress : progress
+
 	const currentTimeMs = Math.max(0, (currentTime + lyricOffsetSec) * 1000)
 
 	// Find active line index
@@ -369,13 +565,30 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 					{/* Background Layer: Custom Wallpaper or Fluid ambient canvas */}
 					{customBgUrl ? (
 						<div
-							className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
+							className="absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-700"
 							style={{
-								backgroundImage: `url(${customBgUrl})`,
 								opacity: customBgOpacity ?? 0.5,
 								filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
 							}}
 						>
+							{customBgType === 'video' ? (
+								<video
+									ref={immersiveVideoRef}
+									src={customBgUrl}
+									autoPlay
+									loop
+									muted
+									playsInline
+									className="w-full h-full object-cover"
+								/>
+							) : (
+								<div
+									className="w-full h-full bg-cover bg-center"
+									style={{
+										backgroundImage: `url(${customBgUrl})`,
+									}}
+								/>
+							)}
 							{/* Gentle transparent gradient to keep lyrics legible while keeping custom wallpaper crystal clear */}
 							<div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/15" />
 						</div>
@@ -388,6 +601,14 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 						data-tauri-drag-region
 						className="relative z-10 h-14 w-full flex items-center justify-end px-6 bg-transparent gap-2"
 					>
+						{/* 歌词管理与微调 */}
+						<button
+							onClick={() => setIsSettingsOpen(true)}
+							className="p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/80 hover:text-white transition-all shadow-sm"
+							title="歌词管理与微调"
+						>
+							<FileText className="w-5 h-5" />
+						</button>
 						<button
 							onClick={toggleWindowFullscreen}
 							className="p-2 rounded-full bg-white/5 hover:bg-white/15 text-white/80 hover:text-white transition-all shadow-sm"
@@ -614,6 +835,140 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							</div>
 						)}
 					</main>
+
+					{/* Right: Vertical Volume Bar (Only visible when mouse hovers over volume area) */}
+					<div
+						className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 pr-3 pl-8 py-8 transition-opacity duration-300 ${
+							isDraggingVolume ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+						}`}
+					>
+						<div className="bg-black/60 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 flex flex-col items-center gap-3 shadow-2xl">
+							<span className="text-[10px] font-mono font-bold text-white/80 select-none">
+								{Math.round((isMuted ? 0 : volume) * 100)}%
+							</span>
+
+							{/* Vertical Slider Track */}
+							<div
+								ref={volumeBarRef}
+								onPointerDown={handleVolumePointerDown}
+								onPointerMove={handleVolumePointerMove}
+								onPointerUp={handleVolumePointerUp}
+								className="relative w-2 h-28 flex flex-col justify-end items-center cursor-pointer group/vtrack py-1"
+							>
+								<div className="w-1.5 h-full bg-white/15 rounded-full overflow-hidden flex flex-col justify-end">
+									<div
+										className="w-full rounded-full transition-all"
+										style={{
+											height: `${(isMuted ? 0 : volume) * 100}%`,
+											backgroundColor: primaryColor,
+										}}
+									/>
+								</div>
+								{/* Thumb */}
+								<div
+									className="w-3 h-3 rounded-full bg-white border border-white/80 pointer-events-none absolute -translate-y-1/2 shadow-md transition-transform group-hover/vtrack:scale-125"
+									style={{
+										bottom: `calc(${(isMuted ? 0 : volume) * 100}% - 6px)`,
+										boxShadow: `0 0 6px ${primaryColor}, 0 2px 4px rgba(0,0,0,0.5)`,
+									}}
+								/>
+							</div>
+
+							<button
+								onClick={toggleMute}
+								className="p-1 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+								title={isMuted ? '取消静音' : '静音'}
+							>
+								{isMuted || volume === 0 ? (
+									<VolumeX className="w-4 h-4 text-rose-400" />
+								) : (
+									<Volume2 className="w-4 h-4" />
+								)}
+							</button>
+						</div>
+					</div>
+
+					{/* Bottom: Straight Linear Progress Bar (Matching main bottom bar scheme, only visible when hovered) */}
+					<div
+						className={`fixed bottom-0 left-0 right-0 z-40 px-8 sm:px-16 pt-8 pb-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300 ${
+							isDraggingProgress ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+						}`}
+					>
+						<div className="w-full flex items-center gap-3 h-5">
+							{/* Current Time */}
+							<span
+								ref={timeTextSpanRef}
+								className="text-[11px] font-mono font-bold text-white/80 min-w-[36px] text-right select-none"
+							>
+								{formatTime(isDraggingProgress ? dragProgress * duration : currentTime)}
+							</span>
+
+							{/* Progress Track */}
+							<div
+								ref={progressBarRef}
+								onPointerDown={handleProgressPointerDown}
+								onPointerMove={handleProgressPointerMove}
+								onPointerUp={handleProgressPointerUp}
+								onPointerLeave={() => setHoverProgress(null)}
+								className="relative flex-1 h-3 flex items-center cursor-pointer group/progress"
+							>
+								{/* Hover Tooltip Capsule */}
+								{hoverProgress !== null && duration > 0 && (
+									<div
+										className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-full bg-[#0d1322]/95 border border-white/20 text-[10px] font-mono font-bold text-white shadow-xl pointer-events-none z-30 flex items-center gap-1 backdrop-blur-md"
+										style={{
+											left: `${Math.max(2, Math.min(98, hoverProgress * 100))}%`,
+										}}
+									>
+										<span
+											className="w-1.5 h-1.5 rounded-full animate-pulse"
+											style={{ backgroundColor: primaryColor }}
+										/>
+										{formatTime(hoverProgress * duration)}
+									</div>
+								)}
+
+								{/* Background Line */}
+								<div className="w-full h-[3px] group-hover/progress:h-[4px] rounded-full bg-white/15 group-hover/progress:bg-white/25 transition-[height,background-color] duration-150 overflow-hidden relative">
+									<div
+										ref={progressBarFillRef}
+										className="h-full rounded-full"
+										style={{
+											width: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
+											backgroundColor: primaryColor,
+										}}
+									/>
+								</div>
+
+								{/* Thumb Circle */}
+								<div
+									ref={progressThumbRef}
+									className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-white border border-white/80 pointer-events-none transition-[opacity,transform] duration-150 ${
+										isDraggingProgress
+											? 'opacity-100 scale-125'
+											: 'opacity-0 group-hover/progress:opacity-100 group-hover/progress:scale-110'
+									}`}
+									style={{
+										left: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
+										boxShadow: `0 0 6px ${primaryColor}, 0 2px 4px rgba(0,0,0,0.5)`,
+									}}
+								/>
+							</div>
+
+							{/* Total Duration */}
+							<span className="text-[11px] font-mono font-bold text-white/80 min-w-[36px] text-left select-none">
+								{formatTime(duration)}
+							</span>
+						</div>
+					</div>
+
+					{/* 歌词管理与微调弹窗 */}
+					<LyricsSettingsModal
+						isOpen={isSettingsOpen}
+						onClose={() => setIsSettingsOpen(false)}
+						track={track}
+						onLyricsUpdated={onLyricsUpdated}
+					/>
 				</motion.div>
 			)}
 		</AnimatePresence>

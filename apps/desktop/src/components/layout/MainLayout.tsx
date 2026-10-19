@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { TitleBar } from './TitleBar'
 import { Sidebar, type NavTab } from './Sidebar'
 import { BottomPlayerBar } from './BottomPlayerBar'
@@ -30,23 +30,78 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
 	const currentTrack = useCurrentTrack()
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
+	const customBgType = useSkinStore((s) => s.customBgType)
 	const customBgOpacity = useSkinStore((s) => s.customBgOpacity)
 	const customBgBlur = useSkinStore((s) => s.customBgBlur)
 	const uiBlur = useSkinStore((s) => s.uiBlur ?? 16)
 	const uiOpacity = useSkinStore((s) => s.uiOpacity ?? 0.35)
 
+	const videoRef = useRef<HTMLVideoElement | null>(null)
+
+	// 视频壁纸后台停止播放、前台自动恢复播放机制
+	useEffect(() => {
+		const video = videoRef.current
+		if (!video || customBgType !== 'video') return
+
+		const handleVisibility = () => {
+			if (document.hidden) {
+				video.pause()
+			} else {
+				video.play().catch(() => {})
+			}
+		}
+
+		const handleWindowBlur = () => {
+			video.pause()
+		}
+
+		const handleWindowFocus = () => {
+			if (!document.hidden) {
+				video.play().catch(() => {})
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibility)
+		window.addEventListener('blur', handleWindowBlur)
+		window.addEventListener('focus', handleWindowFocus)
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibility)
+			window.removeEventListener('blur', handleWindowBlur)
+			window.removeEventListener('focus', handleWindowFocus)
+		}
+	}, [customBgUrl, customBgType])
+
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07090e] text-foreground border border-white/10 shadow-2xl relative select-none">
-			{/* 0. Custom Wallpaper Background Layer */}
+			{/* 0. Custom Wallpaper Background Layer (图片或视频) */}
 			{customBgUrl && (
 				<div
-					className="absolute inset-0 pointer-events-none z-0 bg-cover bg-center transition-all duration-700"
+					className="absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-700"
 					style={{
-						backgroundImage: `url(${customBgUrl})`,
 						opacity: customBgOpacity ?? 0.5,
 						filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
 					}}
-				/>
+				>
+					{customBgType === 'video' ? (
+						<video
+							ref={videoRef}
+							src={customBgUrl}
+							autoPlay
+							loop
+							muted
+							playsInline
+							className="w-full h-full object-cover"
+						/>
+					) : (
+						<div
+							className="w-full h-full bg-cover bg-center"
+							style={{
+								backgroundImage: `url(${customBgUrl})`,
+							}}
+						/>
+					)}
+				</div>
 			)}
 
 			{/* 1. Ambient Dynamic Cover Glow (随当前播放歌曲封面实时晕染底层环境光) */}

@@ -31,6 +31,7 @@ import {
 	getStoredTrackSearchCache,
 	setStoredTrackSearchCache,
 	markTrackAdoptedCandidate,
+	unmarkTrackAdoptedCandidate,
 	getLyricsHighlightColor,
 	setLyricsHighlightColor,
 	getLyricColors,
@@ -205,6 +206,34 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		} finally {
 			setLoadingCandidateId(null)
 		}
+	}
+
+	const handleUnadoptCandidate = async () => {
+		if (!track) return
+		unmarkTrackAdoptedCandidate(track.uniqueKey)
+		setAdoptedCandidateId(null)
+		setAdoptedSource(null)
+		setCustomText('')
+		// 恢复获取默认匹配的歌词
+		try {
+			const defaultRes = await lyricService.fetchLyricForTrack(track, true, {
+				showTranslation: includeTranslation,
+				showRomaji: includeRomaji,
+			})
+			const spl = defaultRes?.splContent || ''
+			onLyricsUpdated?.(spl)
+			setSuccessMsg('已取消采用该歌词，恢复为默认歌词！')
+			setTimeout(() => setSuccessMsg(null), 2500)
+		} catch (err) {
+			console.error('Failed to reset default lyrics:', err)
+		}
+	}
+
+	const formatCandidateDuration = (sec?: number) => {
+		if (!sec || sec <= 0) return ''
+		const m = Math.floor(sec / 60)
+		const s = Math.floor(sec % 60)
+		return `${m}:${s < 10 ? '0' : ''}${s}`
 	}
 
 	const handleToggleTranslation = async (enabled: boolean) => {
@@ -503,6 +532,11 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 														>
 															{item.source === 'netease' ? '网易云音乐' : 'QQ 音乐'}
 														</span>
+														{item.duration > 0 && (
+															<span className="text-[10px] font-mono text-muted-foreground/80 shrink-0">
+																{formatCandidateDuration(item.duration)}
+															</span>
+														)}
 														{isAdopted && (
 															<span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/25 border border-primary/40 text-primary font-bold flex items-center gap-1 shrink-0">
 																<Check className="w-3 h-3 stroke-[3]" />
@@ -515,22 +549,34 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 													</p>
 												</div>
 
-												<button
-													onClick={() => handleApplyCandidate(item)}
-													disabled={loadingCandidateId === item.id}
-													className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 ${
-														isAdopted
-															? 'bg-primary text-white shadow-sm hover:bg-primary/90'
-															: 'bg-primary/20 hover:bg-primary/30 text-primary'
-													}`}
-												>
-													{loadingCandidateId === item.id ? (
-														<Loader2 className="w-3.5 h-3.5 animate-spin" />
-													) : isAdopted ? (
-														<Check className="w-3.5 h-3.5" />
-													) : null}
-													<span>{isAdopted ? '重新应用' : '采用'}</span>
-												</button>
+												<div className="flex items-center gap-1.5 shrink-0">
+													{isAdopted && (
+														<button
+															onClick={handleUnadoptCandidate}
+															className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-colors flex items-center gap-1"
+															title="取消采用该歌词并恢复为默认歌词"
+														>
+															<RotateCcw className="w-3.5 h-3.5" />
+															<span>取消采用</span>
+														</button>
+													)}
+													<button
+														onClick={() => handleApplyCandidate(item)}
+														disabled={loadingCandidateId === item.id}
+														className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+															isAdopted
+																? 'bg-primary text-white shadow-sm hover:bg-primary/90'
+																: 'bg-primary/20 hover:bg-primary/30 text-primary'
+														}`}
+													>
+														{loadingCandidateId === item.id ? (
+															<Loader2 className="w-3.5 h-3.5 animate-spin" />
+														) : isAdopted ? (
+															<Check className="w-3.5 h-3.5" />
+														) : null}
+														<span>{isAdopted ? '重新应用' : '采用'}</span>
+													</button>
+												</div>
 											</div>
 										)
 									})

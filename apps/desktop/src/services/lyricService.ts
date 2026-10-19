@@ -396,6 +396,23 @@ export function markTrackAdoptedCandidate(
 	} catch {}
 }
 
+export function unmarkTrackAdoptedCandidate(trackKey: string): void {
+	try {
+		const cache = getStoredTrackSearchCache(trackKey)
+		if (cache) {
+			delete cache.adoptedId
+			delete cache.adoptedSource
+			setStoredTrackSearchCache(trackKey, cache)
+		}
+		localStorage.removeItem(LYRIC_STORAGE_PREFIX + trackKey)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:custom-lyric-change', {
+				detail: { trackKey, splContent: null },
+			}),
+		)
+	} catch {}
+}
+
 function parseSecondaryLrcMap(lrcStr?: string): Map<number, string> {
 	const map = new Map<number, string>()
 	if (!lrcStr) return map

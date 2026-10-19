@@ -12,6 +12,8 @@ export interface SkinState {
 	activeSkinSuit: BilibiliGarbSuitDetailResponse | null
 	themeColors: BilibiliGarbColor | null
 	customBgUrl: string | null
+	customBgType: 'image' | 'video' | null
+	hasCustomBg: boolean
 	customBgOpacity: number // 0.1 to 1.0 (default 0.5)
 	customBgBlur: number // 0 to 40 px (default 0)
 	customTextColor: string | null // e.g. '#FFFFFF', '#FDE047', or null for default
@@ -20,7 +22,12 @@ export interface SkinState {
 
 	setSkin: (suit: BilibiliGarbSuitDetailResponse | null) => void
 	clearSkin: () => void
-	setCustomBg: (url: string | null, opacity?: number, blur?: number) => void
+	setCustomBg: (
+		url: string | null,
+		opacity?: number,
+		blur?: number,
+		bgType?: 'image' | 'video' | null,
+	) => void
 	clearCustomBg: () => void
 	setTextColor: (color: string | null) => void
 	setUiBlur: (blur: number) => void
@@ -34,6 +41,8 @@ export const useSkinStore = create<SkinState>()(
 			activeSkinSuit: null,
 			themeColors: null,
 			customBgUrl: null,
+			customBgType: null,
+			hasCustomBg: false,
 			customBgOpacity: 0.5,
 			customBgBlur: 0,
 			customTextColor: null,
@@ -81,9 +90,11 @@ export const useSkinStore = create<SkinState>()(
 				})
 			},
 
-			setCustomBg: (url, opacity = 0.5, blur = 0) => {
+			setCustomBg: (url, opacity = 0.5, blur = 0, bgType = 'image') => {
 				set({
 					customBgUrl: url,
+					customBgType: url ? (bgType ?? 'image') : null,
+					hasCustomBg: Boolean(url),
 					customBgOpacity: opacity,
 					customBgBlur: blur,
 				})
@@ -92,6 +103,8 @@ export const useSkinStore = create<SkinState>()(
 			clearCustomBg: () => {
 				set({
 					customBgUrl: null,
+					customBgType: null,
+					hasCustomBg: false,
 					customBgOpacity: 0.5,
 					customBgBlur: 0,
 				})
@@ -112,9 +125,9 @@ export const useSkinStore = create<SkinState>()(
 		{
 			name: 'bbplayer_skin_store',
 			storage: createJSONStorage(() => getDefaultStateStorage()),
-			version: 3,
+			version: 4,
 			migrate: (persistedState: any, version: number) => {
-				if (version < 3 && persistedState) {
+				if (version < 4 && persistedState) {
 					if (
 						persistedState.customBgOpacity === 0.35 ||
 						persistedState.customBgOpacity === 1.0 ||
@@ -128,6 +141,10 @@ export const useSkinStore = create<SkinState>()(
 					if (persistedState.customTextColor === undefined) {
 						persistedState.customTextColor = null
 					}
+					if (persistedState.customBgUrl) {
+						persistedState.hasCustomBg = true
+						persistedState.customBgType = 'image'
+					}
 				}
 				return persistedState as SkinState
 			},
@@ -135,10 +152,13 @@ export const useSkinStore = create<SkinState>()(
 				activeSkinId: state.activeSkinId,
 				activeSkinSuit: state.activeSkinSuit,
 				themeColors: state.themeColors,
-				customBgUrl: state.customBgUrl,
+				hasCustomBg: state.hasCustomBg,
+				customBgType: state.customBgType,
 				customBgOpacity: state.customBgOpacity,
 				customBgBlur: state.customBgBlur,
 				customTextColor: state.customTextColor,
+				uiBlur: state.uiBlur,
+				uiOpacity: state.uiOpacity,
 			}),
 		},
 	),

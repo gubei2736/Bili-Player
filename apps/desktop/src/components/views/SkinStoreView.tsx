@@ -12,6 +12,7 @@ import {
 	Pipette,
 } from 'lucide-react'
 import { useSkinStore, type BilibiliGarbSuitDetailResponse } from '@bbplayer/shared-core'
+import { saveWallpaperToDb, clearWallpaperFromDb } from '../../utils/wallpaperStorage'
 
 interface PresetSkin {
 	id: number
@@ -134,6 +135,7 @@ export const SkinStoreView: React.FC = () => {
 		setSkin,
 		clearSkin,
 		customBgUrl,
+		customBgType,
 		customBgOpacity,
 		customBgBlur,
 		customTextColor,
@@ -187,17 +189,26 @@ export const SkinStoreView: React.FC = () => {
 		document.documentElement.style.setProperty('--ring', '#00AEEC')
 	}
 
-	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0]
 		if (!file) return
-		const reader = new FileReader()
-		reader.onload = (event) => {
-			const res = event.target?.result as string
-			if (res) {
-				setCustomBg(res, customBgOpacity ?? 0.5, customBgBlur ?? 0)
-			}
+		try {
+			const isVideo =
+				file.type.startsWith('video/') ||
+				/\.(mp4|webm|ogg|mov)$/i.test(file.name)
+			const type: 'image' | 'video' = isVideo ? 'video' : 'image'
+			const objectUrl = await saveWallpaperToDb(file, type)
+			setCustomBg(objectUrl, customBgOpacity ?? 0.5, customBgBlur ?? 0, type)
+		} catch (err) {
+			console.error('Failed to save wallpaper to IndexedDB:', err)
+		} finally {
+			if (e.target) e.target.value = ''
 		}
-		reader.readAsDataURL(file)
+	}
+
+	const handleClearWallpaper = async () => {
+		await clearWallpaperFromDb()
+		clearCustomBg()
 	}
 
 	const handleSetFontColor = (color: string | null) => {
@@ -238,7 +249,7 @@ export const SkinStoreView: React.FC = () => {
 					</div>
 					{customBgUrl && (
 						<button
-							onClick={clearCustomBg}
+							onClick={handleClearWallpaper}
 							className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 transition-colors"
 						>
 							<Trash2 className="w-3.5 h-3.5" />
@@ -251,15 +262,30 @@ export const SkinStoreView: React.FC = () => {
 					{/* Wallpaper Preview Area */}
 					<div className="w-full md:w-56 h-32 rounded-xl bg-black/40 border border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center">
 						{customBgUrl ? (
-							<img
-								src={customBgUrl}
-								alt="Custom Background"
-								className="w-full h-full object-cover transition-all"
-								style={{
-									opacity: customBgOpacity,
-									filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
-								}}
-							/>
+							customBgType === 'video' ? (
+								<video
+									src={customBgUrl}
+									autoPlay
+									loop
+									muted
+									playsInline
+									className="w-full h-full object-cover transition-all"
+									style={{
+										opacity: customBgOpacity,
+										filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
+									}}
+								/>
+							) : (
+								<img
+									src={customBgUrl}
+									alt="Custom Background"
+									className="w-full h-full object-cover transition-all"
+									style={{
+										opacity: customBgOpacity,
+										filter: customBgBlur ? `blur(${customBgBlur}px)` : 'none',
+									}}
+								/>
+							)
 						) : (
 							<div className="text-center text-muted-foreground/60 space-y-1">
 								<ImageIcon className="w-6 h-6 mx-auto opacity-50" />
@@ -274,7 +300,7 @@ export const SkinStoreView: React.FC = () => {
 							<input
 								ref={fileInputRef}
 								type="file"
-								accept="image/*"
+								accept="image/*,video/mp4,video/webm"
 								onChange={handleFileUpload}
 								className="hidden"
 							/>
@@ -283,7 +309,7 @@ export const SkinStoreView: React.FC = () => {
 								className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#00AEEC] hover:bg-[#1dbefa] text-white font-semibold transition-all shadow-md shadow-[#00AEEC]/20 active:scale-95"
 							>
 								<Upload className="w-3.5 h-3.5" />
-								<span>上传本地图片</span>
+								<span>上传图片 / 视频壁纸</span>
 							</button>
 
 							{/* UI 字体颜色选项 */}
