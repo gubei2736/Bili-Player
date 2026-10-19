@@ -7,6 +7,7 @@ import {
 	getStoredLyricOffset,
 	getAutoMatchLyricsEnabled,
 	getLyricFontSizes,
+	getLyricsHighlightColor,
 	type LyricFontSizes,
 } from '../../services/lyricService'
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
@@ -41,10 +42,27 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const [lyricOffsetSec, setLyricOffsetSec] = useState(0)
 	const [autoMatchEnabled, setAutoMatchEnabled] = useState(() => getAutoMatchLyricsEnabled())
 	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
+	const [highlightColor, setHighlightColor] = useState(() => getLyricsHighlightColor())
 	const lyricsContainerRef = useRef<HTMLDivElement | null>(null)
 	const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 	const haloCanvasRef = useRef<HTMLCanvasElement | null>(null)
 	const [isWindowFullscreen, setIsWindowFullscreen] = useState(false)
+
+	// 监听歌词字体高亮色彩变更
+	useEffect(() => {
+		const handleColorChange = (e: Event) => {
+			const customEvt = e as CustomEvent<{ color: string }>
+			if (customEvt.detail?.color) {
+				setHighlightColor(customEvt.detail.color)
+			}
+		}
+		window.addEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
+		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
+		return () => {
+			window.removeEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
+			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
+		}
+	}, [])
 
 	// 检查并同步当前应用窗口是否处于全屏状态
 	useEffect(() => {
@@ -510,7 +528,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 																key={sIdx}
 																className="inline-block transition-all duration-75"
 																style={{
-																	background: `linear-gradient(to right, #00AEEC ${fillPct}%, rgba(255, 255, 255, 0.5) ${fillPct}%)`,
+																	background: `linear-gradient(to right, ${highlightColor} ${fillPct}%, rgba(255, 255, 255, 0.5) ${fillPct}%)`,
 																	WebkitBackgroundClip: 'text',
 																	WebkitTextFillColor: 'transparent',
 																}}
@@ -521,9 +539,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 													})
 												) : (
 													<span
+														style={{ color: isActive ? highlightColor : undefined }}
 														className={
 															isActive
-																? 'text-primary drop-shadow-[0_2px_12px_rgba(0,174,236,0.6)]'
+																? 'font-bold'
 																: 'text-white/60'
 														}
 													>
@@ -535,8 +554,12 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											{/* Romaji syllable translation */}
 											{line.romaji && (
 												<p
-													className="text-white/50 font-mono mt-1"
-													style={{ fontSize: `${fontSizes.roma}px` }}
+													className="font-mono mt-1 transition-colors"
+													style={{
+														fontSize: `${fontSizes.roma}px`,
+														color: isActive ? highlightColor : undefined,
+														opacity: isActive ? 0.85 : 0.5,
+													}}
 												>
 													{line.romaji}
 												</p>
@@ -545,8 +568,12 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											{/* Bilingual translated line */}
 											{line.translation && (
 												<p
-													className="text-sky-200/75 mt-1 font-medium"
-													style={{ fontSize: `${fontSizes.trans}px` }}
+													className="mt-1 font-medium transition-colors"
+													style={{
+														fontSize: `${fontSizes.trans}px`,
+														color: isActive ? highlightColor : undefined,
+														opacity: isActive ? 0.9 : 0.65,
+													}}
 												>
 													{line.translation}
 												</p>

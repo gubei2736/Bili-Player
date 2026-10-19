@@ -349,11 +349,12 @@ export const DesktopLyricsApp: React.FC = () => {
 								{/* Romaji subline if available */}
 								{activeLine.romaji && (
 									<p
-										className="text-white/90 font-mono tracking-wider truncate max-w-full pointer-events-none"
+										className="font-mono tracking-wider truncate max-w-full pointer-events-none"
 										style={{
 											fontSize: `${romajiFontSize}px`,
-											filter:
-												'drop-shadow(0 1px 2px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.9))',
+											color: primaryColor,
+											opacity: 0.85,
+											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
 									>
 										{activeLine.romaji}
@@ -365,8 +366,7 @@ export const DesktopLyricsApp: React.FC = () => {
 									className="font-black tracking-wide leading-snug max-w-full line-clamp-2 px-2 pointer-events-none"
 									style={{
 										fontSize: `${fontSize}px`,
-										filter:
-											'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,1))',
+										filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))',
 									}}
 								>
 									{activeLine.isDynamic &&
@@ -400,10 +400,7 @@ export const DesktopLyricsApp: React.FC = () => {
 											)
 										})
 									) : (
-										<span
-											style={{ color: primaryColor }}
-											className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.8)]"
-										>
+										<span style={{ color: primaryColor }}>
 											{activeLine.content}
 										</span>
 									)}
@@ -412,11 +409,12 @@ export const DesktopLyricsApp: React.FC = () => {
 								{/* Chinese Translation line */}
 								{activeLine.translation && (
 									<p
-										className="text-sky-200 font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
+										className="font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
 										style={{
 											fontSize: `${transFontSize}px`,
-											filter:
-												'drop-shadow(0 1px 3px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.85))',
+											color: primaryColor,
+											opacity: 0.9,
+											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
 									>
 										{activeLine.translation}
@@ -429,8 +427,7 @@ export const DesktopLyricsApp: React.FC = () => {
 									className="font-bold text-white tracking-wide"
 									style={{
 										fontSize: `${fontSize}px`,
-										filter:
-											'drop-shadow(0 2px 6px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.85))',
+										filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
 									}}
 								>
 									{title}
@@ -438,7 +435,7 @@ export const DesktopLyricsApp: React.FC = () => {
 								<p
 									className="text-xs text-white/80 font-medium tracking-wider"
 									style={{
-										filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))',
+										filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 									}}
 								>
 									{artist}

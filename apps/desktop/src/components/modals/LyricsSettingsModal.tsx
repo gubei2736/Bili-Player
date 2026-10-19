@@ -31,6 +31,10 @@ import {
 	getStoredTrackSearchCache,
 	setStoredTrackSearchCache,
 	markTrackAdoptedCandidate,
+	getLyricsHighlightColor,
+	setLyricsHighlightColor,
+	PRESET_LYRICS_COLORS,
+	DEFAULT_LYRICS_HIGHLIGHT_COLOR,
 	getDesktopLyricsColor,
 	setDesktopLyricsColor,
 	PRESET_DESKTOP_LYRICS_COLORS,
@@ -63,7 +67,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [adoptedCandidateId, setAdoptedCandidateId] = useState<string | number | null>(null)
 	const [adoptedSource, setAdoptedSource] = useState<string | null>(null)
 	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
-	const [desktopColor, setDesktopColor] = useState<string>(() => getDesktopLyricsColor())
+	const [highlightColor, setHighlightColor] = useState<string>(() => getLyricsHighlightColor())
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
 	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
@@ -598,24 +602,24 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 					{activeTab === 'typography' && (
 						<div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-1 select-none">
 							<p className="text-xs text-muted-foreground leading-relaxed">
-								独立微调桌面悬浮歌词高亮颜色，以及沉浸歌词与桌面歌词各行文本的字体尺寸：
+								微调全屏模式与桌面悬浮歌词的高亮字体色彩（包含正文、翻译与罗马音），以及歌词文本尺寸：
 							</p>
 
-							{/* Desktop Lyrics Custom Color Card */}
+							{/* Lyrics Custom Highlight Color Card */}
 							<div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-3 text-xs">
 								<div className="flex items-center justify-between">
 									<div className="flex items-center gap-2">
 										<Palette className="w-4 h-4 text-primary" />
-										<span className="font-semibold text-foreground">桌面歌词字体高亮颜色</span>
+										<span className="font-semibold text-foreground">歌词字体高亮颜色</span>
 									</div>
 									<div className="flex items-center gap-2">
 										<div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/30 border border-white/10">
 											<span
 												className="w-3 h-3 rounded-full border border-white/30 shadow-sm shrink-0"
-												style={{ backgroundColor: desktopColor }}
+												style={{ backgroundColor: highlightColor }}
 											/>
 											<span className="font-mono text-[10px] text-foreground font-semibold uppercase">
-												{desktopColor}
+												{highlightColor}
 											</span>
 										</div>
 										<label
@@ -624,11 +628,11 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 										>
 											<input
 												type="color"
-												value={desktopColor}
+												value={highlightColor}
 												onChange={(e) => {
 													const col = e.target.value
-													setDesktopColor(col)
-													setDesktopLyricsColor(col)
+													setHighlightColor(col)
+													setLyricsHighlightColor(col)
 												}}
 												className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
 											/>
@@ -639,16 +643,16 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 
 								{/* Color Presets */}
 								<div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-0.5">
-									{PRESET_DESKTOP_LYRICS_COLORS.map((preset) => {
+									{PRESET_LYRICS_COLORS.map((preset) => {
 										const isSelected =
-											desktopColor.toLowerCase() === preset.value.toLowerCase()
+											highlightColor.toLowerCase() === preset.value.toLowerCase()
 										return (
 											<button
 												key={preset.value}
 												type="button"
 												onClick={() => {
-													setDesktopColor(preset.value)
-													setDesktopLyricsColor(preset.value)
+													setHighlightColor(preset.value)
+													setLyricsHighlightColor(preset.value)
 												}}
 												className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all ${
 													isSelected
@@ -761,8 +765,8 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 											const def = { main: 24, trans: 15, roma: 13 }
 											setFontSizes(def)
 											setLyricFontSizes(def)
-											setDesktopColor(DEFAULT_DESKTOP_LYRICS_COLOR)
-											setDesktopLyricsColor(DEFAULT_DESKTOP_LYRICS_COLOR)
+											setHighlightColor(DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+											setLyricsHighlightColor(DEFAULT_LYRICS_HIGHLIGHT_COLOR)
 										}}
 										className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium flex items-center gap-1.5 transition-colors"
 									>
@@ -781,8 +785,12 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								<div className="pt-2 text-center space-y-1.5">
 									{includeRomaji && (
 										<p
-											className="font-mono text-white/55 tracking-wider truncate"
-											style={{ fontSize: `${fontSizes.roma}px` }}
+											className="font-mono tracking-wider truncate"
+											style={{
+												fontSize: `${fontSizes.roma}px`,
+												color: highlightColor,
+												opacity: 0.85,
+											}}
 										>
 											kimi to mita yuki no hana ga
 										</p>
@@ -791,16 +799,20 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 										className="font-bold tracking-wide truncate"
 										style={{
 											fontSize: `${fontSizes.main}px`,
-											color: desktopColor,
-											filter: `drop-shadow(0 2px 10px ${desktopColor}80)`,
+											color: highlightColor,
+											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
 									>
 										君と見た雪の華が
 									</p>
 									{includeTranslation && (
 										<p
-											className="font-medium text-sky-200/85 truncate"
-											style={{ fontSize: `${fontSizes.trans}px` }}
+											className="font-medium truncate"
+											style={{
+												fontSize: `${fontSizes.trans}px`,
+												color: highlightColor,
+												opacity: 0.9,
+											}}
 										>
 											与你一同看过的雪之花
 										</p>

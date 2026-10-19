@@ -9,10 +9,10 @@ import {
 	setLyricOptionRomaji,
 	getPreferredLyricSource,
 	setPreferredLyricSource,
-	getDesktopLyricsColor,
-	setDesktopLyricsColor,
-	PRESET_DESKTOP_LYRICS_COLORS,
-	DEFAULT_DESKTOP_LYRICS_COLOR,
+	getLyricsHighlightColor,
+	setLyricsHighlightColor,
+	PRESET_LYRICS_COLORS,
+	DEFAULT_LYRICS_HIGHLIGHT_COLOR,
 	type PreferredLyricSource,
 } from '../../services/lyricService'
 
@@ -21,7 +21,7 @@ export const LyricsSettingsCard: React.FC = () => {
 	const [showTranslation, setShowTranslation] = useState<boolean>(getLyricOptionTranslation())
 	const [showRomaji, setShowRomaji] = useState<boolean>(getLyricOptionRomaji())
 	const [preferredSource, setPreferredSource] = useState<PreferredLyricSource>(() => getPreferredLyricSource())
-	const [desktopColor, setDesktopColor] = useState<string>(() => getDesktopLyricsColor())
+	const [highlightColor, setHighlightColor] = useState<string>(() => getLyricsHighlightColor())
 
 	useEffect(() => {
 		const handleAutoMatchChange = (e: any) => {
@@ -32,15 +32,17 @@ export const LyricsSettingsCard: React.FC = () => {
 		}
 		const handleColorChange = (e: any) => {
 			if (e.detail?.color) {
-				setDesktopColor(e.detail.color)
+				setHighlightColor(e.detail.color)
 			}
 		}
 		window.addEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
 		window.addEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
+		window.addEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
 		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
 		return () => {
 			window.removeEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
 			window.removeEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
+			window.removeEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
 			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
 		}
 	}, [])
@@ -209,24 +211,24 @@ export const LyricsSettingsCard: React.FC = () => {
 					</button>
 				</div>
 
-				{/* 4. 桌面歌词字体颜色自定义 */}
+				{/* 4. 歌词字体颜色自定义 */}
 				<div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors space-y-2.5">
 					<div className="flex items-center justify-between gap-4">
 						<div className="space-y-0.5">
 							<div className="flex items-center gap-2">
-								<span className="font-semibold text-foreground">桌面歌词字体高亮颜色</span>
+								<span className="font-semibold text-foreground">歌词字体高亮颜色</span>
 								<span
 									className="w-3 h-3 rounded-full border border-white/20 shadow-sm inline-block shrink-0"
-									style={{ backgroundColor: desktopColor }}
+									style={{ backgroundColor: highlightColor }}
 								/>
 							</div>
 							<p className="text-[11px] text-muted-foreground leading-relaxed">
-								自定义独立桌面悬浮歌词的字行高亮色彩，支持预设经典色系与自由调色。
+								自定义全屏模式与桌面悬浮歌词（含正文、翻译与罗马音）的高亮色彩，支持预设经典色系与自由调色。
 							</p>
 						</div>
 						<div className="flex items-center gap-2 shrink-0">
 							<span className="font-mono text-[10px] text-foreground font-semibold uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10">
-								{desktopColor}
+								{highlightColor}
 							</span>
 							<label
 								className="relative cursor-pointer flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
@@ -235,11 +237,11 @@ export const LyricsSettingsCard: React.FC = () => {
 								<Palette className="w-3.5 h-3.5 text-primary" />
 								<input
 									type="color"
-									value={desktopColor}
+									value={highlightColor}
 									onChange={(e) => {
 										const col = e.target.value
-										setDesktopColor(col)
-										setDesktopLyricsColor(col)
+										setHighlightColor(col)
+										setLyricsHighlightColor(col)
 									}}
 									className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
 								/>
@@ -250,16 +252,16 @@ export const LyricsSettingsCard: React.FC = () => {
 
 					{/* 预设配色快捷选择 */}
 					<div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1 border-t border-white/5">
-						{PRESET_DESKTOP_LYRICS_COLORS.map((preset) => {
+						{PRESET_LYRICS_COLORS.map((preset) => {
 							const isSelected =
-								desktopColor.toLowerCase() === preset.value.toLowerCase()
+								highlightColor.toLowerCase() === preset.value.toLowerCase()
 							return (
 								<button
 									key={preset.value}
 									type="button"
 									onClick={() => {
-										setDesktopColor(preset.value)
-										setDesktopLyricsColor(preset.value)
+										setHighlightColor(preset.value)
+										setLyricsHighlightColor(preset.value)
 									}}
 									className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all ${
 										isSelected

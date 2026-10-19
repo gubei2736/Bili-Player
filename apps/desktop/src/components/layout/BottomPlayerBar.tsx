@@ -10,7 +10,6 @@ import {
 	Volume2,
 	VolumeX,
 	Maximize2,
-	Sliders,
 	FolderPlus,
 	Heart,
 	ListMusic,
@@ -83,9 +82,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	})
 	const [isMuted, setIsMuted] = useState(false)
 	const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false)
-	const [loudnessEnabled, setLoudnessEnabled] = useState(() =>
-		desktopAudioEngine.isLoudnessNormalizationEnabled(),
-	)
 
 	// 桌面歌词窗口显隐与穿透锁定状态实时同步
 	const [lyricsVisible, setLyricsVisible] = useState(false)
@@ -485,12 +481,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		}
 	}
 
-	const toggleLoudnessNormalization = () => {
-		const nextState = !loudnessEnabled
-		setLoudnessEnabled(nextState)
-		desktopAudioEngine.setLoudnessNormalization(nextState)
-	}
-
 	const toggleLoopMode = () => {
 		if (playMode === 'sequential') setPlayMode('repeat_all')
 		else if (playMode === 'repeat_all') setPlayMode('repeat_one')
@@ -833,41 +823,6 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 					{/* Playback Controls (Line 2) - Roomy, centered, 100% full circle */}
 					<div className="flex items-center justify-center gap-1.5 sm:gap-2.5 md:gap-3.5 flex-nowrap">
-						{/* Open Video Webpage in Default Browser */}
-						<button
-							onClick={() => {
-								if (!currentTrack || isLocalTrack) return
-								const bvid =
-									(currentTrack as any).bilibiliMetadata?.bvid ||
-									(currentTrack as any).bvid
-								if (bvid) {
-									const pageIndex = (currentTrack as any).bilibiliMetadata?.pageIndex
-									const url = `https://www.bilibili.com/video/${bvid}${pageIndex && pageIndex > 1 ? `?p=${pageIndex}` : ''}`
-									openExternalUrl(url)
-								}
-							}}
-							disabled={
-								!currentTrack ||
-								isLocalTrack ||
-								!((currentTrack as any).bilibiliMetadata?.bvid || (currentTrack as any).bvid)
-							}
-							title={
-								isLocalTrack
-									? '本地音乐无在线网页'
-									: ((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
-										? '在浏览器打开 B 站视频原网页'
-										: '当前歌曲无在线视频网页'
-							}
-							className={`p-1.5 rounded-full transition-colors ${
-								!isLocalTrack &&
-								((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
-									? 'text-muted-foreground hover:text-[#00AEEC] hover:bg-white/10'
-									: 'text-muted-foreground/30 cursor-not-allowed'
-							}`}
-						>
-							<Globe className="w-4 h-4" />
-						</button>
-
 						{/* Add To Custom Playlist */}
 						<button
 							onClick={() => currentTrack && !isLocalTrack && setIsAddToPlaylistOpen(true)}
@@ -973,21 +928,39 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							<SkipForward className="w-5 h-5 fill-current" />
 						</button>
 
-						{/* Equalizer / Loudness Balance */}
+						{/* Open Video Webpage in Default Browser (一键打开原网页) */}
 						<button
-							onClick={toggleLoudnessNormalization}
-							title={
-								loudnessEnabled
-									? 'EBU R128 音频响度平衡：已开启'
-									: 'EBU R128 音频响度平衡：已关闭'
+							onClick={() => {
+								if (!currentTrack || isLocalTrack) return
+								const bvid =
+									(currentTrack as any).bilibiliMetadata?.bvid ||
+									(currentTrack as any).bvid
+								if (bvid) {
+									const pageIndex = (currentTrack as any).bilibiliMetadata?.pageIndex
+									const url = `https://www.bilibili.com/video/${bvid}${pageIndex && pageIndex > 1 ? `?p=${pageIndex}` : ''}`
+									openExternalUrl(url)
+								}
+							}}
+							disabled={
+								!currentTrack ||
+								isLocalTrack ||
+								!((currentTrack as any).bilibiliMetadata?.bvid || (currentTrack as any).bvid)
 							}
-							className={`p-1.5 rounded-full hover:bg-white/10 transition-colors ${
-								loudnessEnabled
-									? 'text-[#00AEEC] drop-shadow-[0_0_8px_rgba(0,174,236,0.6)]'
-									: 'text-muted-foreground hover:text-foreground'
+							title={
+								isLocalTrack
+									? '本地音乐无在线网页'
+									: ((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
+										? '一键在浏览器打开 B 站视频原网页'
+										: '当前歌曲无在线视频网页'
+							}
+							className={`p-1.5 rounded-full transition-colors ${
+								!isLocalTrack &&
+								((currentTrack as any)?.bilibiliMetadata?.bvid || (currentTrack as any)?.bvid)
+									? 'text-muted-foreground hover:text-[#00AEEC] hover:bg-white/10'
+									: 'text-muted-foreground/30 cursor-not-allowed'
 							}`}
 						>
-							<Sliders className="w-4 h-4" />
+							<Globe className="w-4 h-4" />
 						</button>
 					</div>
 				</div>
