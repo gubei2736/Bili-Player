@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
 	FolderHeart,
 	Play,
@@ -52,15 +52,27 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 	const { isLoggedIn, userInfo } = useAuthStore()
 	const {
 		collections,
+		selectedCollectionId,
+		setSelectedCollectionId,
+		collectionTracksCache,
+		setCollectionTracksCache,
 		syncRemotePlaylists,
 		isLoading: isSyncing,
 	} = usePlaylistStore()
 	const { setQueue } = useQueueStore()
 	const currentTrack = useCurrentTrack()
 
-	const [activeCollection, setActiveCollection] =
-		useState<BilibiliCollection | null>(null)
-	const [tracks, setTracks] = useState<BilibiliTrack[]>([])
+	const activeCollection = useMemo(() => {
+		if (!selectedCollectionId) return null
+		return collections.find((c) => c.id === selectedCollectionId) || null
+	}, [collections, selectedCollectionId])
+
+	const [tracks, setTracks] = useState<BilibiliTrack[]>(() => {
+		if (selectedCollectionId && collectionTracksCache[selectedCollectionId]) {
+			return collectionTracksCache[selectedCollectionId]!
+		}
+		return []
+	})
 	const [loadingTracks, setLoadingTracks] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [hiddenIds, setHiddenIds] = useState<number[]>(getHiddenCollectionIds())
@@ -77,10 +89,24 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 		}
 	}, [])
 
+	// If current selected collection is hidden, return to collection list
+	useEffect(() => {
+		if (selectedCollectionId && hiddenIds.includes(selectedCollectionId)) {
+			setSelectedCollectionId(null)
+		}
+	}, [hiddenIds, selectedCollectionId, setSelectedCollectionId])
+
 	const visibleCollections = collections.filter((c) => !hiddenIds.includes(c.id))
 
-	// Fetch tracks when an activeCollection is selected
-	const fetchCollectionTracks = async (col: BilibiliCollection) => {
+	// Fetch tracks when an activeCollection is selected (cache-first)
+	const fetchCollectionTracks = async (col: BilibiliCollection, forceRefresh = false) => {
+		const cached = collectionTracksCache[col.id]
+		if (cached && cached.length > 0 && !forceRefresh) {
+			setTracks(cached)
+			setLoadingTracks(false)
+			return
+		}
+
 		setLoadingTracks(true)
 		setError(null)
 		try {
@@ -93,6 +119,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 					convertCollectionMediaToTrack(m, idx),
 				)
 				setTracks(converted)
+				setCollectionTracksCache(col.id, converted)
 			} else {
 				// Fallback to series archives if not a season collection
 				const seriesRes = await bilibiliApi.getSeriesArchivesPage({
@@ -127,29 +154,49 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 						},
 					}))
 					setTracks(converted)
+					setCollectionTracksCache(col.id, converted)
 				} else {
 					setError('获取合集内容失败，可能是私有或已下架')
-					setTracks([])
+					if (!cached) setTracks([])
 				}
 			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : '网络请求异常')
-			setTracks([])
+			if (!cached) setTracks([])
 		} finally {
 			setLoadingTracks(false)
 		}
 	}
 
+	// Auto sync tracks when activeCollection changes or on restore
+	useEffect(() => {
+		if (activeCollection) {
+			const cached = collectionTracksCache[activeCollection.id]
+			if (cached && cached.length > 0) {
+				setTracks(cached)
+			} else {
+				fetchCollectionTracks(activeCollection, false)
+			}
+		} else {
+			setTracks([])
+		}
+	}, [activeCollection?.id])
+
 	const handleSelectCollection = (col: BilibiliCollection) => {
-		setActiveCollection(col)
-		fetchCollectionTracks(col)
+		setSelectedCollectionId(col.id)
+		const cached = collectionTracksCache[col.id]
+		if (cached && cached.length > 0) {
+			setTracks(cached)
+		} else {
+			fetchCollectionTracks(col, false)
+		}
 	}
 
 	const handleRefresh = async () => {
 		if (!userInfo?.mid) return
 		await syncRemotePlaylists(userInfo.mid)
 		if (activeCollection) {
-			await fetchCollectionTracks(activeCollection)
+			await fetchCollectionTracks(activeCollection, true)
 		}
 	}
 
@@ -215,7 +262,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 				<div className="flex items-center gap-3">
 					{activeCollection && (
 						<button
-							onClick={() => setActiveCollection(null)}
+							onClick={() => setSelectedCollectionId(null)}
 							className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-foreground transition-colors"
 							title="返回合集列表"
 						>

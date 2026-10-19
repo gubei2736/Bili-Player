@@ -59,6 +59,9 @@ pub fn run() {
             shortcuts::update_shortcuts,
             window_ext::get_app_cache_size,
             window_ext::clear_app_cache,
+            window_ext::toggle_main_window_fullscreen,
+            window_ext::is_main_window_fullscreen,
+            window_ext::set_main_window_fullscreen,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

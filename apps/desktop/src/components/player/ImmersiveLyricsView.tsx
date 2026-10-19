@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Maximize2, Minimize2 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
 import { FluidBackground } from './FluidBackground'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 import {
@@ -69,10 +70,15 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		let unmounted = false
 		const checkFs = async () => {
 			try {
-				const { getCurrentWindow } = await import('@tauri-apps/api/window')
-				const fs = await getCurrentWindow().isFullscreen()
+				const fs = await invoke<boolean>('is_main_window_fullscreen')
 				if (!unmounted) setIsWindowFullscreen(fs)
-			} catch {}
+			} catch {
+				try {
+					const { getCurrentWindow } = await import('@tauri-apps/api/window')
+					const fs = await getCurrentWindow().isFullscreen()
+					if (!unmounted) setIsWindowFullscreen(fs)
+				} catch {}
+			}
 		}
 		if (isOpen) {
 			checkFs()
@@ -82,29 +88,40 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		}
 	}, [isOpen])
 
-	// 切换操作系统窗口全屏
+	// 切换操作系统窗口全屏 (F11 或 顶部按钮)
 	const toggleWindowFullscreen = async () => {
 		try {
-			const { getCurrentWindow } = await import('@tauri-apps/api/window')
-			const win = getCurrentWindow()
-			const current = await win.isFullscreen()
-			await win.setFullscreen(!current)
-			setIsWindowFullscreen(!current)
+			const nextFs = await invoke<boolean>('toggle_main_window_fullscreen')
+			setIsWindowFullscreen(nextFs)
 		} catch (err) {
-			console.warn('Toggle window fullscreen failed:', err)
+			console.warn('Rust toggle fullscreen failed, falling back to window API:', err)
+			try {
+				const { getCurrentWindow } = await import('@tauri-apps/api/window')
+				const win = getCurrentWindow()
+				const current = await win.isFullscreen()
+				await win.setFullscreen(!current)
+				setIsWindowFullscreen(!current)
+			} catch (err2) {
+				console.warn('Fallback toggle fullscreen failed:', err2)
+			}
 		}
 	}
 
 	// 关闭沉浸式全屏歌词模式
 	const handleClose = async () => {
 		try {
-			const { getCurrentWindow } = await import('@tauri-apps/api/window')
-			const win = getCurrentWindow()
-			if (await win.isFullscreen()) {
-				await win.setFullscreen(false)
-				setIsWindowFullscreen(false)
-			}
-		} catch {}
+			await invoke('set_main_window_fullscreen', { fullscreen: false })
+			setIsWindowFullscreen(false)
+		} catch {
+			try {
+				const { getCurrentWindow } = await import('@tauri-apps/api/window')
+				const win = getCurrentWindow()
+				if (await win.isFullscreen()) {
+					await win.setFullscreen(false)
+					setIsWindowFullscreen(false)
+				}
+			} catch {}
+		}
 		onClose()
 	}
 
