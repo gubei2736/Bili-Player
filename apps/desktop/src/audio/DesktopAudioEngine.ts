@@ -44,7 +44,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	private analyserNode: AnalyserNode | null = null
 
 	private currentTrack: Track | null = null
-	private loudnessNormalizationEnabled = true
+	private loudnessNormalizationEnabled = false
 	private currentLoudnessGainDb = 0
 	private listeners: Set<PlaybackListener> = new Set()
 
@@ -61,8 +61,12 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			const saved = localStorage.getItem('bbplayer_audio_volume_balance')
 			if (saved !== null) {
 				this.loudnessNormalizationEnabled = saved === 'true'
+			} else {
+				this.loudnessNormalizationEnabled = false
 			}
-		} catch {}
+		} catch {
+			this.loudnessNormalizationEnabled = false
+		}
 		this.setupEventListeners()
 	}
 

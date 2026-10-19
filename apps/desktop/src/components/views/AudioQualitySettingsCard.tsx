@@ -160,8 +160,8 @@ export const AudioQualitySettingsCard: React.FC = () => {
 					<div className="space-y-0.5 mr-3">
 						<p className="font-semibold text-foreground text-xs flex items-center gap-1.5">
 							<span>智能音频音量平衡</span>
-							<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">
-								推荐开启
+							<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25 font-medium">
+								会影响听感，自行选择
 							</span>
 						</p>
 						<p className="text-[11px] text-muted-foreground leading-relaxed">

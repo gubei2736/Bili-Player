@@ -11,7 +11,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { emit, listen } from '@tauri-apps/api/event'
 import { parseSpl, type SplLyricData, type LyricLine } from '@bbplayer/splash'
-import { getLyricFontSizes } from '../../services/lyricService'
+import { getLyricFontSizes, getDesktopLyricsColor } from '../../services/lyricService'
 
 export type LyricsSyncEvent =
 	| {
@@ -52,7 +52,7 @@ export const DesktopLyricsApp: React.FC = () => {
 			return 24
 		}
 	})
-	const [primaryColor, setPrimaryColor] = useState('#00AEEC')
+	const [primaryColor, setPrimaryColor] = useState<string>(() => getDesktopLyricsColor())
 
 	// 高精度本地时钟插值锚点，彻底消除 200ms IPC 节流带来的逐字卡顿
 	const syncAnchorRef = useRef<{
@@ -124,6 +124,13 @@ export const DesktopLyricsApp: React.FC = () => {
 			},
 		)
 
+		const handleLocalColorChange = (e: any) => {
+			if (e.detail?.color) {
+				setPrimaryColor(e.detail.color)
+			}
+		}
+		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
+
 		// 窗口挂载时，主动拉取 Rust 端真实的穿透锁定状态，并通知主窗口补发当前歌词状态
 		invoke<boolean>('is_lyrics_locked')
 			.then((locked) => {
@@ -136,6 +143,7 @@ export const DesktopLyricsApp: React.FC = () => {
 		return () => {
 			unlistenSyncPromise.then((unlisten) => unlisten())
 			unlistenLockPromise.then((unlisten) => unlisten())
+			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
 		}
 	}, [])
 

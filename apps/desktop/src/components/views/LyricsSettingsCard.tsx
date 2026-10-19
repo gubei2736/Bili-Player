@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Languages, Music2, Sparkles, Check } from 'lucide-react'
+import { Languages, Music2, Sparkles, Check, Palette } from 'lucide-react'
 import {
 	getAutoMatchLyricsEnabled,
 	setAutoMatchLyricsEnabled,
@@ -9,6 +9,10 @@ import {
 	setLyricOptionRomaji,
 	getPreferredLyricSource,
 	setPreferredLyricSource,
+	getDesktopLyricsColor,
+	setDesktopLyricsColor,
+	PRESET_DESKTOP_LYRICS_COLORS,
+	DEFAULT_DESKTOP_LYRICS_COLOR,
 	type PreferredLyricSource,
 } from '../../services/lyricService'
 
@@ -17,6 +21,7 @@ export const LyricsSettingsCard: React.FC = () => {
 	const [showTranslation, setShowTranslation] = useState<boolean>(getLyricOptionTranslation())
 	const [showRomaji, setShowRomaji] = useState<boolean>(getLyricOptionRomaji())
 	const [preferredSource, setPreferredSource] = useState<PreferredLyricSource>(() => getPreferredLyricSource())
+	const [desktopColor, setDesktopColor] = useState<string>(() => getDesktopLyricsColor())
 
 	useEffect(() => {
 		const handleAutoMatchChange = (e: any) => {
@@ -25,11 +30,18 @@ export const LyricsSettingsCard: React.FC = () => {
 		const handlePreferredSourceChange = (e: any) => {
 			setPreferredSource(e.detail?.source ?? getPreferredLyricSource())
 		}
+		const handleColorChange = (e: any) => {
+			if (e.detail?.color) {
+				setDesktopColor(e.detail.color)
+			}
+		}
 		window.addEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
 		window.addEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
+		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
 		return () => {
 			window.removeEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
 			window.removeEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
+			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
 		}
 	}, [])
 
@@ -195,6 +207,82 @@ export const LyricsSettingsCard: React.FC = () => {
 							}`}
 						/>
 					</button>
+				</div>
+
+				{/* 4. 桌面歌词字体颜色自定义 */}
+				<div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors space-y-2.5">
+					<div className="flex items-center justify-between gap-4">
+						<div className="space-y-0.5">
+							<div className="flex items-center gap-2">
+								<span className="font-semibold text-foreground">桌面歌词字体高亮颜色</span>
+								<span
+									className="w-3 h-3 rounded-full border border-white/20 shadow-sm inline-block shrink-0"
+									style={{ backgroundColor: desktopColor }}
+								/>
+							</div>
+							<p className="text-[11px] text-muted-foreground leading-relaxed">
+								自定义独立桌面悬浮歌词的字行高亮色彩，支持预设经典色系与自由调色。
+							</p>
+						</div>
+						<div className="flex items-center gap-2 shrink-0">
+							<span className="font-mono text-[10px] text-foreground font-semibold uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10">
+								{desktopColor}
+							</span>
+							<label
+								className="relative cursor-pointer flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
+								title="打开调色板选取任意颜色"
+							>
+								<Palette className="w-3.5 h-3.5 text-primary" />
+								<input
+									type="color"
+									value={desktopColor}
+									onChange={(e) => {
+										const col = e.target.value
+										setDesktopColor(col)
+										setDesktopLyricsColor(col)
+									}}
+									className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+								/>
+								<span>调色盘</span>
+							</label>
+						</div>
+					</div>
+
+					{/* 预设配色快捷选择 */}
+					<div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1 border-t border-white/5">
+						{PRESET_DESKTOP_LYRICS_COLORS.map((preset) => {
+							const isSelected =
+								desktopColor.toLowerCase() === preset.value.toLowerCase()
+							return (
+								<button
+									key={preset.value}
+									type="button"
+									onClick={() => {
+										setDesktopColor(preset.value)
+										setDesktopLyricsColor(preset.value)
+									}}
+									className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all ${
+										isSelected
+											? 'bg-white/10 border-primary ring-1 ring-primary/50'
+											: 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
+									}`}
+									title={`${preset.label} (${preset.value})`}
+								>
+									<span
+										className="w-4 h-4 rounded-full border border-white/20 shadow-sm flex items-center justify-center"
+										style={{ backgroundColor: preset.value }}
+									>
+										{isSelected && (
+											<Check className="w-2.5 h-2.5 text-black drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
+										)}
+									</span>
+									<span className="text-[10px] text-muted-foreground font-medium truncate max-w-full">
+										{preset.label}
+									</span>
+								</button>
+							)
+						})}
+					</div>
 				</div>
 			</div>
 		</div>
