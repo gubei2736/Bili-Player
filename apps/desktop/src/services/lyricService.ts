@@ -209,6 +209,66 @@ export function setLyricFontSizes(sizes: Partial<LyricFontSizes>): void {
 }
 
 // -------------------------------------------------------------
+// 歌词主字体高亮颜色管理 (自定义色值，同时作用于全屏歌词与桌面歌词)
+// -------------------------------------------------------------
+const LYRICS_HIGHLIGHT_COLOR_KEY = 'bbplayer_lyrics_highlight_color'
+const DESKTOP_LYRICS_COLOR_KEY = 'bbplayer_desktop_lyrics_color'
+export const DEFAULT_LYRICS_HIGHLIGHT_COLOR = '#00AEEC'
+export const DEFAULT_DESKTOP_LYRICS_COLOR = DEFAULT_LYRICS_HIGHLIGHT_COLOR
+
+export const PRESET_LYRICS_COLORS = [
+	{ label: 'B站蓝', value: '#00AEEC' },
+	{ label: '少女粉', value: '#FB7299' },
+	{ label: '纯净白', value: '#FFFFFF' },
+	{ label: '荧光金', value: '#FFD700' },
+	{ label: '翡翠绿', value: '#10B981' },
+	{ label: '极光紫', value: '#A855F7' },
+	{ label: '落日橙', value: '#F97316' },
+	{ label: '赛博青', value: '#06B6D4' },
+]
+export const PRESET_DESKTOP_LYRICS_COLORS = PRESET_LYRICS_COLORS
+
+export function getLyricsHighlightColor(): string {
+	try {
+		return (
+			localStorage.getItem(LYRICS_HIGHLIGHT_COLOR_KEY) ||
+			localStorage.getItem(DESKTOP_LYRICS_COLOR_KEY) ||
+			DEFAULT_LYRICS_HIGHLIGHT_COLOR
+		)
+	} catch {
+		return DEFAULT_LYRICS_HIGHLIGHT_COLOR
+	}
+}
+
+export function setLyricsHighlightColor(color: string): void {
+	try {
+		localStorage.setItem(LYRICS_HIGHLIGHT_COLOR_KEY, color)
+		localStorage.setItem(DESKTOP_LYRICS_COLOR_KEY, color)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:lyrics-highlight-color-change', {
+				detail: { color },
+			}),
+		)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:desktop-lyrics-color-change', {
+				detail: { color },
+			}),
+		)
+		import('@tauri-apps/api/event')
+			.then(({ emit }) => {
+				emit('lyrics-sync', {
+					type: 'STYLE_UPDATE',
+					primaryColor: color,
+				}).catch(() => {})
+			})
+			.catch(() => {})
+	} catch {}
+}
+
+export const getDesktopLyricsColor = getLyricsHighlightColor
+export const setDesktopLyricsColor = setLyricsHighlightColor
+
+// -------------------------------------------------------------
 // 歌曲专属搜索候选与已采用歌词记忆缓存
 // -------------------------------------------------------------
 export interface TrackSearchCache {

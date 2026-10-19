@@ -101,19 +101,32 @@ const isMiniWindow = window.location.hash.includes('mini')
 const isTrayWindow = window.location.hash.includes('tray')
 
 if (isLyricsWindow || isMiniWindow || isTrayWindow) {
-	document.documentElement.classList.add('is-transparent-window')
+	document.documentElement.classList.add('is-transparent-window', 'h-full', 'w-full')
 	document.documentElement.classList.remove('bg-[#0b0f17]')
 	document.documentElement.classList.add('bg-transparent')
 	document.documentElement.style.background = 'transparent'
-	document.body.classList.add('is-transparent-window')
+	document.documentElement.style.height = '100%'
+	document.documentElement.style.width = '100%'
+	document.documentElement.style.overflow = 'hidden'
+
+	document.body.classList.add('is-transparent-window', 'h-full', 'w-full')
 	document.body.classList.remove('bg-[#0b0f17]')
 	document.body.classList.add('bg-transparent')
 	document.body.style.background = 'transparent'
+	document.body.style.height = '100%'
+	document.body.style.width = '100%'
+	document.body.style.margin = '0'
+	document.body.style.padding = '0'
 	document.body.style.border = 'none'
 	document.body.style.outline = 'none'
+	document.body.style.overflow = 'hidden'
+
 	const rootEl = document.getElementById('root')
 	if (rootEl) {
 		rootEl.style.background = 'transparent'
+		rootEl.style.height = '100%'
+		rootEl.style.width = '100%'
+		rootEl.style.overflow = 'hidden'
 	}
 }
 

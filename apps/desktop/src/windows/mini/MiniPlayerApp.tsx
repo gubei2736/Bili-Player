@@ -56,15 +56,45 @@ export const MiniPlayerApp: React.FC = () => {
 	})
 
 	const [isExpanded, setIsExpanded] = useState(false)
-	const progressRef = useRef<HTMLDivElement>(null)
-	const [isDraggingSeek, setIsDraggingSeek] = useState(false)
-	const [seekTime, setSeekTime] = useState<number | null>(null)
+	const queueListRef = useRef<HTMLDivElement>(null)
+	const currentTrackRef = useRef<HTMLDivElement>(null)
+
+	// --- 进度条系统：与主界面完全一致的 60FPS 平滑插值与 Pointer Capture 拖拽方案 ---
+	const progressBarRef = useRef<HTMLDivElement>(null)
+	const progressBarFillRef = useRef<HTMLDivElement>(null)
+	const progressThumbRef = useRef<HTMLDivElement>(null)
+	const timeTextSpanRef = useRef<HTMLSpanElement>(null)
+
+	const [isDragging, setIsDragging] = useState(false)
+	const [dragProgress, setDragProgress] = useState(0)
+	const [hoverProgress, setHoverProgress] = useState<number | null>(null)
+	const [displayTime, setDisplayTime] = useState(state.currentTime)
+
+	// 本地 60FPS 平滑插值锚点
+	const syncAnchorRef = useRef({
+		baseTime: state.currentTime,
+		perfNow: performance.now(),
+		isPlaying: state.isPlaying,
+	})
 
 	useEffect(() => {
 		const unlistenSyncPromise = listen<Partial<MiniPlayerState>>(
 			'mini-player-state-sync',
 			(event) => {
-				setState((prev) => ({ ...prev, ...event.payload }))
+				setState((prev) => {
+					const next = { ...prev, ...event.payload }
+					if (event.payload.currentTime !== undefined) {
+						syncAnchorRef.current.baseTime = event.payload.currentTime
+						syncAnchorRef.current.perfNow = performance.now()
+						if (!isDragging) {
+							setDisplayTime(event.payload.currentTime)
+						}
+					}
+					if (event.payload.isPlaying !== undefined) {
+						syncAnchorRef.current.isPlaying = event.payload.isPlaying
+					}
+					return next
+				})
 			},
 		)
 
@@ -75,7 +105,54 @@ export const MiniPlayerApp: React.FC = () => {
 		return () => {
 			unlistenSyncPromise.then((unlisten) => unlisten())
 		}
-	}, [])
+	}, [isDragging])
+
+	// 60FPS 本地平滑推进循环：消除跨窗口广播频率限制带来的顿挫感，与主界面完全一致
+	useEffect(() => {
+		if (!state.isPlaying || isDragging) return
+
+		let animId: number
+		let lastTick = 0
+		const tick = (now: number) => {
+			if (!isDragging) {
+				if (now - lastTick >= 16) {
+					lastTick = now
+					const { baseTime, perfNow, isPlaying } = syncAnchorRef.current
+					if (isPlaying && state.duration > 0) {
+						const elapsed = (performance.now() - perfNow) / 1000
+						const cur = Math.min(state.duration, baseTime + elapsed)
+						setDisplayTime(cur)
+						const pct = (cur / state.duration) * 100
+						if (progressBarFillRef.current) {
+							progressBarFillRef.current.style.width = `${pct}%`
+						}
+						if (progressThumbRef.current) {
+							progressThumbRef.current.style.left = `${pct}%`
+						}
+						if (timeTextSpanRef.current) {
+							timeTextSpanRef.current.textContent = formatTime(cur)
+						}
+					}
+				}
+			}
+			animId = requestAnimationFrame(tick)
+		}
+
+		animId = requestAnimationFrame(tick)
+		return () => {
+			if (animId) cancelAnimationFrame(animId)
+		}
+	}, [state.isPlaying, isDragging, state.duration])
+
+	// 当列表展开或当前曲目变更时，自动平滑滚动到当前曲目视口
+	useEffect(() => {
+		if (isExpanded && currentTrackRef.current) {
+			currentTrackRef.current.scrollIntoView({
+				behavior: 'smooth',
+				block: 'nearest',
+			})
+		}
+	}, [isExpanded, state.currentIndex])
 
 	const formatTime = (secs: number) => {
 		if (!isFinite(secs) || secs < 0) return '0:00'
@@ -135,45 +212,92 @@ export const MiniPlayerApp: React.FC = () => {
 		invoke('restore_main_from_mini').catch(() => {})
 	}
 
-	const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-		if (!progressRef.current || state.duration <= 0) return
-		const rect = progressRef.current.getBoundingClientRect()
-		const clickPct = Math.max(
-			0,
-			Math.min(1, (e.clientX - rect.left) / rect.width),
-		)
-		const targetSec = clickPct * state.duration
-		setState((prev) => ({ ...prev, currentTime: targetSec }))
-		invoke('player_seek', { position: targetSec }).catch(() => {})
+	// 进度条交互计算：指针捕获 + 实时拖拽更新
+	const calculateProgressFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+		const bar = progressBarRef.current
+		if (!bar) return 0
+		const rect = bar.getBoundingClientRect()
+		const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+		return rect.width > 0 ? x / rect.width : 0
 	}
 
-	const displayTime = isDraggingSeek && seekTime !== null ? seekTime : state.currentTime
-	const progressPct =
-		state.duration > 0
-			? Math.max(0, Math.min(100, (displayTime / state.duration) * 100))
+	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+		e.currentTarget.setPointerCapture(e.pointerId)
+		setIsDragging(true)
+		const p = calculateProgressFromPointer(e)
+		setDragProgress(p)
+		const targetSec = p * state.duration
+		setDisplayTime(targetSec)
+		if (timeTextSpanRef.current) {
+			timeTextSpanRef.current.textContent = formatTime(targetSec)
+		}
+		if (progressBarFillRef.current) {
+			progressBarFillRef.current.style.width = `${p * 100}%`
+		}
+		if (progressThumbRef.current) {
+			progressThumbRef.current.style.left = `${p * 100}%`
+		}
+	}
+
+	const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+		const p = calculateProgressFromPointer(e)
+		setHoverProgress(p)
+		if (isDragging) {
+			setDragProgress(p)
+			const targetSec = p * state.duration
+			setDisplayTime(targetSec)
+			if (timeTextSpanRef.current) {
+				timeTextSpanRef.current.textContent = formatTime(targetSec)
+			}
+			if (progressBarFillRef.current) {
+				progressBarFillRef.current.style.width = `${p * 100}%`
+			}
+			if (progressThumbRef.current) {
+				progressThumbRef.current.style.left = `${p * 100}%`
+			}
+		}
+	}
+
+	const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+		if (isDragging) {
+			const p = calculateProgressFromPointer(e)
+			setIsDragging(false)
+			const targetSec = p * state.duration
+			setDisplayTime(targetSec)
+			syncAnchorRef.current.baseTime = targetSec
+			syncAnchorRef.current.perfNow = performance.now()
+			setState((prev) => ({ ...prev, currentTime: targetSec }))
+			invoke('player_seek', { position: targetSec }).catch(() => {})
+		}
+		try {
+			e.currentTarget.releasePointerCapture(e.pointerId)
+		} catch {}
+	}
+
+	const effectiveProgress =
+		isDragging
+			? dragProgress
+			: state.duration > 0
+			? Math.max(0, Math.min(1, displayTime / state.duration))
 			: 0
 
 	const currentQueue = state.queue || []
 
 	return (
-		// Outer transparent padding container to prevent window edges from clipping rounded corners and shadows
-		<div
-			data-tauri-drag-region
-			className="w-full h-full p-1.5 flex flex-col items-center justify-start bg-transparent select-none cursor-move"
-		>
-			{/* Rounded Pill Card: Default Dark theme with anti-aliasing buffer and clean curves */}
+		// Mini Player Root: seamless zero-padding card without outer black shadows
+		<div className="w-full h-full max-h-full p-0 flex flex-col bg-transparent select-none overflow-hidden">
+			{/* Rounded Pill Card: Clean border, solid dark background, zero outer shadows */}
 			<div
-				data-tauri-drag-region
 				style={{
 					transform: 'translateZ(0)',
 					backfaceVisibility: 'hidden',
 				}}
-				className="w-full h-full bg-[#0c101c] text-white rounded-[22px] px-3 py-2.5 flex flex-col shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.65)] border border-white/10 relative overflow-hidden"
+				className="w-full h-full max-h-full bg-[#0c101c] text-white rounded-2xl px-3.5 py-2.5 flex flex-col border border-white/15 relative overflow-hidden"
 			>
 				{/* Top Controls Bar */}
 				<div
 					data-tauri-drag-region
-					className="flex items-center justify-between w-full gap-2.5 flex-shrink-0"
+					className="flex items-center justify-between w-full gap-2.5 flex-shrink-0 cursor-move"
 				>
 					{/* Track Cover & Meta */}
 					<div
@@ -299,39 +423,86 @@ export const MiniPlayerApp: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Bottom Progress Bar */}
+				{/* Bottom Progress Bar - 与主界面完全相同的一体化方案 */}
 				<div
 					data-tauri-drag-region
-					className="flex items-center gap-2 px-1 pt-2 w-full flex-shrink-0"
+					className="flex items-center gap-2 px-1 pt-1.5 w-full flex-shrink-0"
 				>
-					<span className="text-[10px] font-mono text-[#00AEEC] w-6 text-right shrink-0">
-						{formatTime(displayTime)}
+					{/* Current Time */}
+					<span
+						ref={timeTextSpanRef}
+						className="text-[10px] font-mono font-bold text-[#00AEEC] min-w-[32px] text-right shrink-0 select-none"
+					>
+						{formatTime(isDragging ? dragProgress * state.duration : displayTime)}
 					</span>
 
+					{/* Straight Progress Track */}
 					<div
-						ref={progressRef}
-						onClick={handleProgressClick}
-						className="relative flex-1 h-1 bg-white/10 rounded-full cursor-pointer group/bar flex items-center"
+						ref={progressBarRef}
+						onPointerDown={handlePointerDown}
+						onPointerMove={handlePointerMove}
+						onPointerUp={handlePointerUp}
+						onPointerLeave={() => setHoverProgress(null)}
+						className="relative flex-1 h-3 flex items-center cursor-pointer group/progress"
 					>
-						<div
-							className="h-full bg-gradient-to-r from-[#00A1D6] to-[#00AEEC] rounded-full relative transition-all"
-							style={{ width: `${progressPct}%` }}
-						>
-							<div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-2.5 h-2.5 rounded-full bg-white ring-2 ring-[#00AEEC] shadow-md pointer-events-none group-hover/bar:scale-125 transition-transform" />
+						{/* Hover Tooltip Capsule */}
+						{hoverProgress !== null && state.duration > 0 && (
+							<div
+								className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-[#0d1322]/95 border border-white/20 text-[9px] font-mono font-bold text-white shadow-xl pointer-events-none z-30 flex items-center gap-1 backdrop-blur-md"
+								style={{
+									left: `${Math.max(4, Math.min(96, hoverProgress * 100))}%`,
+								}}
+							>
+								<span className="w-1 h-1 rounded-full bg-[#00AEEC] animate-pulse" />
+								{formatTime(hoverProgress * state.duration)}
+							</div>
+						)}
+
+						{/* Background Line */}
+						<div className="w-full h-[3px] group-hover/progress:h-[4px] rounded-full bg-white/10 group-hover/progress:bg-white/15 transition-[height,background-color] duration-150 overflow-hidden relative">
+							{/* Played Progress Line */}
+							<div
+								ref={progressBarFillRef}
+								className="h-full rounded-full bg-[#00AEEC]"
+								style={{
+									width: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
+								}}
+							/>
 						</div>
+
+						{/* Thumb circle */}
+						<div
+							ref={progressThumbRef}
+							className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-white border border-white/80 pointer-events-none transition-[opacity,transform] duration-150 ${
+								isDragging
+									? 'opacity-100 scale-125'
+									: 'opacity-0 group-hover/progress:opacity-100 group-hover/progress:scale-110'
+							}`}
+							style={{
+								left: `${Math.max(0, Math.min(100, effectiveProgress * 100))}%`,
+								boxShadow: '0 0 6px #00AEEC, 0 2px 4px rgba(0,0,0,0.5)',
+							}}
+						/>
 					</div>
 
-					<span className="text-[10px] font-mono text-white/40 w-6 text-left shrink-0">
+					{/* Total Duration */}
+					<span className="text-[10px] font-mono font-bold text-white/40 min-w-[32px] text-left shrink-0 select-none">
 						{formatTime(state.duration)}
 					</span>
 				</div>
 
 				{/* Expanded In-Window Play Queue Drawer */}
 				{isExpanded && (
-					<div className="flex-1 flex flex-col min-h-0 pt-2.5 mt-2 border-t border-white/10">
-						{/* Header row */}
-						<div className="flex items-center justify-between pb-1.5 px-1 flex-shrink-0 text-white/70">
-							<div className="flex items-center gap-1.5 text-[11px] font-medium text-white/90">
+					<div className="flex-1 flex flex-col min-h-0 pt-2 mt-2 border-t border-white/10 overflow-hidden">
+						{/* Header row - draggable */}
+						<div
+							data-tauri-drag-region
+							className="flex items-center justify-between pb-1.5 px-1 flex-shrink-0 text-white/70 cursor-move"
+						>
+							<div
+								data-tauri-drag-region
+								className="flex items-center gap-1.5 text-[11px] font-medium text-white/90"
+							>
 								<Disc3 className="w-3.5 h-3.5 text-[#00AEEC] animate-[spin_6s_linear_infinite]" />
 								<span>当前播放队列</span>
 								<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-white/60">
@@ -356,12 +527,23 @@ export const MiniPlayerApp: React.FC = () => {
 								<p className="text-[10px] text-white/30 mt-0.5">请在主界面添加歌曲播放</p>
 							</div>
 						) : (
-							<div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-mini-scrollbar">
+							<div
+								ref={queueListRef}
+								onWheel={(e) => {
+									e.stopPropagation()
+									if (queueListRef.current) {
+										queueListRef.current.scrollTop += e.deltaY
+									}
+								}}
+								className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 pb-1.5 custom-mini-scrollbar select-none cursor-default"
+								style={{ overscrollBehavior: 'contain' }}
+							>
 								{currentQueue.map((item, idx) => {
 									const isCurrent = idx === state.currentIndex
 									return (
 										<div
 											key={item.uniqueKey || idx}
+											ref={isCurrent ? currentTrackRef : undefined}
 											onClick={() => handlePlayIndex(idx)}
 											className={`group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${
 												isCurrent
@@ -390,9 +572,11 @@ export const MiniPlayerApp: React.FC = () => {
 												)}
 
 												<div className="min-w-0 flex-1 leading-tight">
-													<p className={`truncate font-medium text-[11px] ${
-														isCurrent ? 'text-[#00AEEC] font-semibold' : 'text-white/90'
-													}`}>
+													<p
+														className={`truncate font-medium text-[11px] ${
+															isCurrent ? 'text-[#00AEEC] font-semibold' : 'text-white/90'
+														}`}
+													>
 														{item.title}
 													</p>
 													<p className="text-[9px] text-white/40 truncate">

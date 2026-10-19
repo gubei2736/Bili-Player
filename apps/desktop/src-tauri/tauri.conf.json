@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Bili Player",
   "mainBinaryName": "Bili Player",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "identifier": "com.biliplayer.desktop",
   "build": {
     "frontendDist": "../dist",

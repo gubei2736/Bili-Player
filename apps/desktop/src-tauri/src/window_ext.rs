@@ -73,6 +73,11 @@ pub fn setup_lyrics_window(window: &WebviewWindow) {
     let _ = window.set_shadow(false);
 }
 
+/// Configure mini player window to be completely borderless with no shadow
+pub fn setup_mini_window(window: &WebviewWindow) {
+    let _ = window.set_shadow(false);
+}
+
 /// Apply native window effects (Shadow, Win11 Mica, macOS Vibrancy)
 pub fn setup_window_effects(window: &WebviewWindow) {
     // 1. Set window shadow (Tauri v2 native method)
@@ -279,12 +284,14 @@ pub fn toggle_mini_player(app: AppHandle) -> Result<bool, String> {
         let is_mini_visible = mini_win.is_visible().unwrap_or(false);
         if is_mini_visible {
             let _ = mini_win.hide();
+            let _ = main_win.unminimize();
             let _ = main_win.show();
             let _ = main_win.set_focus();
             let _ = app.emit("mini-player-visibility-change", false);
             Ok(false)
         } else {
             let _ = main_win.hide();
+            setup_mini_window(&mini_win);
             let _ = mini_win.show();
             let _ = mini_win.set_focus();
             let _ = app.emit("mini-player-visibility-change", true);
@@ -299,14 +306,14 @@ pub fn toggle_mini_player(app: AppHandle) -> Result<bool, String> {
 /// Tauri Command: Restore main window from Mini Player
 #[tauri::command]
 pub fn restore_main_from_mini(app: AppHandle) -> Result<(), String> {
-    if let (Some(main_win), Some(mini_win)) = (
-        app.get_webview_window("main"),
-        app.get_webview_window("mini"),
-    ) {
+    if let Some(mini_win) = app.get_webview_window("mini") {
         let _ = mini_win.hide();
+        let _ = app.emit("mini-player-visibility-change", false);
+    }
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.unminimize();
         let _ = main_win.show();
         let _ = main_win.set_focus();
-        let _ = app.emit("mini-player-visibility-change", false);
     }
     Ok(())
 }
@@ -457,5 +464,105 @@ pub fn play_queue_index(app: AppHandle, index: usize) {
         );
         let _ = main_win.eval(&script);
     }
+}
+
+fn calculate_dir_size(path: &std::path::Path) -> u64 {
+    let mut size = 0;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                size += calculate_dir_size(&p);
+            } else if let Ok(meta) = entry.metadata() {
+                size += meta.len();
+            }
+        }
+    }
+    size
+}
+
+/// Tauri Command: Get total cache size in bytes (EBWebView Cache + audio_cache)
+#[tauri::command]
+pub fn get_app_cache_size(app: AppHandle) -> Result<u64, String> {
+    use tauri::Manager;
+    let mut total_size: u64 = 0;
+
+    // 1. EBWebView/Default/Cache & components
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let eb_cache = std::path::PathBuf::from(local_app_data)
+            .join("com.biliplayer.desktop")
+            .join("EBWebView")
+            .join("Default")
+            .join("Cache");
+        if eb_cache.exists() {
+            total_size += calculate_dir_size(&eb_cache);
+        }
+    }
+
+    // 2. stream_proxy audio_cache
+    if let Ok(cache_dir) = app.path().app_cache_dir() {
+        let audio_cache = cache_dir.join("audio_cache");
+        if audio_cache.exists() {
+            total_size += calculate_dir_size(&audio_cache);
+        }
+    }
+
+    Ok(total_size)
+}
+
+/// Tauri Command: Clear temporary caches (audio cache + EBWebView cache)
+#[tauri::command]
+pub fn clear_app_cache(app: AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    // 1. Clear stream_proxy audio_cache
+    if let Ok(cache_dir) = app.path().app_cache_dir() {
+        let audio_cache = cache_dir.join("audio_cache");
+        if audio_cache.exists() {
+            let _ = std::fs::remove_dir_all(&audio_cache);
+            let _ = std::fs::create_dir_all(&audio_cache);
+        }
+    }
+
+    // 2. Clear EBWebView Cache files (delete files inside EBWebView/Default/Cache)
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let base_dir = std::path::PathBuf::from(local_app_data);
+        let eb_cache = base_dir
+            .join("com.biliplayer.desktop")
+            .join("EBWebView")
+            .join("Default")
+            .join("Cache");
+        if eb_cache.exists() {
+            if let Ok(entries) = std::fs::read_dir(&eb_cache) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() {
+                        let _ = std::fs::remove_dir_all(&p);
+                    } else {
+                        let _ = std::fs::remove_file(&p);
+                    }
+                }
+            }
+        }
+
+        // Also prune any leftover junk components
+        let ebwebview = base_dir
+            .join("com.biliplayer.desktop")
+            .join("EBWebView");
+        let junk_dirs = [
+            "component_crx_cache",
+            "WidevineCdm",
+            "Subresource Filter",
+            "Speech Recognition",
+        ];
+        for junk in junk_dirs {
+            let p = ebwebview.join(junk);
+            if p.exists() {
+                let _ = std::fs::remove_dir_all(p);
+            }
+        }
+    }
+
+    Ok(())
 }
 

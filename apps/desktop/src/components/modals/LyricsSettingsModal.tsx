@@ -10,6 +10,7 @@ import {
 	Save,
 	Languages,
 	Type,
+	Palette,
 } from 'lucide-react'
 import type { Track } from '@bbplayer/shared-core'
 import {
@@ -30,6 +31,14 @@ import {
 	getStoredTrackSearchCache,
 	setStoredTrackSearchCache,
 	markTrackAdoptedCandidate,
+	getLyricsHighlightColor,
+	setLyricsHighlightColor,
+	PRESET_LYRICS_COLORS,
+	DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+	getDesktopLyricsColor,
+	setDesktopLyricsColor,
+	PRESET_DESKTOP_LYRICS_COLORS,
+	DEFAULT_DESKTOP_LYRICS_COLOR,
 	type LyricSearchCandidate,
 	type PreferredLyricSource,
 	type LyricFontSizes,
@@ -58,6 +67,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [adoptedCandidateId, setAdoptedCandidateId] = useState<string | number | null>(null)
 	const [adoptedSource, setAdoptedSource] = useState<string | null>(null)
 	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
+	const [highlightColor, setHighlightColor] = useState<string>(() => getLyricsHighlightColor())
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
 	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
@@ -323,7 +333,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 									: 'text-muted-foreground hover:text-foreground'
 							}`}
 						>
-							字号大小
+							字号色彩
 						</button>
 					</div>
 
@@ -588,12 +598,85 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 						</div>
 					)}
 
-					{/* Tab 4: Typography / 字号大小调节 */}
+					{/* Tab 4: Typography & Color / 字号与色彩调节 */}
 					{activeTab === 'typography' && (
 						<div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-1 select-none">
 							<p className="text-xs text-muted-foreground leading-relaxed">
-								独立微调全屏沉浸歌词与桌面歌词各行文本的字体尺寸：
+								微调全屏模式与桌面悬浮歌词的高亮字体色彩（包含正文、翻译与罗马音），以及歌词文本尺寸：
 							</p>
+
+							{/* Lyrics Custom Highlight Color Card */}
+							<div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-3 text-xs">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-2">
+										<Palette className="w-4 h-4 text-primary" />
+										<span className="font-semibold text-foreground">歌词字体高亮颜色</span>
+									</div>
+									<div className="flex items-center gap-2">
+										<div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/30 border border-white/10">
+											<span
+												className="w-3 h-3 rounded-full border border-white/30 shadow-sm shrink-0"
+												style={{ backgroundColor: highlightColor }}
+											/>
+											<span className="font-mono text-[10px] text-foreground font-semibold uppercase">
+												{highlightColor}
+											</span>
+										</div>
+										<label
+											className="relative cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
+											title="打开调色板选取任意颜色"
+										>
+											<input
+												type="color"
+												value={highlightColor}
+												onChange={(e) => {
+													const col = e.target.value
+													setHighlightColor(col)
+													setLyricsHighlightColor(col)
+												}}
+												className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+											/>
+											<span>调色盘</span>
+										</label>
+									</div>
+								</div>
+
+								{/* Color Presets */}
+								<div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-0.5">
+									{PRESET_LYRICS_COLORS.map((preset) => {
+										const isSelected =
+											highlightColor.toLowerCase() === preset.value.toLowerCase()
+										return (
+											<button
+												key={preset.value}
+												type="button"
+												onClick={() => {
+													setHighlightColor(preset.value)
+													setLyricsHighlightColor(preset.value)
+												}}
+												className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all ${
+													isSelected
+														? 'bg-white/10 border-primary ring-1 ring-primary/50'
+														: 'bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10'
+												}`}
+												title={`${preset.label} (${preset.value})`}
+											>
+												<span
+													className="w-4 h-4 rounded-full border border-white/20 shadow-sm flex items-center justify-center"
+													style={{ backgroundColor: preset.value }}
+												>
+													{isSelected && (
+														<Check className="w-2.5 h-2.5 text-black drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
+													)}
+												</span>
+												<span className="text-[10px] text-muted-foreground font-medium truncate max-w-full">
+													{preset.label}
+												</span>
+											</button>
+										)
+									})}
+								</div>
+							</div>
 
 							{/* Sliders Card */}
 							<div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-4 text-xs">
@@ -682,11 +765,13 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 											const def = { main: 24, trans: 15, roma: 13 }
 											setFontSizes(def)
 											setLyricFontSizes(def)
+											setHighlightColor(DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+											setLyricsHighlightColor(DEFAULT_LYRICS_HIGHLIGHT_COLOR)
 										}}
 										className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium flex items-center gap-1.5 transition-colors"
 									>
 										<RotateCcw className="w-3 h-3" />
-										<span>恢复默认字号</span>
+										<span>恢复默认字号与颜色</span>
 									</button>
 								</div>
 							</div>
@@ -700,22 +785,34 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								<div className="pt-2 text-center space-y-1.5">
 									{includeRomaji && (
 										<p
-											className="font-mono text-white/55 tracking-wider truncate"
-											style={{ fontSize: `${fontSizes.roma}px` }}
+											className="font-mono tracking-wider truncate"
+											style={{
+												fontSize: `${fontSizes.roma}px`,
+												color: highlightColor,
+												opacity: 0.85,
+											}}
 										>
 											kimi to mita yuki no hana ga
 										</p>
 									)}
 									<p
-										className="font-bold text-primary tracking-wide drop-shadow-[0_2px_12px_rgba(var(--primary-rgb),0.5)] truncate"
-										style={{ fontSize: `${fontSizes.main}px` }}
+										className="font-bold tracking-wide truncate"
+										style={{
+											fontSize: `${fontSizes.main}px`,
+											color: highlightColor,
+											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
+										}}
 									>
 										君と見た雪の華が
 									</p>
 									{includeTranslation && (
 										<p
-											className="font-medium text-sky-200/85 truncate"
-											style={{ fontSize: `${fontSizes.trans}px` }}
+											className="font-medium truncate"
+											style={{
+												fontSize: `${fontSizes.trans}px`,
+												color: highlightColor,
+												opacity: 0.9,
+											}}
 										>
 											与你一同看过的雪之花
 										</p>

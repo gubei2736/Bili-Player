@@ -7,6 +7,7 @@ import {
 	getStoredLyricOffset,
 	getAutoMatchLyricsEnabled,
 	getLyricFontSizes,
+	getLyricsHighlightColor,
 	type LyricFontSizes,
 } from '../../services/lyricService'
 import { parseSpl, type SplLyricData } from '@bbplayer/splash'
@@ -41,10 +42,27 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const [lyricOffsetSec, setLyricOffsetSec] = useState(0)
 	const [autoMatchEnabled, setAutoMatchEnabled] = useState(() => getAutoMatchLyricsEnabled())
 	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
+	const [highlightColor, setHighlightColor] = useState(() => getLyricsHighlightColor())
 	const lyricsContainerRef = useRef<HTMLDivElement | null>(null)
 	const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 	const haloCanvasRef = useRef<HTMLCanvasElement | null>(null)
 	const [isWindowFullscreen, setIsWindowFullscreen] = useState(false)
+
+	// 监听歌词字体高亮色彩变更
+	useEffect(() => {
+		const handleColorChange = (e: Event) => {
+			const customEvt = e as CustomEvent<{ color: string }>
+			if (customEvt.detail?.color) {
+				setHighlightColor(customEvt.detail.color)
+			}
+		}
+		window.addEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
+		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
+		return () => {
+			window.removeEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
+			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
+		}
+	}, [])
 
 	// 检查并同步当前应用窗口是否处于全屏状态
 	useEffect(() => {
@@ -176,9 +194,13 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		})
 
 		let animId: number
-		const updateLoop = () => {
-			if (desktopAudioEngine.isPlaying()) {
-				setCurrentTime(desktopAudioEngine.getCurrentTime())
+		let lastUpdate = 0
+		const updateLoop = (now: number) => {
+			if (now - lastUpdate >= 16) {
+				lastUpdate = now
+				if (desktopAudioEngine.isPlaying()) {
+					setCurrentTime(desktopAudioEngine.getCurrentTime())
+				}
 			}
 			animId = requestAnimationFrame(updateLoop)
 		}
@@ -231,6 +253,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	}, [activeIndex, isOpen])
 
 	// Audio Halo Visualizer on Left Cover
+	// ⚡ 性能优化：改用 ResizeObserver 仅在实际缩放时重置显存纹理，杜绝每帧重复分配显存，并支持后台休眠
 	useEffect(() => {
 		if (!isOpen) return
 		const canvas = haloCanvasRef.current
@@ -239,40 +262,68 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		if (!ctx) return
 
 		let animId: number
+		let lastHalo = 0
 		const freqBuffer = new Uint8Array(128)
 
-		const renderHalo = () => {
-			desktopAudioEngine.getFrequencyData(freqBuffer)
-			let sum = 0
-			for (let i = 0; i < 32; i++) {
-				sum += freqBuffer[i]!
+		let currentW = (canvas.width = canvas.offsetWidth || 300)
+		let currentH = (canvas.height = canvas.offsetHeight || 300)
+
+		const ro = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				const { width, height } = entry.contentRect
+				if (width > 0 && height > 0) {
+					currentW = canvas.width = Math.round(width)
+					currentH = canvas.height = Math.round(height)
+				}
 			}
-			const avgEnergy = sum / 32 / 255 // 0.0 to 1.0
+		})
+		ro.observe(canvas)
 
-			const w = (canvas.width = canvas.offsetWidth)
-			const h = (canvas.height = canvas.offsetHeight)
-			ctx.clearRect(0, 0, w, h)
+		const renderHalo = (now: number) => {
+			// 后台/最小化休眠
+			if (document.hidden) {
+				animId = requestAnimationFrame(renderHalo)
+				return
+			}
 
-			const cx = w / 2
-			const cy = h / 2
-			const baseR = Math.min(w, h) * 0.42
-			const pulseR = baseR + avgEnergy * 28
+			// ⚡ 限制音频光晕为 60FPS，防止高刷屏下过量重绘损耗 GPU
+			if (now - lastHalo >= 16) {
+				lastHalo = now
+				desktopAudioEngine.getFrequencyData(freqBuffer)
+				let sum = 0
+				for (let i = 0; i < 32; i++) {
+					sum += freqBuffer[i]!
+				}
+				const avgEnergy = sum / 32 / 255 // 0.0 to 1.0
 
-			const grad = ctx.createRadialGradient(cx, cy, baseR * 0.8, cx, cy, pulseR)
-			grad.addColorStop(0, 'rgba(0, 174, 236, 0.4)')
-			grad.addColorStop(0.5, 'rgba(255, 46, 147, 0.3)')
-			grad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+				const w = currentW
+				const h = currentH
+				ctx.clearRect(0, 0, w, h)
 
-			ctx.fillStyle = grad
-			ctx.beginPath()
-			ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
-			ctx.fill()
+				const cx = w / 2
+				const cy = h / 2
+				const baseR = Math.min(w, h) * 0.42
+				const pulseR = baseR + avgEnergy * 28
+
+				const grad = ctx.createRadialGradient(cx, cy, baseR * 0.8, cx, cy, pulseR)
+				grad.addColorStop(0, 'rgba(0, 174, 236, 0.4)')
+				grad.addColorStop(0.5, 'rgba(255, 46, 147, 0.3)')
+				grad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+
+				ctx.fillStyle = grad
+				ctx.beginPath()
+				ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
+				ctx.fill()
+			}
 
 			animId = requestAnimationFrame(renderHalo)
 		}
 
 		animId = requestAnimationFrame(renderHalo)
-		return () => cancelAnimationFrame(animId)
+		return () => {
+			ro.disconnect()
+			cancelAnimationFrame(animId)
+		}
 	}, [isOpen])
 
 	const customBgUrl = useSkinStore((s) => s.customBgUrl)
@@ -477,7 +528,7 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 																key={sIdx}
 																className="inline-block transition-all duration-75"
 																style={{
-																	background: `linear-gradient(to right, #00AEEC ${fillPct}%, rgba(255, 255, 255, 0.5) ${fillPct}%)`,
+																	background: `linear-gradient(to right, ${highlightColor} ${fillPct}%, rgba(255, 255, 255, 0.5) ${fillPct}%)`,
 																	WebkitBackgroundClip: 'text',
 																	WebkitTextFillColor: 'transparent',
 																}}
@@ -488,9 +539,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 													})
 												) : (
 													<span
+														style={{ color: isActive ? highlightColor : undefined }}
 														className={
 															isActive
-																? 'text-primary drop-shadow-[0_2px_12px_rgba(0,174,236,0.6)]'
+																? 'font-bold'
 																: 'text-white/60'
 														}
 													>
@@ -502,8 +554,12 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											{/* Romaji syllable translation */}
 											{line.romaji && (
 												<p
-													className="text-white/50 font-mono mt-1"
-													style={{ fontSize: `${fontSizes.roma}px` }}
+													className="font-mono mt-1 transition-colors"
+													style={{
+														fontSize: `${fontSizes.roma}px`,
+														color: isActive ? highlightColor : undefined,
+														opacity: isActive ? 0.85 : 0.5,
+													}}
 												>
 													{line.romaji}
 												</p>
@@ -512,8 +568,12 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											{/* Bilingual translated line */}
 											{line.translation && (
 												<p
-													className="text-sky-200/75 mt-1 font-medium"
-													style={{ fontSize: `${fontSizes.trans}px` }}
+													className="mt-1 font-medium transition-colors"
+													style={{
+														fontSize: `${fontSizes.trans}px`,
+														color: isActive ? highlightColor : undefined,
+														opacity: isActive ? 0.9 : 0.65,
+													}}
 												>
 													{line.translation}
 												</p>

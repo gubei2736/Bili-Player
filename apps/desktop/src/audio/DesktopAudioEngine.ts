@@ -44,7 +44,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	private analyserNode: AnalyserNode | null = null
 
 	private currentTrack: Track | null = null
-	private loudnessNormalizationEnabled = true
+	private loudnessNormalizationEnabled = false
 	private currentLoudnessGainDb = 0
 	private listeners: Set<PlaybackListener> = new Set()
 
@@ -61,8 +61,12 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			const saved = localStorage.getItem('bbplayer_audio_volume_balance')
 			if (saved !== null) {
 				this.loudnessNormalizationEnabled = saved === 'true'
+			} else {
+				this.loudnessNormalizationEnabled = false
 			}
-		} catch {}
+		} catch {
+			this.loudnessNormalizationEnabled = false
+		}
 		this.setupEventListeners()
 	}
 
@@ -300,6 +304,31 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			currentTime: this.getCurrentTime(),
 			duration: track.duration || this.getDuration(),
 			track,
+		})
+	}
+
+	/**
+	 * 在准备切歌时立即调用：瞬间中止上一首音频的发声，防止在获取下一首音频流的等待期间旧歌继续播放
+	 */
+	public prepareTrackSwitch(track?: Track): void {
+		try {
+			this.audio.pause()
+		} catch {}
+		if (track) {
+			this.currentTrack = track
+			this.updateMediaSession(track)
+			this.emit({
+				type: 'trackchange',
+				currentTime: 0,
+				duration: track.duration || 0,
+				track,
+			})
+		}
+		this.emit({
+			type: 'pause',
+			currentTime: 0,
+			duration: track?.duration || 0,
+			track: track || this.currentTrack,
 		})
 	}
 

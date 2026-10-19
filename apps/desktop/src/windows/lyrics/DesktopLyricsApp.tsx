@@ -11,7 +11,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { emit, listen } from '@tauri-apps/api/event'
 import { parseSpl, type SplLyricData, type LyricLine } from '@bbplayer/splash'
-import { getLyricFontSizes } from '../../services/lyricService'
+import { getLyricFontSizes, getDesktopLyricsColor } from '../../services/lyricService'
 
 export type LyricsSyncEvent =
 	| {
@@ -52,7 +52,7 @@ export const DesktopLyricsApp: React.FC = () => {
 			return 24
 		}
 	})
-	const [primaryColor, setPrimaryColor] = useState('#00AEEC')
+	const [primaryColor, setPrimaryColor] = useState<string>(() => getDesktopLyricsColor())
 
 	// 高精度本地时钟插值锚点，彻底消除 200ms IPC 节流带来的逐字卡顿
 	const syncAnchorRef = useRef<{
@@ -124,6 +124,13 @@ export const DesktopLyricsApp: React.FC = () => {
 			},
 		)
 
+		const handleLocalColorChange = (e: any) => {
+			if (e.detail?.color) {
+				setPrimaryColor(e.detail.color)
+			}
+		}
+		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
+
 		// 窗口挂载时，主动拉取 Rust 端真实的穿透锁定状态，并通知主窗口补发当前歌词状态
 		invoke<boolean>('is_lyrics_locked')
 			.then((locked) => {
@@ -136,6 +143,7 @@ export const DesktopLyricsApp: React.FC = () => {
 		return () => {
 			unlistenSyncPromise.then((unlisten) => unlisten())
 			unlistenLockPromise.then((unlisten) => unlisten())
+			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
 		}
 	}, [])
 
@@ -155,16 +163,20 @@ export const DesktopLyricsApp: React.FC = () => {
 		return lyricsData.lines[0] || null
 	}, [lyricsData, displayTimeMs])
 
-	// 60FPS / 144FPS 本地平滑插值循环：仅在播放中且存在歌词时运行
+	// 60FPS 本地平滑插值循环：仅在播放中且存在歌词时运行，限制最高 60FPS 消除高刷屏（180Hz/240Hz）多余重绘与 DWM 混色开销
 	useEffect(() => {
 		if (!isPlaying || !lyricsData || lyricsData.lines.length === 0) return
 
 		let rafId: number
-		const tick = () => {
-			const { baseTimeMs, perfNow, isPlaying: playing } = syncAnchorRef.current
-			if (playing) {
-				const elapsed = performance.now() - perfNow
-				setDisplayTimeMs(baseTimeMs + elapsed)
+		let lastTick = 0
+		const tick = (now: number) => {
+			if (now - lastTick >= 16) {
+				lastTick = now
+				const { baseTimeMs, perfNow, isPlaying: playing } = syncAnchorRef.current
+				if (playing) {
+					const elapsed = performance.now() - perfNow
+					setDisplayTimeMs(baseTimeMs + elapsed)
+				}
 			}
 			rafId = requestAnimationFrame(tick)
 		}
@@ -337,11 +349,12 @@ export const DesktopLyricsApp: React.FC = () => {
 								{/* Romaji subline if available */}
 								{activeLine.romaji && (
 									<p
-										className="text-white/90 font-mono tracking-wider truncate max-w-full pointer-events-none"
+										className="font-mono tracking-wider truncate max-w-full pointer-events-none"
 										style={{
 											fontSize: `${romajiFontSize}px`,
-											filter:
-												'drop-shadow(0 1px 2px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.9))',
+											color: primaryColor,
+											opacity: 0.85,
+											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
 									>
 										{activeLine.romaji}
@@ -353,8 +366,7 @@ export const DesktopLyricsApp: React.FC = () => {
 									className="font-black tracking-wide leading-snug max-w-full line-clamp-2 px-2 pointer-events-none"
 									style={{
 										fontSize: `${fontSize}px`,
-										filter:
-											'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.9)) drop-shadow(0 0 2px rgba(0,0,0,1))',
+										filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))',
 									}}
 								>
 									{activeLine.isDynamic &&
@@ -388,10 +400,7 @@ export const DesktopLyricsApp: React.FC = () => {
 											)
 										})
 									) : (
-										<span
-											style={{ color: primaryColor }}
-											className="drop-shadow-[0_2px_12px_rgba(0,174,236,0.8)]"
-										>
+										<span style={{ color: primaryColor }}>
 											{activeLine.content}
 										</span>
 									)}
@@ -400,11 +409,12 @@ export const DesktopLyricsApp: React.FC = () => {
 								{/* Chinese Translation line */}
 								{activeLine.translation && (
 									<p
-										className="text-sky-200 font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
+										className="font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
 										style={{
 											fontSize: `${transFontSize}px`,
-											filter:
-												'drop-shadow(0 1px 3px rgba(0,0,0,0.95)) drop-shadow(0 0 6px rgba(0,0,0,0.85))',
+											color: primaryColor,
+											opacity: 0.9,
+											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
 									>
 										{activeLine.translation}
@@ -417,8 +427,7 @@ export const DesktopLyricsApp: React.FC = () => {
 									className="font-bold text-white tracking-wide"
 									style={{
 										fontSize: `${fontSize}px`,
-										filter:
-											'drop-shadow(0 2px 6px rgba(0,0,0,0.95)) drop-shadow(0 0 10px rgba(0,0,0,0.85))',
+										filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
 									}}
 								>
 									{title}
@@ -426,7 +435,7 @@ export const DesktopLyricsApp: React.FC = () => {
 								<p
 									className="text-xs text-white/80 font-medium tracking-wider"
 									style={{
-										filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))',
+										filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 									}}
 								>
 									{artist}
