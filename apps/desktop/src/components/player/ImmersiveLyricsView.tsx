@@ -79,6 +79,9 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const progressBarFillRef = useRef<HTMLDivElement | null>(null)
 	const progressThumbRef = useRef<HTMLDivElement | null>(null)
 	const timeTextSpanRef = useRef<HTMLSpanElement | null>(null)
+	const isDraggingProgressRef = useRef(false)
+	isDraggingProgressRef.current = isDraggingProgress
+	const seekLockUntilRef = useRef<number>(0)
 
 	// 监听歌词字体色彩变更
 	useEffect(() => {
@@ -244,7 +247,9 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		setCurrentTime(desktopAudioEngine.getCurrentTime())
 		const unsubscribe = desktopAudioEngine.subscribe((event) => {
 			if (event.type === 'timeupdate') {
-				setCurrentTime(event.currentTime)
+				if (!isDraggingProgressRef.current && performance.now() > seekLockUntilRef.current) {
+					setCurrentTime(event.currentTime)
+				}
 			}
 		})
 
@@ -253,8 +258,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		const updateLoop = (now: number) => {
 			if (now - lastUpdate >= 16) {
 				lastUpdate = now
-				if (desktopAudioEngine.isPlaying()) {
-					setCurrentTime(desktopAudioEngine.getCurrentTime())
+				if (!isDraggingProgressRef.current && performance.now() > seekLockUntilRef.current) {
+					if (desktopAudioEngine.isPlaying()) {
+						setCurrentTime(desktopAudioEngine.getCurrentTime())
+					}
 				}
 			}
 			animId = requestAnimationFrame(updateLoop)
@@ -400,10 +407,13 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const handleProgressPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.currentTarget.setPointerCapture(e.pointerId)
 		setIsDraggingProgress(true)
+		seekLockUntilRef.current = performance.now() + 400
 		const p = calculateProgressFromPointer(e)
 		setDragProgress(p)
+		const targetSec = p * duration
+		setCurrentTime(targetSec)
 		if (timeTextSpanRef.current) {
-			timeTextSpanRef.current.textContent = formatTime(p * duration)
+			timeTextSpanRef.current.textContent = formatTime(targetSec)
 		}
 		if (progressBarFillRef.current) {
 			progressBarFillRef.current.style.width = `${p * 100}%`
@@ -418,8 +428,11 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		setHoverProgress(p)
 		if (isDraggingProgress) {
 			setDragProgress(p)
+			seekLockUntilRef.current = performance.now() + 400
+			const targetSec = p * duration
+			setCurrentTime(targetSec)
 			if (timeTextSpanRef.current) {
-				timeTextSpanRef.current.textContent = formatTime(p * duration)
+				timeTextSpanRef.current.textContent = formatTime(targetSec)
 			}
 			if (progressBarFillRef.current) {
 				progressBarFillRef.current.style.width = `${p * 100}%`
@@ -433,9 +446,22 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 	const handleProgressPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
 		if (isDraggingProgress) {
 			const p = calculateProgressFromPointer(e)
+			const targetSec = p * duration
+			seekLockUntilRef.current = performance.now() + 400
+			setCurrentTime(targetSec)
 			setIsDraggingProgress(false)
+			if (timeTextSpanRef.current) {
+				timeTextSpanRef.current.textContent = formatTime(targetSec)
+			}
+			if (progressBarFillRef.current) {
+				progressBarFillRef.current.style.width = `${p * 100}%`
+			}
+			if (progressThumbRef.current) {
+				progressThumbRef.current.style.left = `${p * 100}%`
+			}
 			if (duration > 0) {
-				desktopAudioEngine.seek(p * duration)
+				desktopAudioEngine.seek(targetSec)
+				desktopAudioEngine.play().catch(() => {})
 			}
 		}
 		try {
@@ -842,41 +868,42 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 							isDraggingVolume ? 'opacity-100' : 'opacity-0 hover:opacity-100'
 						}`}
 					>
-						<div className="bg-black/60 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 flex flex-col items-center gap-3 shadow-2xl">
-							<span className="text-[10px] font-mono font-bold text-white/80 select-none">
+						<div className="bg-black/35 backdrop-blur-xl border border-white/10 rounded-2xl p-2.5 flex flex-col items-center gap-3 shadow-2xl">
+							<span className="text-[10px] font-mono font-bold text-white/70 select-none">
 								{Math.round((isMuted ? 0 : volume) * 100)}%
 							</span>
 
-							{/* Vertical Slider Track */}
+							{/* Vertical Slider Track (Double height: h-56) */}
 							<div
 								ref={volumeBarRef}
 								onPointerDown={handleVolumePointerDown}
 								onPointerMove={handleVolumePointerMove}
 								onPointerUp={handleVolumePointerUp}
-								className="relative w-2 h-28 flex flex-col justify-end items-center cursor-pointer group/vtrack py-1"
+								className="relative w-2 h-56 flex flex-col justify-end items-center cursor-pointer group/vtrack py-1"
 							>
-								<div className="w-1.5 h-full bg-white/15 rounded-full overflow-hidden flex flex-col justify-end">
+								<div className="w-1.5 h-full bg-white/15 rounded-full overflow-hidden flex flex-col justify-end backdrop-blur-sm">
 									<div
 										className="w-full rounded-full transition-all"
 										style={{
 											height: `${(isMuted ? 0 : volume) * 100}%`,
 											backgroundColor: primaryColor,
+											opacity: 0.75,
 										}}
 									/>
 								</div>
 								{/* Thumb */}
 								<div
-									className="w-3 h-3 rounded-full bg-white border border-white/80 pointer-events-none absolute -translate-y-1/2 shadow-md transition-transform group-hover/vtrack:scale-125"
+									className="w-3 h-3 rounded-full bg-white/80 backdrop-blur-sm border border-white/50 pointer-events-none absolute -translate-y-1/2 shadow-md transition-transform group-hover/vtrack:scale-125"
 									style={{
 										bottom: `calc(${(isMuted ? 0 : volume) * 100}% - 6px)`,
-										boxShadow: `0 0 6px ${primaryColor}, 0 2px 4px rgba(0,0,0,0.5)`,
+										boxShadow: `0 0 8px ${primaryColor}80, 0 2px 4px rgba(0,0,0,0.3)`,
 									}}
 								/>
 							</div>
 
 							<button
 								onClick={toggleMute}
-								className="p-1 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+								className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
 								title={isMuted ? '取消静音' : '静音'}
 							>
 								{isMuted || volume === 0 ? (
