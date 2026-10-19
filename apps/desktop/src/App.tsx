@@ -23,6 +23,7 @@ import {
 	getStoredCustomLyric,
 } from './services/lyricService'
 import { SkinStoreView, applyFontColorToDom } from './components/views/SkinStoreView'
+import { getWallpaperFromDb } from './utils/wallpaperStorage'
 import { HistoryHeatmapView } from './components/views/HistoryHeatmapView'
 import { SearchView } from './components/views/SearchView'
 import { FavoritesView } from './components/views/FavoritesView'
@@ -290,6 +291,21 @@ export const App: React.FC = () => {
 		if (!useAuthStore.getState().isLoggedIn) {
 			loginQrService.getOrFetch().catch(() => {})
 		}
+
+		// 从 IndexedDB 读取并稳定恢复用户自定义图片/视频壁纸，避免 Base64 塞满 localStorage 导致重启丢失
+		getWallpaperFromDb()
+			.then((record) => {
+				if (record && record.url) {
+					const skinState = useSkinStore.getState()
+					skinState.setCustomBg(
+						record.url,
+						skinState.customBgOpacity,
+						skinState.customBgBlur,
+						record.type,
+					)
+				}
+			})
+			.catch((e) => console.warn('Restore wallpaper note:', e))
 	}, [])
 
 	// 2. Initialize active theme skin colors & font colors
@@ -1060,6 +1076,7 @@ export const App: React.FC = () => {
 				track={currentTrack}
 				splContent={activeSplContent}
 				isMatching={isMatchingLyrics}
+				onLyricsUpdated={(spl) => setActiveSplContent(spl)}
 			/>
 		</>
 	)

@@ -11,7 +11,12 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { emit, listen } from '@tauri-apps/api/event'
 import { parseSpl, type SplLyricData, type LyricLine } from '@bbplayer/splash'
-import { getLyricFontSizes, getDesktopLyricsColor } from '../../services/lyricService'
+import {
+	getLyricFontSizes,
+	getDesktopLyricsColor,
+	getLyricColors,
+	type LyricColors,
+} from '../../services/lyricService'
 
 export type LyricsSyncEvent =
 	| {
@@ -29,9 +34,11 @@ export type LyricsSyncEvent =
 	  }
 	| {
 			type: 'STYLE_UPDATE'
-			fontSize: number
-			primaryColor: string
-			lockMouse: boolean
+			fontSize?: number
+			primaryColor?: string
+			transColor?: string
+			romaColor?: string
+			lockMouse?: boolean
 	  }
 
 const FONT_SIZE_STORAGE_KEY = 'bbplayer_desktop_lyrics_fontsize'
@@ -53,6 +60,8 @@ export const DesktopLyricsApp: React.FC = () => {
 		}
 	})
 	const [primaryColor, setPrimaryColor] = useState<string>(() => getDesktopLyricsColor())
+	const [transColor, setTransColor] = useState<string>(() => getLyricColors().trans)
+	const [romaColor, setRomaColor] = useState<string>(() => getLyricColors().roma)
 
 	// 高精度本地时钟插值锚点，彻底消除 200ms IPC 节流带来的逐字卡顿
 	const syncAnchorRef = useRef<{
@@ -106,9 +115,11 @@ export const DesktopLyricsApp: React.FC = () => {
 					setIsPlaying(payload.isPlaying)
 					setDisplayTimeMs(payload.currentTimeMs)
 				} else if (payload.type === 'STYLE_UPDATE') {
-					if (payload.fontSize) setFontSize(payload.fontSize)
+					if (payload.fontSize !== undefined) setFontSize(payload.fontSize)
 					if (payload.primaryColor) setPrimaryColor(payload.primaryColor)
-					setIsLocked(payload.lockMouse)
+					if (payload.transColor) setTransColor(payload.transColor)
+					if (payload.romaColor) setRomaColor(payload.romaColor)
+					if (payload.lockMouse !== undefined) setIsLocked(payload.lockMouse)
 				}
 			},
 		)
@@ -129,7 +140,15 @@ export const DesktopLyricsApp: React.FC = () => {
 				setPrimaryColor(e.detail.color)
 			}
 		}
+		const handleAllColorsChange = (e: any) => {
+			if (e.detail) {
+				if (e.detail.main) setPrimaryColor(e.detail.main)
+				if (e.detail.trans) setTransColor(e.detail.trans)
+				if (e.detail.roma) setRomaColor(e.detail.roma)
+			}
+		}
 		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
+		window.addEventListener('bbplayer:lyric-colors-change', handleAllColorsChange)
 
 		// 窗口挂载时，主动拉取 Rust 端真实的穿透锁定状态，并通知主窗口补发当前歌词状态
 		invoke<boolean>('is_lyrics_locked')
@@ -144,6 +163,7 @@ export const DesktopLyricsApp: React.FC = () => {
 			unlistenSyncPromise.then((unlisten) => unlisten())
 			unlistenLockPromise.then((unlisten) => unlisten())
 			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
+			window.removeEventListener('bbplayer:lyric-colors-change', handleAllColorsChange)
 		}
 	}, [])
 
@@ -352,7 +372,7 @@ export const DesktopLyricsApp: React.FC = () => {
 										className="font-mono tracking-wider truncate max-w-full pointer-events-none"
 										style={{
 											fontSize: `${romajiFontSize}px`,
-											color: primaryColor,
+											color: romaColor,
 											opacity: 0.85,
 											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
@@ -412,7 +432,7 @@ export const DesktopLyricsApp: React.FC = () => {
 										className="font-medium tracking-wide truncate max-w-full pt-0.5 pointer-events-none"
 										style={{
 											fontSize: `${transFontSize}px`,
-											color: primaryColor,
+											color: transColor,
 											opacity: 0.9,
 											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}

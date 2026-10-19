@@ -6,11 +6,13 @@ import {
 	AppWindow,
 	Music,
 	Sparkles,
+	ExternalLink,
 } from 'lucide-react'
 import { AudioQualitySettingsCard } from './AudioQualitySettingsCard'
 import { LyricsSettingsCard } from './LyricsSettingsCard'
 import { CacheSettingsCard } from './CacheSettingsCard'
 import { ShortcutsSettingsView } from './ShortcutsSettingsView'
+import { openExternalUrl } from '../../utils/openUrl'
 
 export interface SettingsViewProps {
 	customExportDir: string | null
@@ -212,7 +214,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
 						<div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] text-muted-foreground">
 							<span>Windows x64 · Tauri 2.0 原生架构</span>
-							<span className="text-emerald-400 font-medium">已是最新版本</span>
+							<button
+								onClick={() =>
+									openExternalUrl('https://github.com/gubei2736/Bili-Player')
+								}
+								className="text-emerald-400 hover:text-emerald-300 font-medium hover:underline inline-flex items-center gap-1 transition-colors cursor-pointer"
+								title="前往 GitHub 仓库查看最新版本"
+							>
+								<span>查看最新版本</span>
+								<ExternalLink className="w-3 h-3" />
+							</button>
 						</div>
 					</div>
 				</div>

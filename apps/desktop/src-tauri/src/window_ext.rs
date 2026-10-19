@@ -566,3 +566,31 @@ pub fn clear_app_cache(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn toggle_main_window_fullscreen(app: AppHandle) -> Result<bool, String> {
+    if let Some(main_win) = app.get_webview_window("main") {
+        let is_fs = main_win.is_fullscreen().map_err(|e| e.to_string())?;
+        main_win.set_fullscreen(!is_fs).map_err(|e| e.to_string())?;
+        Ok(!is_fs)
+    } else {
+        Err("main window not found".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn is_main_window_fullscreen(app: AppHandle) -> Result<bool, String> {
+    if let Some(main_win) = app.get_webview_window("main") {
+        main_win.is_fullscreen().map_err(|e| e.to_string())
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+pub fn set_main_window_fullscreen(app: AppHandle, fullscreen: bool) -> Result<(), String> {
+    if let Some(main_win) = app.get_webview_window("main") {
+        main_win.set_fullscreen(fullscreen).map_err(|e| e.to_string())
+    } else {
+        Err("main window not found".to_string())
+    }
+}

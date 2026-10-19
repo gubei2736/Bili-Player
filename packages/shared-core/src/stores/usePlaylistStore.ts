@@ -11,17 +11,22 @@ import { getDefaultStateStorage } from './storage'
 
 export interface PlaylistState {
 	selectedPlaylistId: number | null
+	selectedCollectionId: number | null
 	favoritePlaylists: BilibiliPlaylist[]
 	collections: BilibiliCollection[]
 	playlistTracksCache: Record<number, BilibiliTrack[]>
+	collectionTracksCache: Record<number, BilibiliTrack[]>
 	isLoading: boolean
 	error: string | null
 
 	setSelectedPlaylistId: (id: number | null) => void
+	setSelectedCollectionId: (id: number | null) => void
 	setFavoritePlaylists: (list: BilibiliPlaylist[]) => void
 	setCollections: (list: BilibiliCollection[]) => void
 	setPlaylistTracksCache: (favoriteId: number, tracks: BilibiliTrack[]) => void
 	clearPlaylistTracksCache: (favoriteId?: number) => void
+	setCollectionTracksCache: (collectionId: number, tracks: BilibiliTrack[]) => void
+	clearCollectionTracksCache: (collectionId?: number) => void
 	syncRemotePlaylists: (userMid: number) => Promise<void>
 }
 
@@ -29,14 +34,20 @@ export const usePlaylistStore = create<PlaylistState>()(
 	persist(
 		(set, get) => ({
 			selectedPlaylistId: null,
+			selectedCollectionId: null,
 			favoritePlaylists: [],
 			collections: [],
 			playlistTracksCache: {},
+			collectionTracksCache: {},
 			isLoading: false,
 			error: null,
 
 			setSelectedPlaylistId: (id) => {
 				set({ selectedPlaylistId: id })
+			},
+
+			setSelectedCollectionId: (id) => {
+				set({ selectedCollectionId: id })
 			},
 
 			setFavoritePlaylists: (list) => {
@@ -64,6 +75,26 @@ export const usePlaylistStore = create<PlaylistState>()(
 						return { playlistTracksCache: next }
 					}
 					return { playlistTracksCache: {} }
+				})
+			},
+
+			setCollectionTracksCache: (collectionId, tracks) => {
+				set((state) => ({
+					collectionTracksCache: {
+						...state.collectionTracksCache,
+						[collectionId]: tracks,
+					},
+				}))
+			},
+
+			clearCollectionTracksCache: (collectionId) => {
+				set((state) => {
+					if (collectionId !== undefined) {
+						const next = { ...state.collectionTracksCache }
+						delete next[collectionId]
+						return { collectionTracksCache: next }
+					}
+					return { collectionTracksCache: {} }
 				})
 			},
 
@@ -100,9 +131,11 @@ export const usePlaylistStore = create<PlaylistState>()(
 			storage: createJSONStorage(() => getDefaultStateStorage()),
 			partialize: (state) => ({
 				selectedPlaylistId: state.selectedPlaylistId,
+				selectedCollectionId: state.selectedCollectionId,
 				favoritePlaylists: state.favoritePlaylists,
 				collections: state.collections,
 				playlistTracksCache: state.playlistTracksCache,
+				collectionTracksCache: state.collectionTracksCache,
 			}),
 		},
 	),

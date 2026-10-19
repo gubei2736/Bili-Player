@@ -209,10 +209,12 @@ export function setLyricFontSizes(sizes: Partial<LyricFontSizes>): void {
 }
 
 // -------------------------------------------------------------
-// 歌词主字体高亮颜色管理 (自定义色值，同时作用于全屏歌词与桌面歌词)
+// 歌词字体颜色管理 (正文歌词、翻译歌词、罗马音注音独立自定义，同时作用于全屏歌词与桌面歌词)
 // -------------------------------------------------------------
 const LYRICS_HIGHLIGHT_COLOR_KEY = 'bbplayer_lyrics_highlight_color'
 const DESKTOP_LYRICS_COLOR_KEY = 'bbplayer_desktop_lyrics_color'
+const LYRICS_TRANS_COLOR_KEY = 'bbplayer_lyrics_trans_color'
+const LYRICS_ROMA_COLOR_KEY = 'bbplayer_lyrics_roma_color'
 export const DEFAULT_LYRICS_HIGHLIGHT_COLOR = '#00AEEC'
 export const DEFAULT_DESKTOP_LYRICS_COLOR = DEFAULT_LYRICS_HIGHLIGHT_COLOR
 
@@ -228,41 +230,120 @@ export const PRESET_LYRICS_COLORS = [
 ]
 export const PRESET_DESKTOP_LYRICS_COLORS = PRESET_LYRICS_COLORS
 
-export function getLyricsHighlightColor(): string {
+export interface LyricColors {
+	main: string
+	trans: string
+	roma: string
+}
+
+export function getLyricColors(): LyricColors {
 	try {
-		return (
+		const main =
 			localStorage.getItem(LYRICS_HIGHLIGHT_COLOR_KEY) ||
 			localStorage.getItem(DESKTOP_LYRICS_COLOR_KEY) ||
 			DEFAULT_LYRICS_HIGHLIGHT_COLOR
-		)
+		const trans = localStorage.getItem(LYRICS_TRANS_COLOR_KEY) || main
+		const roma = localStorage.getItem(LYRICS_ROMA_COLOR_KEY) || main
+		return { main, trans, roma }
 	} catch {
-		return DEFAULT_LYRICS_HIGHLIGHT_COLOR
+		return {
+			main: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+			trans: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+			roma: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+		}
 	}
 }
 
-export function setLyricsHighlightColor(color: string): void {
+export function setLyricColor(type: 'main' | 'trans' | 'roma', color: string): void {
 	try {
-		localStorage.setItem(LYRICS_HIGHLIGHT_COLOR_KEY, color)
-		localStorage.setItem(DESKTOP_LYRICS_COLOR_KEY, color)
+		if (type === 'main') {
+			localStorage.setItem(LYRICS_HIGHLIGHT_COLOR_KEY, color)
+			localStorage.setItem(DESKTOP_LYRICS_COLOR_KEY, color)
+		} else if (type === 'trans') {
+			localStorage.setItem(LYRICS_TRANS_COLOR_KEY, color)
+		} else if (type === 'roma') {
+			localStorage.setItem(LYRICS_ROMA_COLOR_KEY, color)
+		}
+
+		const colors = getLyricColors()
 		window.dispatchEvent(
-			new CustomEvent('bbplayer:lyrics-highlight-color-change', {
-				detail: { color },
+			new CustomEvent('bbplayer:lyric-colors-change', {
+				detail: colors,
 			}),
 		)
-		window.dispatchEvent(
-			new CustomEvent('bbplayer:desktop-lyrics-color-change', {
-				detail: { color },
-			}),
-		)
+		if (type === 'main') {
+			window.dispatchEvent(
+				new CustomEvent('bbplayer:lyrics-highlight-color-change', {
+					detail: { color },
+				}),
+			)
+			window.dispatchEvent(
+				new CustomEvent('bbplayer:desktop-lyrics-color-change', {
+					detail: { color },
+				}),
+			)
+		}
+
 		import('@tauri-apps/api/event')
 			.then(({ emit }) => {
 				emit('lyrics-sync', {
 					type: 'STYLE_UPDATE',
-					primaryColor: color,
+					primaryColor: colors.main,
+					transColor: colors.trans,
+					romaColor: colors.roma,
 				}).catch(() => {})
 			})
 			.catch(() => {})
 	} catch {}
+}
+
+export function resetLyricColors(): void {
+	try {
+		localStorage.setItem(LYRICS_HIGHLIGHT_COLOR_KEY, DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+		localStorage.setItem(DESKTOP_LYRICS_COLOR_KEY, DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+		localStorage.setItem(LYRICS_TRANS_COLOR_KEY, DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+		localStorage.setItem(LYRICS_ROMA_COLOR_KEY, DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+
+		const colors = {
+			main: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+			trans: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+			roma: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+		}
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:lyric-colors-change', {
+				detail: colors,
+			}),
+		)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:lyrics-highlight-color-change', {
+				detail: { color: DEFAULT_LYRICS_HIGHLIGHT_COLOR },
+			}),
+		)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:desktop-lyrics-color-change', {
+				detail: { color: DEFAULT_LYRICS_HIGHLIGHT_COLOR },
+			}),
+		)
+
+		import('@tauri-apps/api/event')
+			.then(({ emit }) => {
+				emit('lyrics-sync', {
+					type: 'STYLE_UPDATE',
+					primaryColor: colors.main,
+					transColor: colors.trans,
+					romaColor: colors.roma,
+				}).catch(() => {})
+			})
+			.catch(() => {})
+	} catch {}
+}
+
+export function getLyricsHighlightColor(): string {
+	return getLyricColors().main
+}
+
+export function setLyricsHighlightColor(color: string): void {
+	setLyricColor('main', color)
 }
 
 export const getDesktopLyricsColor = getLyricsHighlightColor
@@ -312,6 +393,23 @@ export function markTrackAdoptedCandidate(
 			updatedAt: Date.now(),
 		}
 		setStoredTrackSearchCache(trackKey, cache)
+	} catch {}
+}
+
+export function unmarkTrackAdoptedCandidate(trackKey: string): void {
+	try {
+		const cache = getStoredTrackSearchCache(trackKey)
+		if (cache) {
+			delete cache.adoptedId
+			delete cache.adoptedSource
+			setStoredTrackSearchCache(trackKey, cache)
+		}
+		localStorage.removeItem(LYRIC_STORAGE_PREFIX + trackKey)
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:custom-lyric-change', {
+				detail: { trackKey, splContent: null },
+			}),
+		)
 	} catch {}
 }
 

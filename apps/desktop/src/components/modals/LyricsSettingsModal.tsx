@@ -31,8 +31,12 @@ import {
 	getStoredTrackSearchCache,
 	setStoredTrackSearchCache,
 	markTrackAdoptedCandidate,
+	unmarkTrackAdoptedCandidate,
 	getLyricsHighlightColor,
 	setLyricsHighlightColor,
+	getLyricColors,
+	setLyricColor,
+	resetLyricColors,
 	PRESET_LYRICS_COLORS,
 	DEFAULT_LYRICS_HIGHLIGHT_COLOR,
 	getDesktopLyricsColor,
@@ -42,6 +46,7 @@ import {
 	type LyricSearchCandidate,
 	type PreferredLyricSource,
 	type LyricFontSizes,
+	type LyricColors,
 } from '../../services/lyricService'
 
 export interface LyricsSettingsModalProps {
@@ -67,12 +72,25 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 	const [adoptedCandidateId, setAdoptedCandidateId] = useState<string | number | null>(null)
 	const [adoptedSource, setAdoptedSource] = useState<string | null>(null)
 	const [fontSizes, setFontSizes] = useState<LyricFontSizes>(() => getLyricFontSizes())
-	const [highlightColor, setHighlightColor] = useState<string>(() => getLyricsHighlightColor())
+	const [lyricColors, setLyricColors] = useState<LyricColors>(() => getLyricColors())
+	const [activeColorTarget, setActiveColorTarget] = useState<'main' | 'trans' | 'roma'>('main')
 	const [successMsg, setSuccessMsg] = useState<string | null>(null)
 	const [includeTranslation, setIncludeTranslation] = useState(() => getLyricOptionTranslation())
 	const [includeRomaji, setIncludeRomaji] = useState(() => getLyricOptionRomaji())
 	const [sourceFilter, setSourceFilter] = useState<PreferredLyricSource>(() => getPreferredLyricSource())
 	const [hasSearched, setHasSearched] = useState(false)
+
+	useEffect(() => {
+		const handleColorsChange = (e: any) => {
+			if (e.detail) {
+				setLyricColors(e.detail)
+			}
+		}
+		window.addEventListener('bbplayer:lyric-colors-change', handleColorsChange)
+		return () => {
+			window.removeEventListener('bbplayer:lyric-colors-change', handleColorsChange)
+		}
+	}, [])
 
 	const handleSearch = async (kw: string, filter = sourceFilter) => {
 		if (!kw.trim()) return
@@ -133,6 +151,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 			setOffsetSec(getStoredLyricOffset(track.uniqueKey))
 			setCustomText(getStoredCustomLyric(track.uniqueKey) || '')
 			setFontSizes(getLyricFontSizes())
+			setLyricColors(getLyricColors())
 
 			// 检查是否已有上次搜索并采用过的记忆缓存！
 			const searchCache = getStoredTrackSearchCache(track.uniqueKey)
@@ -187,6 +206,34 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 		} finally {
 			setLoadingCandidateId(null)
 		}
+	}
+
+	const handleUnadoptCandidate = async () => {
+		if (!track) return
+		unmarkTrackAdoptedCandidate(track.uniqueKey)
+		setAdoptedCandidateId(null)
+		setAdoptedSource(null)
+		setCustomText('')
+		// 恢复获取默认匹配的歌词
+		try {
+			const defaultRes = await lyricService.fetchLyricForTrack(track, true, {
+				showTranslation: includeTranslation,
+				showRomaji: includeRomaji,
+			})
+			const spl = defaultRes?.splContent || ''
+			onLyricsUpdated?.(spl)
+			setSuccessMsg('已取消采用该歌词，恢复为默认歌词！')
+			setTimeout(() => setSuccessMsg(null), 2500)
+		} catch (err) {
+			console.error('Failed to reset default lyrics:', err)
+		}
+	}
+
+	const formatCandidateDuration = (sec?: number) => {
+		if (!sec || sec <= 0) return ''
+		const m = Math.floor(sec / 60)
+		const s = Math.floor(sec % 60)
+		return `${m}:${s < 10 ? '0' : ''}${s}`
 	}
 
 	const handleToggleTranslation = async (enabled: boolean) => {
@@ -333,7 +380,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 									: 'text-muted-foreground hover:text-foreground'
 							}`}
 						>
-							字号色彩
+							字号管理
 						</button>
 					</div>
 
@@ -485,6 +532,11 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 														>
 															{item.source === 'netease' ? '网易云音乐' : 'QQ 音乐'}
 														</span>
+														{item.duration > 0 && (
+															<span className="text-[10px] font-mono text-muted-foreground/80 shrink-0">
+																{formatCandidateDuration(item.duration)}
+															</span>
+														)}
 														{isAdopted && (
 															<span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/25 border border-primary/40 text-primary font-bold flex items-center gap-1 shrink-0">
 																<Check className="w-3 h-3 stroke-[3]" />
@@ -497,22 +549,34 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 													</p>
 												</div>
 
-												<button
-													onClick={() => handleApplyCandidate(item)}
-													disabled={loadingCandidateId === item.id}
-													className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 ${
-														isAdopted
-															? 'bg-primary text-white shadow-sm hover:bg-primary/90'
-															: 'bg-primary/20 hover:bg-primary/30 text-primary'
-													}`}
-												>
-													{loadingCandidateId === item.id ? (
-														<Loader2 className="w-3.5 h-3.5 animate-spin" />
-													) : isAdopted ? (
-														<Check className="w-3.5 h-3.5" />
-													) : null}
-													<span>{isAdopted ? '重新应用' : '采用'}</span>
-												</button>
+												<div className="flex items-center gap-1.5 shrink-0">
+													{isAdopted && (
+														<button
+															onClick={handleUnadoptCandidate}
+															className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-colors flex items-center gap-1"
+															title="取消采用该歌词并恢复为默认歌词"
+														>
+															<RotateCcw className="w-3.5 h-3.5" />
+															<span>取消采用</span>
+														</button>
+													)}
+													<button
+														onClick={() => handleApplyCandidate(item)}
+														disabled={loadingCandidateId === item.id}
+														className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+															isAdopted
+																? 'bg-primary text-white shadow-sm hover:bg-primary/90'
+																: 'bg-primary/20 hover:bg-primary/30 text-primary'
+														}`}
+													>
+														{loadingCandidateId === item.id ? (
+															<Loader2 className="w-3.5 h-3.5 animate-spin" />
+														) : isAdopted ? (
+															<Check className="w-3.5 h-3.5" />
+														) : null}
+														<span>{isAdopted ? '重新应用' : '采用'}</span>
+													</button>
+												</div>
 											</div>
 										)
 									})
@@ -605,34 +669,87 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								微调全屏模式与桌面悬浮歌词的高亮字体色彩（包含正文、翻译与罗马音），以及歌词文本尺寸：
 							</p>
 
-							{/* Lyrics Custom Highlight Color Card */}
+							{/* Lyrics Custom Color Card */}
 							<div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-3 text-xs">
-								<div className="flex items-center justify-between">
-									<div className="flex items-center gap-2">
-										<Palette className="w-4 h-4 text-primary" />
-										<span className="font-semibold text-foreground">歌词字体高亮颜色</span>
+								<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+									<div className="flex items-center gap-3">
+										<div className="flex items-center gap-1.5 shrink-0">
+											<Palette className="w-4 h-4 text-primary" />
+											<span className="font-semibold text-foreground">歌词颜色</span>
+										</div>
+
+										{/* 三个选项在“歌词颜色”右侧：歌词、翻译、罗马音 */}
+										<div className="flex items-center gap-1 p-0.5 rounded-lg bg-black/40 border border-white/10 shrink-0">
+											<button
+												type="button"
+												onClick={() => setActiveColorTarget('main')}
+												className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+													activeColorTarget === 'main'
+														? 'bg-primary text-white font-semibold shadow'
+														: 'text-muted-foreground hover:text-foreground'
+												}`}
+											>
+												<span
+													className="w-2.5 h-2.5 rounded-full border border-white/20"
+													style={{ backgroundColor: lyricColors.main }}
+												/>
+												<span>歌词</span>
+											</button>
+											<button
+												type="button"
+												onClick={() => setActiveColorTarget('trans')}
+												className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+													activeColorTarget === 'trans'
+														? 'bg-primary text-white font-semibold shadow'
+														: 'text-muted-foreground hover:text-foreground'
+												}`}
+											>
+												<span
+													className="w-2.5 h-2.5 rounded-full border border-white/20"
+													style={{ backgroundColor: lyricColors.trans }}
+												/>
+												<span>翻译</span>
+											</button>
+											<button
+												type="button"
+												onClick={() => setActiveColorTarget('roma')}
+												className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+													activeColorTarget === 'roma'
+														? 'bg-primary text-white font-semibold shadow'
+														: 'text-muted-foreground hover:text-foreground'
+												}`}
+											>
+												<span
+													className="w-2.5 h-2.5 rounded-full border border-white/20"
+													style={{ backgroundColor: lyricColors.roma }}
+												/>
+												<span>罗马音</span>
+											</button>
+										</div>
 									</div>
-									<div className="flex items-center gap-2">
+
+									{/* 选中哪个就调整哪个的颜色 */}
+									<div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
 										<div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/30 border border-white/10">
 											<span
 												className="w-3 h-3 rounded-full border border-white/30 shadow-sm shrink-0"
-												style={{ backgroundColor: highlightColor }}
+												style={{ backgroundColor: lyricColors[activeColorTarget] }}
 											/>
 											<span className="font-mono text-[10px] text-foreground font-semibold uppercase">
-												{highlightColor}
+												{lyricColors[activeColorTarget]}
 											</span>
 										</div>
 										<label
-											className="relative cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
+											className="relative cursor-pointer flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
 											title="打开调色板选取任意颜色"
 										>
 											<input
 												type="color"
-												value={highlightColor}
+												value={lyricColors[activeColorTarget]}
 												onChange={(e) => {
 													const col = e.target.value
-													setHighlightColor(col)
-													setLyricsHighlightColor(col)
+													setLyricColor(activeColorTarget, col)
+													setLyricColors((prev) => ({ ...prev, [activeColorTarget]: col }))
 												}}
 												className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
 											/>
@@ -644,15 +761,19 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 								{/* Color Presets */}
 								<div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-0.5">
 									{PRESET_LYRICS_COLORS.map((preset) => {
+										const currentColor = lyricColors[activeColorTarget]
 										const isSelected =
-											highlightColor.toLowerCase() === preset.value.toLowerCase()
+											currentColor.toLowerCase() === preset.value.toLowerCase()
 										return (
 											<button
 												key={preset.value}
 												type="button"
 												onClick={() => {
-													setHighlightColor(preset.value)
-													setLyricsHighlightColor(preset.value)
+													setLyricColor(activeColorTarget, preset.value)
+													setLyricColors((prev) => ({
+														...prev,
+														[activeColorTarget]: preset.value,
+													}))
 												}}
 												className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all ${
 													isSelected
@@ -765,8 +886,12 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 											const def = { main: 24, trans: 15, roma: 13 }
 											setFontSizes(def)
 											setLyricFontSizes(def)
-											setHighlightColor(DEFAULT_LYRICS_HIGHLIGHT_COLOR)
-											setLyricsHighlightColor(DEFAULT_LYRICS_HIGHLIGHT_COLOR)
+											resetLyricColors()
+											setLyricColors({
+												main: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+												trans: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+												roma: DEFAULT_LYRICS_HIGHLIGHT_COLOR,
+											})
 										}}
 										className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium flex items-center gap-1.5 transition-colors"
 									>
@@ -788,7 +913,7 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 											className="font-mono tracking-wider truncate"
 											style={{
 												fontSize: `${fontSizes.roma}px`,
-												color: highlightColor,
+												color: lyricColors.roma,
 												opacity: 0.85,
 											}}
 										>
@@ -799,18 +924,18 @@ export const LyricsSettingsModal: React.FC<LyricsSettingsModalProps> = ({
 										className="font-bold tracking-wide truncate"
 										style={{
 											fontSize: `${fontSizes.main}px`,
-											color: highlightColor,
+											color: lyricColors.main,
 											filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
 										}}
 									>
-										君と見た雪の華が
+										君と見た雪の华が
 									</p>
 									{includeTranslation && (
 										<p
 											className="font-medium truncate"
 											style={{
 												fontSize: `${fontSizes.trans}px`,
-												color: highlightColor,
+												color: lyricColors.trans,
 												opacity: 0.9,
 											}}
 										>
