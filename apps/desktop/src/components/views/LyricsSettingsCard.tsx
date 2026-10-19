@@ -11,9 +11,12 @@ import {
 	setPreferredLyricSource,
 	getLyricsHighlightColor,
 	setLyricsHighlightColor,
+	getLyricColors,
+	setLyricColor,
 	PRESET_LYRICS_COLORS,
 	DEFAULT_LYRICS_HIGHLIGHT_COLOR,
 	type PreferredLyricSource,
+	type LyricColors,
 } from '../../services/lyricService'
 
 export const LyricsSettingsCard: React.FC = () => {
@@ -21,7 +24,8 @@ export const LyricsSettingsCard: React.FC = () => {
 	const [showTranslation, setShowTranslation] = useState<boolean>(getLyricOptionTranslation())
 	const [showRomaji, setShowRomaji] = useState<boolean>(getLyricOptionRomaji())
 	const [preferredSource, setPreferredSource] = useState<PreferredLyricSource>(() => getPreferredLyricSource())
-	const [highlightColor, setHighlightColor] = useState<string>(() => getLyricsHighlightColor())
+	const [lyricColors, setLyricColors] = useState<LyricColors>(() => getLyricColors())
+	const [activeColorTarget, setActiveColorTarget] = useState<'main' | 'trans' | 'roma'>('main')
 
 	useEffect(() => {
 		const handleAutoMatchChange = (e: any) => {
@@ -32,18 +36,25 @@ export const LyricsSettingsCard: React.FC = () => {
 		}
 		const handleColorChange = (e: any) => {
 			if (e.detail?.color) {
-				setHighlightColor(e.detail.color)
+				setLyricColors(getLyricColors())
+			}
+		}
+		const handleAllColorsChange = (e: any) => {
+			if (e.detail) {
+				setLyricColors(e.detail)
 			}
 		}
 		window.addEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
 		window.addEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
 		window.addEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
 		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
+		window.addEventListener('bbplayer:lyric-colors-change', handleAllColorsChange)
 		return () => {
 			window.removeEventListener('bbplayer:auto-match-lyrics-change', handleAutoMatchChange)
 			window.removeEventListener('bbplayer:preferred-lyric-source-change', handlePreferredSourceChange)
 			window.removeEventListener('bbplayer:lyrics-highlight-color-change', handleColorChange)
 			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleColorChange)
+			window.removeEventListener('bbplayer:lyric-colors-change', handleAllColorsChange)
 		}
 	}, [])
 
@@ -211,37 +222,87 @@ export const LyricsSettingsCard: React.FC = () => {
 					</button>
 				</div>
 
-				{/* 4. 歌词字体颜色自定义 */}
+				{/* 4. 歌词颜色自定义 */}
 				<div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors space-y-2.5">
-					<div className="flex items-center justify-between gap-4">
-						<div className="space-y-0.5">
-							<div className="flex items-center gap-2">
-								<span className="font-semibold text-foreground">歌词字体高亮颜色</span>
-								<span
-									className="w-3 h-3 rounded-full border border-white/20 shadow-sm inline-block shrink-0"
-									style={{ backgroundColor: highlightColor }}
-								/>
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+						<div className="flex items-center gap-3">
+							<div className="flex items-center gap-1.5 shrink-0">
+								<Palette className="w-3.5 h-3.5 text-primary" />
+								<span className="font-semibold text-foreground">歌词颜色</span>
 							</div>
-							<p className="text-[11px] text-muted-foreground leading-relaxed">
-								自定义全屏模式与桌面悬浮歌词（含正文、翻译与罗马音）的高亮色彩，支持预设经典色系与自由调色。
-							</p>
+
+							{/* 三个选项在“歌词颜色”右侧：歌词、翻译、罗马音 */}
+							<div className="flex items-center gap-1 p-0.5 rounded-lg bg-black/40 border border-white/10 shrink-0">
+								<button
+									type="button"
+									onClick={() => setActiveColorTarget('main')}
+									className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+										activeColorTarget === 'main'
+											? 'bg-primary text-white font-semibold shadow'
+											: 'text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									<span
+										className="w-2.5 h-2.5 rounded-full border border-white/20"
+										style={{ backgroundColor: lyricColors.main }}
+									/>
+									<span>歌词</span>
+								</button>
+								<button
+									type="button"
+									onClick={() => setActiveColorTarget('trans')}
+									className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+										activeColorTarget === 'trans'
+											? 'bg-primary text-white font-semibold shadow'
+											: 'text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									<span
+										className="w-2.5 h-2.5 rounded-full border border-white/20"
+										style={{ backgroundColor: lyricColors.trans }}
+									/>
+									<span>翻译</span>
+								</button>
+								<button
+									type="button"
+									onClick={() => setActiveColorTarget('roma')}
+									className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+										activeColorTarget === 'roma'
+											? 'bg-primary text-white font-semibold shadow'
+											: 'text-muted-foreground hover:text-foreground'
+									}`}
+								>
+									<span
+										className="w-2.5 h-2.5 rounded-full border border-white/20"
+										style={{ backgroundColor: lyricColors.roma }}
+									/>
+									<span>罗马音</span>
+								</button>
+							</div>
 						</div>
-						<div className="flex items-center gap-2 shrink-0">
-							<span className="font-mono text-[10px] text-foreground font-semibold uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10">
-								{highlightColor}
-							</span>
+
+						{/* 选中哪个就调整哪个的颜色 */}
+						<div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+							<div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/30 border border-white/10">
+								<span
+									className="w-3 h-3 rounded-full border border-white/30 shadow-sm shrink-0"
+									style={{ backgroundColor: lyricColors[activeColorTarget] }}
+								/>
+								<span className="font-mono text-[10px] text-foreground font-semibold uppercase">
+									{lyricColors[activeColorTarget]}
+								</span>
+							</div>
 							<label
 								className="relative cursor-pointer flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
 								title="打开调色板选取任意颜色"
 							>
-								<Palette className="w-3.5 h-3.5 text-primary" />
 								<input
 									type="color"
-									value={highlightColor}
+									value={lyricColors[activeColorTarget]}
 									onChange={(e) => {
 										const col = e.target.value
-										setHighlightColor(col)
-										setLyricsHighlightColor(col)
+										setLyricColor(activeColorTarget, col)
+										setLyricColors((prev) => ({ ...prev, [activeColorTarget]: col }))
 									}}
 									className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
 								/>
@@ -250,18 +311,26 @@ export const LyricsSettingsCard: React.FC = () => {
 						</div>
 					</div>
 
+					<p className="text-[11px] text-muted-foreground leading-relaxed">
+						自定义全屏模式与桌面悬浮歌词（正文歌词、翻译与罗马音注音）的独立字体色彩，支持预设色系与自由调色。
+					</p>
+
 					{/* 预设配色快捷选择 */}
 					<div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1 border-t border-white/5">
 						{PRESET_LYRICS_COLORS.map((preset) => {
+							const currentColor = lyricColors[activeColorTarget]
 							const isSelected =
-								highlightColor.toLowerCase() === preset.value.toLowerCase()
+								currentColor.toLowerCase() === preset.value.toLowerCase()
 							return (
 								<button
 									key={preset.value}
 									type="button"
 									onClick={() => {
-										setHighlightColor(preset.value)
-										setLyricsHighlightColor(preset.value)
+										setLyricColor(activeColorTarget, preset.value)
+										setLyricColors((prev) => ({
+											...prev,
+											[activeColorTarget]: preset.value,
+										}))
 									}}
 									className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all ${
 										isSelected
