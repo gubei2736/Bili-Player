@@ -721,6 +721,7 @@ export const App: React.FC = () => {
 		;(window as any).__bbplayer_seek = (pos: number) => {
 			if (typeof pos === 'number' && !isNaN(pos)) {
 				desktopAudioEngine.seek(pos)
+				desktopAudioEngine.play().catch(() => {})
 				broadcastMiniPlayerState()
 			}
 		}

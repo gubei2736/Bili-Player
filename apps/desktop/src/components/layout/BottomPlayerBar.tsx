@@ -215,6 +215,9 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const progressThumbRef = useRef<HTMLDivElement>(null)
 	const timeTextSpanRef = useRef<HTMLSpanElement>(null)
 	const lastDisplaySecRef = useRef<number>(-1)
+	const isDraggingRef = useRef(false)
+	isDraggingRef.current = isDragging
+	const seekLockUntilRef = useRef<number>(0)
 
 	const isLocalTrack =
 		currentTrack?.source === 'local' ||
@@ -327,8 +330,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			}
 			if (event.type === 'pause') setIsPlaying(false)
 			if (event.type === 'timeupdate') {
-				setCurrentTime(event.currentTime)
-				setDuration(event.duration || 0)
+				if (!isDraggingRef.current && performance.now() > seekLockUntilRef.current) {
+					setCurrentTime(event.currentTime)
+					setDuration(event.duration || 0)
+				}
 			}
 			if (event.type === 'ended') {
 				const prevUniqueKey = desktopAudioEngine.getCurrentTrack()?.uniqueKey
@@ -391,21 +396,23 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			if (!isDragging) {
 				if (now - lastUpdate >= 16) {
 					lastUpdate = now
-					const cur = desktopAudioEngine.getCurrentTime()
-					if (duration > 0) {
-						const pct = Math.max(0, Math.min(100, (cur / duration) * 100))
-						if (progressBarFillRef.current) {
-							progressBarFillRef.current.style.width = `${pct}%`
+					if (performance.now() > seekLockUntilRef.current) {
+						const cur = desktopAudioEngine.getCurrentTime()
+						if (duration > 0) {
+							const pct = Math.max(0, Math.min(100, (cur / duration) * 100))
+							if (progressBarFillRef.current) {
+								progressBarFillRef.current.style.width = `${pct}%`
+							}
+							if (progressThumbRef.current) {
+								progressThumbRef.current.style.left = `${pct}%`
+							}
 						}
-						if (progressThumbRef.current) {
-							progressThumbRef.current.style.left = `${pct}%`
-						}
-					}
-					const curSec = Math.floor(cur)
-					if (curSec !== lastDisplaySecRef.current) {
-						lastDisplaySecRef.current = curSec
-						if (timeTextSpanRef.current) {
-							timeTextSpanRef.current.textContent = formatTime(cur)
+						const curSec = Math.floor(cur)
+						if (curSec !== lastDisplaySecRef.current) {
+							lastDisplaySecRef.current = curSec
+							if (timeTextSpanRef.current) {
+								timeTextSpanRef.current.textContent = formatTime(cur)
+							}
 						}
 					}
 				}
@@ -451,7 +458,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const handleSeek = (fraction: number) => {
 		const seekTime = fraction * duration
 		desktopAudioEngine.seek(seekTime)
+		desktopAudioEngine.play().catch(() => {})
+		setIsPlaying(true)
 		setCurrentTime(seekTime)
+		seekLockUntilRef.current = performance.now() + 350
 		if (timeTextSpanRef.current) {
 			timeTextSpanRef.current.textContent = formatTime(seekTime)
 		}
@@ -565,6 +575,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.currentTarget.setPointerCapture(e.pointerId)
 		setIsDragging(true)
+		seekLockUntilRef.current = performance.now() + 350
 		const p = calculateProgressFromPointer(e)
 		setDragProgress(p)
 		if (timeTextSpanRef.current) {
@@ -583,6 +594,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		setHoverProgress(p)
 		if (isDragging) {
 			setDragProgress(p)
+			seekLockUntilRef.current = performance.now() + 350
 			if (timeTextSpanRef.current) {
 				timeTextSpanRef.current.textContent = formatTime(p * duration)
 			}
