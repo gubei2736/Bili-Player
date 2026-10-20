@@ -617,7 +617,7 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
 									className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/90 text-white disabled:opacity-50 shadow-md transition-colors"
 								>
 									<Download className="w-3.5 h-3.5" />
-									<span>开始批量下载 ({selectedTrackKeys.size})</span>
+									<span>开始批量下载</span>
 								</button>
 							</>
 						)}

@@ -294,7 +294,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 							title="管理或隐藏非音乐合集"
 						>
 							<SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-							<span>过滤管理</span>
+							<span>过滤</span>
 							{hiddenIds.length > 0 && (
 								<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/20 text-primary font-semibold">
 									已隐藏 {hiddenIds.length}
@@ -313,7 +313,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 								isSyncing || loadingTracks ? 'animate-spin' : ''
 							}`}
 						/>
-						<span>刷新同步</span>
+						<span>刷新</span>
 					</button>
 
 					{activeCollection && tracks.length > 0 && (
@@ -323,7 +323,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 								className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all duration-150"
 							>
 								<Play className="w-3.5 h-3.5 fill-current" />
-								<span>播放合集 ({tracks.length})</span>
+								<span>播放合集</span>
 							</button>
 							<button
 								onClick={() => onBatchExport?.(activeCollection.title, tracks)}
@@ -331,7 +331,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 								title="批量下载当前合集曲目（支持大会员最高规格）"
 							>
 								<Download className="w-3.5 h-3.5 text-sky-400" />
-								<span>批量下载 ({tracks.length})</span>
+								<span>批量下载</span>
 							</button>
 						</>
 					)}
@@ -347,7 +347,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
 							<p className="text-xs">
 								{collections.length > 0
 									? '所有追更合集均已隐藏'
-									: '暂无订阅合集，在 B 站收藏喜爱的视频合集后点击右上角“刷新同步”'}
+									: '暂无订阅合集，在 B 站收藏喜爱的视频合集后点击右上角“刷新”'}
 							</p>
 							{collections.length > 0 && (
 								<button

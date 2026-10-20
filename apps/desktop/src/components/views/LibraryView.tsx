@@ -212,7 +212,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 		}
 	}
 
-	const filteredPlaylists = playlists.filter((pl) => {
+	const filteredPlaylists = playlists.filter((pl) => pl.id !== DEFAULT_LOCAL_MUSIC_PLAYLIST_ID).filter((pl) => {
 		if (!playlistSearchKeyword.trim()) return true
 		const kw = playlistSearchKeyword.toLowerCase().trim()
 		return (
@@ -305,10 +305,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 										className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
 									>
 										<Play className="w-4 h-4 fill-current" />
-										<span>
-											播放全部{' '}
-											{filteredTracks.length > 0 && `(${filteredTracks.length})`}
-										</span>
+										<span>播放全部</span>
 									</button>
 
 									{!isLocalPlaylist && (
@@ -322,11 +319,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 											title="批量下载此歌单在线歌曲（支持大会员最高规格）"
 										>
 											<Download className="w-3.5 h-3.5 text-sky-400" />
-											<span>
-												批量下载
-												{currentPlaylist.tracks.filter((t) => t.source !== 'local').length > 0 &&
-													` (${currentPlaylist.tracks.filter((t) => t.source !== 'local').length})`}
-											</span>
+											<span>批量下载</span>
 										</button>
 									)}
 

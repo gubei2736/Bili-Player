@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import {
 	Compass,
+	HardDrive,
 	Library,
 	Heart,
 	FolderHeart,
@@ -23,6 +24,7 @@ export type NavTab =
 	| 'explore'
 	| 'search'
 	| 'library'
+	| 'local'
 	| 'favorites'
 	| 'collections'
 	| 'history'
@@ -86,6 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	const discoverGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
 		{ id: 'explore', label: '发现音乐', icon: <Compass className="w-4 h-4" /> },
 		{ id: 'library', label: '我的音乐库', icon: <Library className="w-4 h-4" /> },
+		{ id: 'local', label: '本地歌曲', icon: <HardDrive className="w-4 h-4" /> },
 	]
 
 	const myMusicGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [

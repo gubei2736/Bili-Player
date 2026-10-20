@@ -260,7 +260,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 						title="管理或隐藏非音乐收藏夹"
 					>
 						<SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-						<span>过滤管理</span>
+						<span>过滤</span>
 						{hiddenIds.length > 0 && (
 							<span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/20 text-primary font-semibold">
 								已隐藏 {hiddenIds.length}
@@ -278,7 +278,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 								isSyncingPlaylists || loadingTracks ? 'animate-spin' : ''
 							}`}
 						/>
-						<span>刷新同步</span>
+						<span>刷新</span>
 					</button>
 
 					{filteredTracks.length > 0 && (
@@ -288,7 +288,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 								className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all duration-150"
 							>
 								<Play className="w-3.5 h-3.5 fill-current" />
-								<span>播放全部 ({filteredTracks.length})</span>
+								<span>播放全部</span>
 							</button>
 							<button
 								onClick={() => {
@@ -300,7 +300,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 								title="批量下载当前收藏夹歌曲（支持大会员最高规格）"
 							>
 								<Download className="w-3.5 h-3.5 text-sky-400" />
-								<span>批量下载 ({tracks.length})</span>
+								<span>批量下载</span>
 							</button>
 						</>
 					)}

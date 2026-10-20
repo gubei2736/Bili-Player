@@ -30,6 +30,7 @@ import { SearchView } from './components/views/SearchView'
 import { FavoritesView } from './components/views/FavoritesView'
 import { CollectionsView } from './components/views/CollectionsView'
 import { LibraryView } from './components/views/LibraryView'
+import { LocalMusicView } from './components/views/LocalMusicView'
 import { SettingsView } from './components/views/SettingsView'
 import { initDesktopDatabase } from './db/desktopDb'
 import { loginQrService } from './services/loginQrService'
@@ -972,6 +973,8 @@ export const App: React.FC = () => {
 								onBatchExport={(title, tracks) => setBatchExportData({ title, tracks })}
 							/>
 						)}
+
+						{tab === 'local' && <LocalMusicView />}
 
 						{tab === 'favorites' && (
 							<FavoritesView
