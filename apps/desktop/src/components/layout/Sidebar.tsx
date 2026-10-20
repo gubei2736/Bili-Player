@@ -12,6 +12,8 @@ import {
 	LogOut,
 	Sparkles,
 	AlertCircle,
+	Eye,
+	EyeOff,
 } from 'lucide-react'
 import { useAuthStore, useSkinStore, useQueueStore } from '@bbplayer/shared-core'
 import { loginQrService } from '../../services/loginQrService'
@@ -44,6 +46,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	const uiBlur = useSkinStore((s) => s.uiBlur ?? 16)
 	const uiOpacity = useSkinStore((s) => s.uiOpacity ?? 0.35)
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+	const [showExplore, setShowExplore] = useState<boolean>(() => {
+		try {
+			const saved = localStorage.getItem('bbplayer_show_explore')
+			return saved !== null ? saved === 'true' : true
+		} catch {
+			return true
+		}
+	})
+
+	const toggleShowExplore = (e?: React.MouseEvent) => {
+		if (e) e.stopPropagation()
+		setShowExplore((prev) => {
+			const next = !prev
+			try {
+				localStorage.setItem('bbplayer_show_explore', String(next))
+			} catch {}
+			if (!next && activeTab === 'explore') {
+				onSelectTab('library')
+			}
+			window.dispatchEvent(
+				new CustomEvent('bbplayer:show-explore-change', { detail: { show: next } }),
+			)
+			return next
+		})
+	}
+
+	useEffect(() => {
+		const handleEvent = (e: any) => {
+			if (e.detail?.show !== undefined) {
+				setShowExplore(e.detail.show)
+			}
+		}
+		window.addEventListener('bbplayer:show-explore-change', handleEvent)
+		return () => window.removeEventListener('bbplayer:show-explore-change', handleEvent)
+	}, [])
 
 	const discoverGroup: { id: NavTab; label: string; icon: React.ReactNode }[] = [
 		{ id: 'explore', label: '发现音乐', icon: <Compass className="w-4 h-4" /> },
@@ -128,13 +166,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			{/* Top Nav Groups */}
 			<div className="space-y-5 overflow-y-auto no-scrollbar pt-1">
 				<div className="space-y-1">
-					<p
-						className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60"
-						style={customTextColor ? { color: customTextColor, opacity: 0.65 } : undefined}
-					>
-						音乐馆
-					</p>
-					{discoverGroup.map(renderNavButton)}
+					<div className="flex items-center justify-between px-3 pb-1">
+						<p
+							className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60"
+							style={customTextColor ? { color: customTextColor, opacity: 0.65 } : undefined}
+						>
+							音乐馆
+						</p>
+						<button
+							onClick={toggleShowExplore}
+							title={showExplore ? '隐藏「发现音乐」' : '显示「发现音乐」'}
+							className="p-1 rounded-md hover:bg-white/10 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+						>
+							{showExplore ? (
+								<Eye className="w-3.5 h-3.5" />
+							) : (
+								<EyeOff className="w-3.5 h-3.5 text-primary" />
+							)}
+						</button>
+					</div>
+					{discoverGroup
+						.filter((item) => item.id !== 'explore' || showExplore)
+						.map(renderNavButton)}
 				</div>
 
 				<div className="space-y-1">
