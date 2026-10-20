@@ -51,6 +51,7 @@ pub fn run() {
             exporter::export_cached_track_to_m4a,
             exporter::pick_export_path,
             exporter::pick_export_dir,
+            exporter::open_folder_in_explorer,
             local_scanner::pick_local_music_dir,
             local_scanner::scan_local_music_dir,
             http_client::native_http_request,

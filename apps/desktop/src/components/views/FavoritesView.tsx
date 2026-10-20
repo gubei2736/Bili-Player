@@ -38,11 +38,13 @@ import {
 export interface FavoritesViewProps {
 	onExportTrack?: (track: Track) => void
 	onOpenLoginModal?: () => void
+	onBatchExport?: (title: string, tracks: Track[]) => void
 }
 
 export const FavoritesView: React.FC<FavoritesViewProps> = ({
 	onExportTrack,
 	onOpenLoginModal,
+	onBatchExport,
 }) => {
 	const { isLoggedIn, userInfo } = useAuthStore()
 	const {
@@ -280,13 +282,27 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 					</button>
 
 					{filteredTracks.length > 0 && (
-						<button
-							onClick={handlePlayAll}
-							className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all duration-150"
-						>
-							<Play className="w-3.5 h-3.5 fill-current" />
-							<span>播放全部 ({filteredTracks.length})</span>
-						</button>
+						<>
+							<button
+								onClick={handlePlayAll}
+								className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition-all duration-150"
+							>
+								<Play className="w-3.5 h-3.5 fill-current" />
+								<span>播放全部 ({filteredTracks.length})</span>
+							</button>
+							<button
+								onClick={() => {
+									const activePl = favoritePlaylists.find((p) => p.id === selectedPlaylistId)
+									const pTitle = activePl ? activePl.title : '我的收藏'
+									onBatchExport?.(pTitle, tracks)
+								}}
+								className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-foreground transition-all duration-150"
+								title="批量下载当前收藏夹歌曲（支持大会员最高规格）"
+							>
+								<Download className="w-3.5 h-3.5 text-sky-400" />
+								<span>批量下载 ({tracks.length})</span>
+							</button>
+						</>
 					)}
 				</div>
 			</div>

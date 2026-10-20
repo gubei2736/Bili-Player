@@ -298,21 +298,25 @@ export class BilibiliApi {
 		BilibiliApiError
 	> {
 		const { bvid, cid, audioQuality, enableDolby, enableHiRes, preferDolbyFirst } = params
-		// 纯音频极速模式：16 (DASH) + 256 (Dolby Audio)
-		// 严禁请求 64(HDR) + 128(4K) + 512(8K) + 1024(AV1) + fourk: '1'，大幅减小 B 站服务器转码与响应耗时
+		// 当请求 Hi-Res 无损音质 (FLAC) 或杜比全景声时，需传入 fnval=4048 以便 B 站下发 dash.flac / dash.dolby
+		// 基础常规 AAC 模式下使用 16 (DASH)，保证极速响应
 		let fnvalNum = 16
-		if (enableDolby) {
-			fnvalNum |= 256
+		if (enableDolby || enableHiRes) {
+			fnvalNum = 4048
 		}
 		const fnval = String(fnvalNum)
-		const wbiParams = getWbiEncodedParams({
+		const queryPayload: Record<string, string> = {
 			bvid,
 			cid: String(cid),
 			fnval,
 			fnver: '0',
 			qlt: String(audioQuality),
 			voice_balance: '1',
-		})
+		}
+		if (enableHiRes) {
+			queryPayload.fourk = '1'
+		}
+		const wbiParams = getWbiEncodedParams(queryPayload)
 
 		return wbiParams
 			.andThen((encodedParams) => {

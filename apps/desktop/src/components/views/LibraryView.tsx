@@ -46,6 +46,7 @@ export interface LibraryViewProps {
 	onOpenImport: () => void
 	onOpenCreate: () => void
 	onExportTrack?: (track: Track) => void
+	onBatchExport?: (title: string, tracks: Track[]) => void
 }
 
 function formatDuration(seconds: number): string {
@@ -58,6 +59,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 	onOpenImport,
 	onOpenCreate,
 	onExportTrack,
+	onBatchExport,
 }) => {
 	const {
 		playlists,
@@ -308,6 +310,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 											{filteredTracks.length > 0 && `(${filteredTracks.length})`}
 										</span>
 									</button>
+
+									{!isLocalPlaylist && (
+										<button
+											onClick={() => {
+												const onlineTracks = currentPlaylist.tracks.filter((t) => t.source !== 'local')
+												onBatchExport?.(currentPlaylist.title, onlineTracks)
+											}}
+											disabled={currentPlaylist.tracks.filter((t) => t.source !== 'local').length === 0}
+											className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-foreground border border-white/10 text-xs font-semibold transition-colors disabled:opacity-50"
+											title="批量下载此歌单在线歌曲（支持大会员最高规格）"
+										>
+											<Download className="w-3.5 h-3.5 text-sky-400" />
+											<span>
+												批量下载
+												{currentPlaylist.tracks.filter((t) => t.source !== 'local').length > 0 &&
+													` (${currentPlaylist.tracks.filter((t) => t.source !== 'local').length})`}
+											</span>
+										</button>
+									)}
 
 									{/* Local Music: Custom Directory Scan */}
 									{isLocalPlaylist && (
