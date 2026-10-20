@@ -1,6 +1,6 @@
 [package]
 name = "bili-player"
-version = "1.1.2"
+version = "1.1.3"
 description = "Bili Player Desktop Application"
 authors = ["bili-player"]
 edition = "2021"

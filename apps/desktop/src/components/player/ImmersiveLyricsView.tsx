@@ -762,11 +762,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 								lyricsData.lines.map((line, idx) => {
 									const isActive = idx === activeIndex
 									const distance = Math.abs(idx - activeIndex)
-									// 优雅流体动效阶梯：结合景深透明度、缩放聚焦与水平平滑位移，产生如水流推移般的层次感
+									// 纯净字号缩放聚焦与景深透明度梯队，左侧原位对齐无水平横移与指示条干扰
 									const opacity =
 										distance === 0 ? 1 : distance === 1 ? 0.72 : distance === 2 ? 0.48 : 0.28
-									const scale = isActive ? 1.06 : distance === 1 ? 1.0 : distance === 2 ? 0.97 : 0.94
-									const translateX = isActive ? 12 : distance === 1 ? 0 : distance === 2 ? -4 : -8
+									const scale = isActive ? 1.06 : distance === 1 ? 1.0 : distance === 2 ? 0.97 : 0.95
 
 									return (
 										<div
@@ -784,20 +783,10 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 											style={{
 												filter: 'none',
 												opacity,
-												transform: `translateX(${translateX}px) scale(${scale})`,
-												transition: 'transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1)',
+												transform: `scale(${scale})`,
+												transition: 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
 											}}
 										>
-											{/* 活跃歌词左侧动态流光微光条 */}
-											{isActive && (
-												<span
-													className="absolute -left-4 top-2 bottom-2 w-1 rounded-full animate-pulse transition-all duration-300"
-													style={{
-														backgroundColor: lyricColors.main,
-														boxShadow: `0 0 12px ${lyricColors.main}`,
-													}}
-												/>
-											)}
 											{/* Main line with syllable highlight */}
 											<p
 												className="font-bold tracking-wide leading-relaxed"
