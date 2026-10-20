@@ -17,12 +17,54 @@ interface CachedStreamInfo {
 const streamCache = new Map<string, CachedStreamInfo>()
 export const pageListCache = new Map<string, any[]>()
 
+let cachedProxyPort: number | null = null
+
+async function getProxyPort(): Promise<number> {
+	if (cachedProxyPort && cachedProxyPort > 0) return cachedProxyPort
+	try {
+		const p = await invoke<number>('get_stream_proxy_port')
+		if (p && p > 0) {
+			cachedProxyPort = p
+			return p
+		}
+	} catch {}
+	return 0
+}
+
 /**
  * 后台静默预加载音频流缓存（支持清晰度偏好智能匹配），使切歌时实现 0ms 秒播
  */
-export function prefetchPartStream(bvid: string, cid: number): void {
+export function prefetchPartStream(bvid: string, cid: number, nextTrack?: Track): void {
 	const cacheKey = `${bvid}_${cid}`
-	if (streamCache.has(cacheKey)) return
+	if (streamCache.has(cacheKey)) {
+		const cached = streamCache.get(cacheKey)!
+		if (cached.expireAt > Date.now() && nextTrack) {
+			getProxyPort().then((port) => {
+				if (port > 0) {
+					const proxyUrl = `http://127.0.0.1:${port}/proxy?url=${encodeURIComponent(
+						cached.streamData.url,
+					)}&bvid=${bvid}&cid=${cid}`
+					let loudnessDeltaDb = 0
+					if (
+						cached.streamData.volume &&
+						typeof cached.streamData.volume.measured_i === 'number'
+					) {
+						const target =
+							typeof cached.streamData.volume.target_i === 'number'
+								? cached.streamData.volume.target_i
+								: -14.0
+						loudnessDeltaDb = target - cached.streamData.volume.measured_i
+					}
+					desktopAudioEngine.preloadNextTrack(
+						nextTrack,
+						proxyUrl,
+						loudnessDeltaDb,
+					)
+				}
+			})
+		}
+		return
+	}
 
 	const qualityPref = getAudioQualityPreference()
 	let audioQuality = 30280
@@ -55,13 +97,34 @@ export function prefetchPartStream(bvid: string, cid: number): void {
 			enableHiRes,
 			preferDolbyFirst,
 		})
-		.then((res) => {
+		.then(async (res) => {
 			if (res.isOk()) {
 				streamCache.set(cacheKey, {
 					streamData: res.value,
 					expireAt: Date.now() + 30 * 60 * 1000,
 				})
 				logMultipart('playTrackHelper', '分 P / 下一首音频流预热成功', { bvid, cid })
+				if (nextTrack) {
+					const port = await getProxyPort()
+					if (port > 0) {
+						const proxyUrl = `http://127.0.0.1:${port}/proxy?url=${encodeURIComponent(
+							res.value.url,
+						)}&bvid=${bvid}&cid=${cid}`
+						let loudnessDeltaDb = 0
+						if (res.value.volume && typeof res.value.volume.measured_i === 'number') {
+							const target =
+								typeof res.value.volume.target_i === 'number'
+									? res.value.volume.target_i
+									: -14.0
+							loudnessDeltaDb = target - res.value.volume.measured_i
+						}
+						desktopAudioEngine.preloadNextTrack(
+							nextTrack,
+							proxyUrl,
+							loudnessDeltaDb,
+						)
+					}
+				}
 			}
 		})
 		.catch(() => {})
@@ -98,7 +161,7 @@ export function schedulePrefetchNextTrack(): void {
 			}
 
 			if (cid) {
-				prefetchPartStream(bvid, cid)
+				prefetchPartStream(bvid, cid, nextTrack)
 			}
 		} catch (err) {
 			logDebug('playTrackHelper', '下一首静默预热捕获异常', err)
@@ -108,7 +171,6 @@ export function schedulePrefetchNextTrack(): void {
 
 let currentLoadingTrackKey: string | null = null
 let latestPlayRequestId = 0
-let cachedProxyPort: number | null = null
 
 /**
  * 强一致同步器：直接在 apps/desktop 侧通过 useQueueStore.setState 强制将目标分 P 写入当前播放位置
@@ -488,7 +550,18 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				const curPage = biliTrack.bilibiliMetadata.pageIndex || 1
 				const nextPart = biliTrack.bilibiliMetadata.pages.find((p) => Number(p.page) === Number(curPage + 1))
 				if (nextPart && nextPart.cid) {
-					prefetchPartStream(bvid, nextPart.cid)
+					const nextPartTrack: BilibiliTrack = {
+						...biliTrack,
+						uniqueKey: `bilibili_${bvid}_${nextPart.page}`,
+						title: nextPart.part || biliTrack.title,
+						bilibiliMetadata: {
+							...biliTrack.bilibiliMetadata,
+							pageIndex: nextPart.page,
+							cid: nextPart.cid,
+							pagePart: nextPart.part,
+						},
+					}
+					prefetchPartStream(bvid, nextPart.cid, nextPartTrack)
 				}
 			}
 		} else {

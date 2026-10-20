@@ -22,7 +22,10 @@ import {
 	Layers,
 	PictureInPicture2,
 	Globe,
+	SlidersHorizontal,
 } from 'lucide-react'
+import { EqualizerModal } from '../modals/EqualizerModal'
+import { getEqualizerSettings } from '../../audio/equalizerSettings'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { openExternalUrl } from '../../utils/openUrl'
@@ -193,6 +196,21 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [lyricModalOpen, setLyricModalOpen] = useState(false)
 	const [queueOpen, setQueueOpen] = useState(false)
 	const [partsModalOpen, setPartsModalOpen] = useState(false)
+	const [equalizerOpen, setEqualizerOpen] = useState(false)
+	const [equalizerActive, setEqualizerActive] = useState(() => {
+		const s = getEqualizerSettings()
+		return s.enabled || s.vocalEnhancerEnabled
+	})
+
+	useEffect(() => {
+		const handler = (e: any) => {
+			const s = e.detail || getEqualizerSettings()
+			setEqualizerActive(s.enabled || s.vocalEnhancerEnabled)
+		}
+		window.addEventListener('bbplayer:equalizer-changed', handler)
+		return () =>
+			window.removeEventListener('bbplayer:equalizer-changed', handler)
+	}, [])
 
 	// Listen for queue drawer open requests from Mini Player
 	useEffect(() => {
@@ -980,6 +998,19 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							<SkipForward className="w-5 h-5 fill-current" />
 						</button>
 
+						{/* Multi-band EQ & Vocal Enhancer (EQ 均衡器与人声增强) */}
+						<button
+							onClick={() => setEqualizerOpen(true)}
+							title="EQ 均衡器与人声增强"
+							className={`p-1.5 rounded-full transition-all active:scale-90 ${
+								equalizerActive
+									? 'text-[#00AEEC] bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 shadow-[0_0_8px_rgba(0,174,236,0.35)]'
+									: 'text-foreground/85 hover:text-white hover:bg-white/10'
+							}`}
+						>
+							<SlidersHorizontal className="w-4 h-4" />
+						</button>
+
 						{/* Open Video Webpage in Default Browser (一键打开原网页) */}
 						<button
 							onClick={() => {
@@ -1267,6 +1298,12 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				isOpen={isAddToPlaylistOpen}
 				onClose={() => setIsAddToPlaylistOpen(false)}
 				track={currentTrack}
+			/>
+
+			{/* Equalizer & Audio FX Modal */}
+			<EqualizerModal
+				isOpen={equalizerOpen}
+				onClose={() => setEqualizerOpen(false)}
 			/>
 		</footer>
 	)
