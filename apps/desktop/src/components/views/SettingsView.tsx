@@ -1,4 +1,5 @@
 import React from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import {
 	FolderOpen,
 	Sliders,
@@ -7,6 +8,7 @@ import {
 	Music,
 	Sparkles,
 	ExternalLink,
+	Power,
 } from 'lucide-react'
 import { AudioQualitySettingsCard } from './AudioQualitySettingsCard'
 import { LyricsSettingsCard } from './LyricsSettingsCard'
@@ -31,6 +33,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 	closeAction,
 	onSetCloseAction,
 }) => {
+	const [autoStart, setAutoStart] = React.useState<boolean>(false)
+
+	React.useEffect(() => {
+		invoke<boolean>('is_autostart_enabled')
+			.then((enabled) => setAutoStart(!!enabled))
+			.catch(() => setAutoStart(false))
+	}, [])
+
+	const handleToggleAutoStart = async () => {
+		const nextVal = !autoStart
+		try {
+			await invoke('set_autostart_enabled', { enabled: nextVal })
+			setAutoStart(nextVal)
+		} catch (err) {
+			console.error('Failed to update autostart setting:', err)
+		}
+	}
+
 	return (
 		<div className="space-y-6 w-full max-w-5xl pb-16 select-none animate-in fade-in duration-200">
 			{/* Page Header */}
@@ -191,8 +211,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 						</div>
 					</div>
 
-					{/* About & Version Card */}
+					{/* Auto-Start Preference Card */}
 					<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs flex flex-col justify-between space-y-3">
+						<div className="flex items-start justify-between gap-4">
+							<div className="space-y-1">
+								<p className="font-semibold text-foreground flex items-center gap-1.5">
+									<Power className="w-4 h-4 text-[#00AEEC]" />
+									<span>开机自启动</span>
+								</p>
+								<p className="text-[11px] text-muted-foreground leading-relaxed">
+									开启后将在系统开机登录 Windows 时自动在后台静默启动 Bili Player
+								</p>
+							</div>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={autoStart}
+								onClick={handleToggleAutoStart}
+								className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+									autoStart ? 'bg-[#00AEEC]' : 'bg-white/20'
+								}`}
+							>
+								<span
+									className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+										autoStart ? 'translate-x-4' : 'translate-x-0'
+									}`}
+								/>
+							</button>
+						</div>
+						<div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] text-muted-foreground">
+							<span>系统启动服务</span>
+							<span
+								className={`font-medium ${
+									autoStart ? 'text-emerald-400' : 'text-muted-foreground'
+								}`}
+							>
+								{autoStart ? '已启用开机自启' : '未开启 (默认关闭)'}
+							</span>
+						</div>
+					</div>
+
+					{/* About & Version Card */}
+					<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs flex flex-col justify-between space-y-3 lg:col-span-2">
 						<div className="flex items-center gap-3">
 							<div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-[#00A1D6] to-[#00AEEC] flex items-center justify-center text-white shadow-md shrink-0">
 								<Music className="w-6 h-6 fill-white" />

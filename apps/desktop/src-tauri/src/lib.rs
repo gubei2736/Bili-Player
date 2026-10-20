@@ -63,6 +63,8 @@ pub fn run() {
             window_ext::toggle_main_window_fullscreen,
             window_ext::is_main_window_fullscreen,
             window_ext::set_main_window_fullscreen,
+            window_ext::is_autostart_enabled,
+            window_ext::set_autostart_enabled,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

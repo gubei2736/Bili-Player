@@ -594,3 +594,77 @@ pub fn set_main_window_fullscreen(app: AppHandle, fullscreen: bool) -> Result<()
         Err("main window not found".to_string())
     }
 }
+
+#[tauri::command]
+pub fn is_autostart_enabled() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let output = std::process::Command::new("reg")
+            .args(&[
+                "query",
+                r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                "/v",
+                "Bili Player",
+            ])
+            .creation_flags(0x08000000)
+            .output();
+
+        match output {
+            Ok(out) => Ok(out.status.success()),
+            Err(_) => Ok(false),
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+pub fn set_autostart_enabled(enabled: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        if enabled {
+            let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            let exe_path = current_exe.to_string_lossy().to_string();
+            let val = format!("\"{}\"", exe_path);
+            let status = std::process::Command::new("reg")
+                .args(&[
+                    "add",
+                    r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                    "/v",
+                    "Bili Player",
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    &val,
+                    "/f",
+                ])
+                .creation_flags(0x08000000)
+                .status()
+                .map_err(|e| e.to_string())?;
+
+            if !status.success() {
+                return Err("Failed to register autostart in Windows registry".to_string());
+            }
+        } else {
+            let _ = std::process::Command::new("reg")
+                .args(&[
+                    "delete",
+                    r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                    "/v",
+                    "Bili Player",
+                    "/f",
+                ])
+                .creation_flags(0x08000000)
+                .status();
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(())
+    }
+}
