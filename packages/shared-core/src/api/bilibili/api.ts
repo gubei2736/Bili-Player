@@ -302,7 +302,7 @@ export class BilibiliApi {
 		// 基础常规 AAC 模式下使用 16 (DASH)，保证极速响应
 		let fnvalNum = 16
 		if (enableDolby || enableHiRes) {
-			fnvalNum = 8144
+			fnvalNum = 4048
 		}
 		const fnval = String(fnvalNum)
 		const queryPayload: Record<string, string> = {
@@ -327,6 +327,17 @@ export class BilibiliApi {
 			})
 			.andThen((response) => {
 				const { dash, durl, volume } = response
+				const rawDashInfo = {
+					hasDash: !!dash,
+					hasFlacNode: !!dash?.flac,
+					flacDisplay: dash?.flac?.display,
+					hasFlacAudio: !!dash?.flac?.audio,
+					flacAudioId: dash?.flac?.audio?.id,
+					hasDolbyNode: !!dash?.dolby,
+					hasDolbyAudio: !!(dash?.dolby?.audio && dash.dolby.audio.length > 0),
+					dolbyAudioId: dash?.dolby?.audio?.[0]?.id,
+					audioStreamIds: dash?.audio?.map((a) => a.id) || [],
+				}
 
 				if (!dash) {
 					if (!durl?.[0]) {
@@ -343,6 +354,7 @@ export class BilibiliApi {
 						getTime: Date.now() + 60 * 1000,
 						type: 'mp4' as const,
 						volume,
+						rawDashInfo,
 					})
 				}
 
@@ -358,6 +370,7 @@ export class BilibiliApi {
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
+						rawDashInfo,
 						})
 					}
 					if (enableHiRes && dash?.flac?.audio) {
@@ -369,6 +382,7 @@ export class BilibiliApi {
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
+						rawDashInfo,
 						})
 					}
 				} else {
@@ -382,6 +396,7 @@ export class BilibiliApi {
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
+						rawDashInfo,
 						})
 					}
 
@@ -395,6 +410,7 @@ export class BilibiliApi {
 							getTime: Date.now() + 60 * 1000,
 							type: 'dash' as const,
 							volume,
+						rawDashInfo,
 						})
 					}
 				}
@@ -423,6 +439,7 @@ export class BilibiliApi {
 						getTime,
 						type: 'dash' as const,
 						volume,
+						rawDashInfo,
 					})
 				}
 

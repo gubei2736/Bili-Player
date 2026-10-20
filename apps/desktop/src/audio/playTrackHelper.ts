@@ -501,7 +501,25 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 					bandwidth: streamData.bandwidth,
 					codecs: streamData.codecs,
 					urlSample: streamData.url?.substring(0, 80) + '...',
+					rawDashInfo: streamData.rawDashInfo,
 				})
+
+				if (enableHiRes) {
+					if (streamData.quality === 30251) {
+						logDebug('playTrackHelper', '🎉 成功匹配并加载 Hi-Res 无损音质流 (30251 FLAC)', {
+							codecs: streamData.codecs,
+							bandwidth: streamData.bandwidth,
+						})
+					} else {
+						logDebug('playTrackHelper', '⚠️ 当前配置请求 Hi-Res，但未能下发 30251 FLAC，降级为常规音质', {
+							actualQuality: streamData.quality,
+							rawDashInfo: streamData.rawDashInfo,
+							reason: !streamData.rawDashInfo?.hasFlacAudio
+								? 'B 站响应的 dash.flac.audio 为 null。这通常说明当前请求未附带有效的大会员 Cookie，或 B 站服务端未对 Web 端开放该视频的 FLAC 权限'
+								: '未知原因',
+						})
+					}
+				}
 
 				streamCache.set(cacheKey, {
 					streamData,

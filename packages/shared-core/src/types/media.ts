@@ -54,6 +54,7 @@ export interface BilibiliTrack extends BaseTrack {
 			codecs?: string
 			getTime: number
 			type: 'mp4' | 'dash' | 'local'
+			rawDashInfo?: any
 			volume?: {
 				measured_i: number
 				target_i: number

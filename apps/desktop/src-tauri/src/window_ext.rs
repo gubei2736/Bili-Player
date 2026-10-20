@@ -182,6 +182,12 @@ pub fn exit_app(app: AppHandle) {
 }
 
 pub fn get_log_file_path() -> std::path::PathBuf {
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        let desktop_path = std::path::PathBuf::from(user_profile).join("Desktop").join("bili_player_debug.log");
+        if std::fs::OpenOptions::new().create(true).write(true).open(&desktop_path).is_ok() {
+            return desktop_path;
+        }
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             let path = parent.join("bili_player_debug.log");
