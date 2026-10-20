@@ -28,12 +28,13 @@
 <details>
 <summary>点击展开大图</summary>
 
-<img width="1565" height="1004" alt="1" src="https://github.com/user-attachments/assets/ec37ec6c-8427-46cd-82cf-82ae9491912f" />
-<img width="1564" height="996" alt="2" src="https://github.com/user-attachments/assets/a64775de-e371-450d-bac8-6ede1dca5c62" />
-<img width="1564" height="999" alt="4" src="https://github.com/user-attachments/assets/5752ab68-c0e4-4444-b487-61480cabc447" />
-<img width="1561" height="999" alt="3" src="https://github.com/user-attachments/assets/52246cb0-1be1-4d78-9d8c-0da4272321ac" />
-<img width="1561" height="998" alt="5" src="https://github.com/user-attachments/assets/ae8fa648-6c3d-455a-96fe-a6e5d1502e48" />
-<img width="1563" height="1000" alt="6" src="https://github.com/user-attachments/assets/b93a266a-356a-48ac-ad31-f63355615030" />
+<img width="1498" height="1000" alt="1" src="https://github.com/user-attachments/assets/ac126a0f-2890-4037-a38e-d6f30f1e9dd9" />
+<img width="1499" height="996" alt="2" src="https://github.com/user-attachments/assets/a1bccf50-3974-4b15-8fb5-083437d634bd" />
+<img width="1496" height="999" alt="3" src="https://github.com/user-attachments/assets/766cffd1-e15e-4949-8647-1843cb95448d" />
+<img width="1501" height="994" alt="4" src="https://github.com/user-attachments/assets/be857ef7-7996-4381-b233-f3c953540572" />
+<img width="1500" height="1000" alt="5" src="https://github.com/user-attachments/assets/7fa499bc-7e22-49af-82f4-8c07d2988bfb" />
+<img width="1496" height="1000" alt="6" src="https://github.com/user-attachments/assets/2e9e555b-5ebb-4827-b0ae-831bf5ab4ce2" />
+
 
 </details>
 
@@ -114,34 +115,6 @@ Bili Player/
 
 ---
 
-## 开发与编译指南
-
-### 前置环境需求
-1. **Node.js** >= 18.0.0
-2. **pnpm** >= 9.0.0
-3. **Rust** 工具链（建议 1.75+，Windows 环境需包含 MSVC 工具链，如 Visual Studio Build Tools）
-
-### 安装依赖
-```bash
-pnpm install
-```
-
-### 启动桌面端开发调试
-```bash
-pnpm --filter desktop tauri dev
-```
-
-### 构建生产环境可执行文件
-```bash
-pnpm --filter desktop tauri build
-```
-
-编译产物将输出至：
-- 安装版：`apps/desktop/src-tauri/target/release/Bili Player-Setup-1.1.3.exe`
-- 便携版：`apps/desktop/src-tauri/target/release/Bili Player-Portable-1.1.3.exe`
-- 绿色压缩包：`apps/desktop/src-tauri/target/release/Bili Player-Setup-1.1.3-win.zip`
-
----
 
 ## 隐私与数据安全
 
@@ -151,6 +124,8 @@ Bili Player 遵循本地优先原则设计：
 - **直接点对点交互**：所有网络交互均仅在客户端与目标服务器之间点对点通信，无任何第三方服务器中转。
 
 ---
+
+如果你喜欢这个项目，欢迎 ⭐️ Star 支持！也欢迎提出 Issue 交流与反馈。
 
 ## 感谢
 
