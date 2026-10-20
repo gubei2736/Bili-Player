@@ -302,7 +302,7 @@ export class BilibiliApi {
 		// 基础常规 AAC 模式下使用 16 (DASH)，保证极速响应
 		let fnvalNum = 16
 		if (enableDolby || enableHiRes) {
-			fnvalNum = 4048
+			fnvalNum = 8144
 		}
 		const fnval = String(fnvalNum)
 		const queryPayload: Record<string, string> = {
@@ -313,7 +313,7 @@ export class BilibiliApi {
 			qlt: String(audioQuality),
 			voice_balance: '1',
 		}
-		if (enableHiRes) {
+		if (enableHiRes || enableDolby) {
 			queryPayload.fourk = '1'
 		}
 		const wbiParams = getWbiEncodedParams(queryPayload)
@@ -351,7 +351,7 @@ export class BilibiliApi {
 					if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
 						const dolbyAudio = dash.dolby.audio[0]
 						return okAsync({
-							url: dolbyAudio.baseUrl,
+							url: dolbyAudio.baseUrl || dolbyAudio.backupUrl?.[0] || '',
 							quality: dolbyAudio.id || 30250,
 							bandwidth: dolbyAudio.bandwidth,
 							codecs: dolbyAudio.codecs,
@@ -362,7 +362,7 @@ export class BilibiliApi {
 					}
 					if (enableHiRes && dash?.flac?.audio) {
 						return okAsync({
-							url: dash.flac.audio.baseUrl,
+							url: dash.flac.audio.baseUrl || dash.flac.audio.backupUrl?.[0] || '',
 							quality: dash.flac.audio.id || 30251,
 							bandwidth: dash.flac.audio.bandwidth,
 							codecs: dash.flac.audio.codecs,
@@ -375,7 +375,7 @@ export class BilibiliApi {
 					// 默认高保真音质金字塔：Hi-Res 无损 (FLAC) > 杜比全景声 (EC-3) > 常规最高档 AAC
 					if (enableHiRes && dash?.flac?.audio) {
 						return okAsync({
-							url: dash.flac.audio.baseUrl,
+							url: dash.flac.audio.baseUrl || dash.flac.audio.backupUrl?.[0] || '',
 							quality: dash.flac.audio.id || 30251,
 							bandwidth: dash.flac.audio.bandwidth,
 							codecs: dash.flac.audio.codecs,
@@ -388,7 +388,7 @@ export class BilibiliApi {
 					if (enableDolby && dash?.dolby?.audio && dash.dolby.audio.length > 0) {
 						const dolbyAudio = dash.dolby.audio[0]
 						return okAsync({
-							url: dolbyAudio.baseUrl,
+							url: dolbyAudio.baseUrl || dolbyAudio.backupUrl?.[0] || '',
 							quality: dolbyAudio.id || 30250,
 							bandwidth: dolbyAudio.bandwidth,
 							codecs: dolbyAudio.codecs,

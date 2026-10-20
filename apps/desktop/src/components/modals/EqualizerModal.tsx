@@ -10,6 +10,9 @@ import {
 	Check,
 	Shuffle,
 	AudioWaveform,
+	Plus,
+	Trash2,
+	Bookmark,
 } from 'lucide-react'
 import {
 	EQ_FREQUENCIES,
@@ -18,6 +21,11 @@ import {
 	getEqualizerSettings,
 	saveEqualizerSettings,
 	DEFAULT_EQ_SETTINGS,
+	getCustomPresets,
+	saveCustomPreset,
+	updateCustomPreset,
+	deleteCustomPreset,
+	MAX_CUSTOM_PRESETS,
 	type EqualizerSettings,
 	type EQPreset,
 } from '../../audio/equalizerSettings'
@@ -35,11 +43,21 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 	const [settings, setSettings] = useState<EqualizerSettings>(() =>
 		getEqualizerSettings(),
 	)
+	const [customPresets, setCustomPresets] = useState<EQPreset[]>(() =>
+		getCustomPresets(),
+	)
+	const [isCreatingPreset, setIsCreatingPreset] = useState(false)
+	const [presetNameInput, setPresetNameInput] = useState('')
+	const [saveError, setSaveError] = useState<string | null>(null)
 
 	// 当弹窗打开时重新同步配置
 	useEffect(() => {
 		if (isOpen) {
 			setSettings(getEqualizerSettings())
+			setCustomPresets(getCustomPresets())
+			setIsCreatingPreset(false)
+			setPresetNameInput('')
+			setSaveError(null)
 		}
 	}, [isOpen])
 
@@ -66,6 +84,51 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 			presetId: preset.id,
 			gains: [...preset.gains],
 		})
+	}
+
+	const handleStartCreatePreset = () => {
+		if (customPresets.length >= MAX_CUSTOM_PRESETS) {
+			setSaveError(`自定义预设已达上限 (至多 ${MAX_CUSTOM_PRESETS} 条)，请先删除已有预设`)
+			return
+		}
+		setSaveError(null)
+		setPresetNameInput(`自定义预设 ${customPresets.length + 1}`)
+		setIsCreatingPreset(true)
+	}
+
+	const handleConfirmSavePreset = () => {
+		const res = saveCustomPreset(presetNameInput, settings.gains)
+		if (!res.success || !res.preset) {
+			setSaveError(res.message || '保存失败')
+			return
+		}
+		const updatedList = getCustomPresets()
+		setCustomPresets(updatedList)
+		setIsCreatingPreset(false)
+		setPresetNameInput('')
+		setSaveError(null)
+		// 自动选中新保存的预设
+		updateSettings({
+			...settings,
+			enabled: true,
+			presetId: res.preset.id,
+			gains: [...res.preset.gains],
+		})
+	}
+
+	const handleDeletePreset = (e: React.MouseEvent, presetId: string) => {
+		e.stopPropagation()
+		deleteCustomPreset(presetId)
+		const updatedList = getCustomPresets()
+		setCustomPresets(updatedList)
+		if (settings.presetId === presetId) {
+			// 若当前选中的正好是被删除的预设，回退到默认平直
+			updateSettings({
+				...settings,
+				presetId: 'flat',
+				gains: [...EQ_PRESETS[0].gains],
+			})
+		}
 	}
 
 	const handleGainChange = (bandIndex: number, val: number) => {
@@ -119,9 +182,17 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 		})
 	}
 
+	const allPresets = [...EQ_PRESETS, ...customPresets]
 	const activePreset =
-		EQ_PRESETS.find((p) => p.id === settings.presetId) ||
-		EQ_PRESETS[EQ_PRESETS.length - 1]
+		allPresets.find((p) => p.id === settings.presetId) ||
+		(settings.presetId === 'custom'
+			? {
+					id: 'custom',
+					name: '自定义 (微调中)',
+					gains: settings.gains,
+					desc: '自由微调每个频段增益',
+			  }
+			: EQ_PRESETS[0])
 
 	return createPortal(
 		<div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
@@ -186,14 +257,19 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 				{/* 2. Scrollable Content Area */}
 				<div className="flex-1 overflow-y-auto px-6 py-4 space-y-5 custom-scrollbar">
 					{/* Presets Bar */}
-					<div>
-						<div className="text-xs font-medium text-muted-foreground mb-2 flex items-center justify-between">
-							<span>音效预设 (Presets)</span>
+					<div className="space-y-3">
+						<div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+							<span className="flex items-center gap-1.5">
+								<Bookmark className="w-3.5 h-3.5 text-[#00AEEC]" />
+								音效预设 (Presets)
+							</span>
 							<span className="text-[11px] text-[#00AEEC]">
-								当前: {activePreset?.name}
+								当前: {activePreset?.name || '自定义'}
 							</span>
 						</div>
-						<div className="flex flex-wrap gap-2">
+
+						{/* 官方内置预设 */}
+						<div className="flex flex-wrap gap-1.5 sm:gap-2">
 							{EQ_PRESETS.map((preset) => {
 								const isSelected = settings.presetId === preset.id
 								return (
@@ -210,6 +286,106 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 									</button>
 								)
 							})}
+						</div>
+
+						{/* 自定义预设管理区域 (至多 6 条) */}
+						<div className="pt-2.5 border-t border-white/5">
+							<div className="flex items-center justify-between mb-2">
+								<span className="text-[11px] text-muted-foreground/90 font-medium">
+									我的自定义预设 ({customPresets.length}/{MAX_CUSTOM_PRESETS})
+								</span>
+
+								{!isCreatingPreset && (
+									<button
+										onClick={handleStartCreatePreset}
+										disabled={customPresets.length >= MAX_CUSTOM_PRESETS}
+										className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 text-[#00AEEC] border border-[#00AEEC]/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+										title={
+											customPresets.length >= MAX_CUSTOM_PRESETS
+												? `已达上限 (${MAX_CUSTOM_PRESETS}条)`
+												: '将当前 10 段 EQ 增益保存为自定义预设'
+										}
+									>
+										<Plus className="w-3.5 h-3.5" />
+										保存为预设
+									</button>
+								)}
+							</div>
+
+							{/* 正在新建预设的输入栏 */}
+							{isCreatingPreset && (
+								<div className="mb-2.5 p-2.5 rounded-xl bg-white/[0.04] border border-[#00AEEC]/40 space-y-2 animate-in fade-in duration-150">
+									<div className="flex items-center gap-2">
+										<input
+											type="text"
+											value={presetNameInput}
+											onChange={(e) => {
+												setPresetNameInput(e.target.value)
+												setSaveError(null)
+											}}
+											maxLength={16}
+											autoFocus
+											placeholder="请输入预设名称 (如: 暖声氛围)"
+											onKeyDown={(e) => {
+												if (e.key === 'Enter') handleConfirmSavePreset()
+												if (e.key === 'Escape') setIsCreatingPreset(false)
+											}}
+											className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white placeholder:text-muted-foreground/60 focus:outline-none focus:border-[#00AEEC]"
+										/>
+										<button
+											onClick={handleConfirmSavePreset}
+											className="px-3 py-1 rounded-lg bg-[#00AEEC] hover:bg-[#1bbefa] text-white text-xs font-medium transition-colors"
+										>
+											确认保存
+										</button>
+										<button
+											onClick={() => {
+												setIsCreatingPreset(false)
+												setSaveError(null)
+											}}
+											className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-muted-foreground hover:text-white text-xs transition-colors"
+										>
+											取消
+										</button>
+									</div>
+									{saveError && (
+										<p className="text-[11px] text-red-400">{saveError}</p>
+									)}
+								</div>
+							)}
+
+							{/* 自定义预设列表 */}
+							{customPresets.length === 0 ? (
+								<div className="text-[11px] text-muted-foreground/60 py-1">
+									暂无自定义预设，调整均衡器推子后点击右上角“保存为预设”即可收藏（至多6条）
+								</div>
+							) : (
+								<div className="flex flex-wrap gap-1.5 sm:gap-2">
+									{customPresets.map((preset) => {
+										const isSelected = settings.presetId === preset.id
+										return (
+											<div
+												key={preset.id}
+												onClick={() => handleSelectPreset(preset)}
+												className={`group flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+													isSelected
+														? 'bg-[#00AEEC] text-white shadow-[0_2px_8px_rgba(0,174,236,0.35)] scale-105'
+														: 'bg-white/5 hover:bg-white/10 text-foreground/80 hover:text-white border border-white/5'
+												}`}
+											>
+												<span className="max-w-[100px] truncate">{preset.name}</span>
+												<button
+													onClick={(e) => handleDeletePreset(e, preset.id)}
+													className="p-1 rounded hover:bg-black/30 text-white/60 hover:text-red-300 transition-colors"
+													title="删除此预设"
+												>
+													<Trash2 className="w-3 h-3" />
+												</button>
+											</div>
+										)
+									})}
+								</div>
+							)}
 						</div>
 					</div>
 

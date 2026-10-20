@@ -111,3 +111,87 @@ export function saveEqualizerSettings(settings: EqualizerSettings): void {
 		}
 	} catch {}
 }
+
+export const MAX_CUSTOM_PRESETS = 6
+export const CUSTOM_PRESETS_STORAGE_KEY = 'bbplayer_custom_eq_presets_v1'
+
+export function getCustomPresets(): EQPreset[] {
+	try {
+		const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY)
+		if (raw) {
+			const parsed = JSON.parse(raw)
+			if (Array.isArray(parsed)) {
+				return parsed
+					.filter(
+						(p) =>
+							p &&
+							typeof p.id === 'string' &&
+							typeof p.name === 'string' &&
+							Array.isArray(p.gains) &&
+							p.gains.length === 10,
+					)
+					.slice(0, MAX_CUSTOM_PRESETS)
+			}
+		}
+	} catch {}
+	return []
+}
+
+export function saveCustomPreset(
+	name: string,
+	gains: number[],
+): { success: boolean; preset?: EQPreset; message?: string } {
+	try {
+		const current = getCustomPresets()
+		if (current.length >= MAX_CUSTOM_PRESETS) {
+			return {
+				success: false,
+				message: `自定义预设最多只能保存 ${MAX_CUSTOM_PRESETS} 条，请先删除不需要的预设`,
+			}
+		}
+		const trimmedName = name.trim() || `自定义预设 ${current.length + 1}`
+		const newPreset: EQPreset = {
+			id: `custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+			name: trimmedName,
+			gains: [...gains],
+			desc: '用户自定义均衡器参数',
+		}
+		const updated = [...current, newPreset]
+		localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(updated))
+		return { success: true, preset: newPreset }
+	} catch (e: any) {
+		return { success: false, message: e?.message || '保存预设失败' }
+	}
+}
+
+export function updateCustomPreset(
+	id: string,
+	name: string,
+	gains: number[],
+): { success: boolean; preset?: EQPreset; message?: string } {
+	try {
+		const current = getCustomPresets()
+		const idx = current.findIndex((p) => p.id === id)
+		if (idx === -1) {
+			return { success: false, message: '未找到对应预设' }
+		}
+		const updatedItem: EQPreset = {
+			...current[idx],
+			name: name.trim() || current[idx].name,
+			gains: [...gains],
+		}
+		current[idx] = updatedItem
+		localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(current))
+		return { success: true, preset: updatedItem }
+	} catch (e: any) {
+		return { success: false, message: e?.message || '更新预设失败' }
+	}
+}
+
+export function deleteCustomPreset(id: string): void {
+	try {
+		const current = getCustomPresets()
+		const filtered = current.filter((p) => p.id !== id)
+		localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(filtered))
+	} catch {}
+}

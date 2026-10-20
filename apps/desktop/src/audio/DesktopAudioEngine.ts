@@ -859,13 +859,13 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		if (this.audioCtx && active.fadeGainNode) {
 			const tStart = this.audioCtx.currentTime
 			active.fadeGainNode.gain.cancelScheduledValues(tStart)
-			active.fadeGainNode.gain.setValueAtTime(0.01, tStart)
+			active.fadeGainNode.gain.setValueAtTime(0.0001, tStart)
 
 			await active.audio.play()
 
 			const tPlay = this.audioCtx.currentTime
 			active.fadeGainNode.gain.cancelScheduledValues(tPlay)
-			active.fadeGainNode.gain.setValueAtTime(Math.max(0.01, active.fadeGainNode.gain.value), tPlay)
+			active.fadeGainNode.gain.setValueAtTime(0.0001, tPlay)
 			active.fadeGainNode.gain.setTargetAtTime(1.0, tPlay, 0.04)
 		} else {
 			await active.audio.play()
@@ -896,14 +896,14 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		const now = this.audioCtx.currentTime
 		active.fadeGainNode.gain.cancelScheduledValues(now)
 		active.fadeGainNode.gain.setValueAtTime(active.fadeGainNode.gain.value, now)
-		active.fadeGainNode.gain.setTargetAtTime(0.0001, now, 0.03)
+		active.fadeGainNode.gain.setTargetAtTime(0.0001, now, 0.02)
 
 		this.pauseTimer = setTimeout(() => {
 			active.audio.pause()
 			if (this.audioCtx && active.fadeGainNode) {
 				const tEnd = this.audioCtx.currentTime
 				active.fadeGainNode.gain.cancelScheduledValues(tEnd)
-				active.fadeGainNode.gain.setValueAtTime(1.0, tEnd)
+				active.fadeGainNode.gain.setValueAtTime(0.0001, tEnd)
 			}
 			this.emit({
 				type: 'pause',
@@ -911,16 +911,26 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				duration: this.getDuration(),
 				track: this.currentTrack,
 			})
+			this.pauseTimer = null
 		}, 80)
 	}
 
 	public stop(): void {
+		if (this.pauseTimer) {
+			clearTimeout(this.pauseTimer)
+			this.pauseTimer = null
+		}
 		for (const slot of this.slots) {
 			slot.audio.pause()
 			slot.audio.currentTime = 0
 			slot.audio.removeAttribute('src')
 			slot.track = null
 			slot.isPreloaded = false
+			if (this.audioCtx && slot.fadeGainNode) {
+				const now = this.audioCtx.currentTime
+				slot.fadeGainNode.gain.cancelScheduledValues(now)
+				slot.fadeGainNode.gain.setValueAtTime(0.0001, now)
+			}
 		}
 		this.currentTrack = null
 	}
