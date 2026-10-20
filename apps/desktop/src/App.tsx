@@ -15,6 +15,7 @@ import { LoginModal } from './components/modals/LoginModal'
 import { PlaylistImportModal } from './components/modals/PlaylistImportModal'
 import { CreatePlaylistModal } from './components/modals/CreatePlaylistModal'
 import { ExportTrackModal } from './components/modals/ExportTrackModal'
+import { BatchExportModal } from './components/modals/BatchExportModal'
 import { ImmersiveLyricsView } from './components/player/ImmersiveLyricsView'
 import {
 	lyricService,
@@ -79,6 +80,7 @@ export const App: React.FC = () => {
 	const [activeSplContent, setActiveSplContent] = useState<string>('')
 	const [isMatchingLyrics, setIsMatchingLyrics] = useState(false)
 	const [exportModalTrack, setExportModalTrack] = useState<Track | null>(null)
+	const [batchExportData, setBatchExportData] = useState<{ title: string; tracks: Track[] } | null>(null)
 	const [fullscreenLyricsOpen, setFullscreenLyricsOpen] = useState(false)
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 	const [searchQuery, setSearchQuery] = useState('')
@@ -967,6 +969,7 @@ export const App: React.FC = () => {
 								onOpenImport={() => setPlaylistImportOpen(true)}
 								onOpenCreate={() => setCreatePlaylistOpen(true)}
 								onExportTrack={setExportModalTrack}
+								onBatchExport={(title, tracks) => setBatchExportData({ title, tracks })}
 							/>
 						)}
 
@@ -974,6 +977,7 @@ export const App: React.FC = () => {
 							<FavoritesView
 								onExportTrack={setExportModalTrack}
 								onOpenLoginModal={() => setLoginModalOpen(true)}
+								onBatchExport={(title, tracks) => setBatchExportData({ title, tracks })}
 							/>
 						)}
 
@@ -981,6 +985,7 @@ export const App: React.FC = () => {
 							<CollectionsView
 								onExportTrack={setExportModalTrack}
 								onOpenLoginModal={() => setLoginModalOpen(true)}
+								onBatchExport={(title, tracks) => setBatchExportData({ title, tracks })}
 							/>
 						)}
 
@@ -1069,6 +1074,13 @@ export const App: React.FC = () => {
 				isOpen={exportModalTrack !== null}
 				onClose={() => setExportModalTrack(null)}
 				track={exportModalTrack}
+			/>
+
+			<BatchExportModal
+				isOpen={batchExportData !== null}
+				onClose={() => setBatchExportData(null)}
+				title={batchExportData?.title || ''}
+				tracks={batchExportData?.tracks || []}
 			/>
 
 			<ImmersiveLyricsView
