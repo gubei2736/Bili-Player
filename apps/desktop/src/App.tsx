@@ -491,12 +491,12 @@ export const App: React.FC = () => {
 				}
 			}
 		} else if (action === 'prev_track') {
-			const prevTrack = queueStore.prev()
+			const prevTrack = queueStore.prev(true)
 			if (prevTrack) {
 				playTrackWithProxy(prevTrack).catch(() => {})
 			}
 		} else if (action === 'next_track') {
-			const nextTrack = queueStore.next()
+			const nextTrack = queueStore.next(true)
 			if (nextTrack) {
 				playTrackWithProxy(nextTrack).catch(() => {})
 			}

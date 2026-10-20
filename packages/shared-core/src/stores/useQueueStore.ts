@@ -25,8 +25,8 @@ export interface QueueState {
 		extraMetadata?: Partial<BilibiliTrack['bilibiliMetadata']>,
 		trackOverrides?: Partial<Pick<BilibiliTrack, 'title' | 'duration' | 'uniqueKey'>>,
 	) => void
-	next: () => Track | null
-	prev: () => Track | null
+	next: (forceStep?: boolean) => Track | null
+	prev: (forceStep?: boolean) => Track | null
 	setPlayMode: (mode: PlayMode) => void
 	getCurrentTrack: () => Track | null
 }
@@ -324,12 +324,13 @@ export const useQueueStore = create<QueueState>()(
 				})
 			},
 
-			next: () => {
+			next: (forceStep = false) => {
 				const { queue, currentIndex, playMode } = get()
 				let { shuffledIndices } = get()
 				if (queue.length === 0) return null
 
-				if (playMode === 'repeat_one') {
+				// 仅在非主动强制切歌时，单曲循环才返回当前歌曲
+				if (playMode === 'repeat_one' && !forceStep) {
 					const validIdx = currentIndex >= 0 && currentIndex < queue.length ? currentIndex : 0
 					const active = cloneTrack(queue[validIdx])
 					set({ currentIndex: validIdx, currentTrack: active })
@@ -350,7 +351,7 @@ export const useQueueStore = create<QueueState>()(
 
 				const nextIdx = currentIndex + 1
 				if (nextIdx >= queue.length) {
-					if (playMode === 'repeat_all') {
+					if (playMode === 'repeat_all' || forceStep) {
 						const active = cloneTrack(queue[0])
 						set({ currentIndex: 0, currentTrack: active })
 						return active
@@ -363,12 +364,13 @@ export const useQueueStore = create<QueueState>()(
 				return active
 			},
 
-			prev: () => {
+			prev: (forceStep = false) => {
 				const { queue, currentIndex, playMode } = get()
 				let { shuffledIndices } = get()
 				if (queue.length === 0) return null
 
-				if (playMode === 'repeat_one') {
+				// 仅在非主动强制切歌时，单曲循环才返回当前歌曲
+				if (playMode === 'repeat_one' && !forceStep) {
 					const validIdx = currentIndex >= 0 && currentIndex < queue.length ? currentIndex : 0
 					const active = cloneTrack(queue[validIdx])
 					set({ currentIndex: validIdx, currentTrack: active })
@@ -391,7 +393,7 @@ export const useQueueStore = create<QueueState>()(
 
 				const prevIdx = currentIndex - 1
 				if (prevIdx < 0) {
-					if (playMode === 'repeat_all') {
+					if (playMode === 'repeat_all' || forceStep) {
 						const lastIdx = queue.length - 1
 						const active = cloneTrack(queue[lastIdx])
 						set({ currentIndex: lastIdx, currentTrack: active })

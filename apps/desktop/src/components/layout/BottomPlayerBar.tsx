@@ -48,7 +48,7 @@ import {
 import { LyricsSettingsModal } from '../modals/LyricsSettingsModal'
 import { VideoPartsModal } from '../modals/VideoPartsModal'
 import { AddToPlaylistModal } from '../modals/AddToPlaylistModal'
-import { logMultipart } from '../../utils/debugLogger'
+import { logMultipart, logDebug, logError } from '../../utils/debugLogger'
 
 export interface BottomPlayerBarProps {
 	onToggleFullscreenLyrics?: () => void
@@ -396,31 +396,71 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	}, [next])
 
 	const handlePrevTrack = (e?: React.MouseEvent) => {
-		if (e) e.stopPropagation()
-		const prevTrack = prev()
+		if (e) {
+			e.preventDefault()
+			e.stopPropagation()
+		}
+		const queueStore = useQueueStore.getState()
+		logMultipart('BottomPlayerBar', '用户点击【上一曲】按钮', {
+			currentIndex: queueStore.currentIndex,
+			queueLength: queueStore.queue.length,
+			playMode: queueStore.playMode,
+			currentTrack: queueStore.currentTrack?.title,
+			engineTrack: desktopAudioEngine.getCurrentTrack()?.title,
+			isPlaying,
+		})
+
+		const prevTrack = prev(true)
 		if (prevTrack) {
+			logMultipart('BottomPlayerBar', '切歌定位到上一曲成功', {
+				title: prevTrack.title,
+				uniqueKey: prevTrack.uniqueKey,
+			})
 			playTrackWithProxy(prevTrack, true).catch((err) =>
-				console.error('Failed to play prev track:', err),
+				logError('BottomPlayerBar', '切上一曲播放失败', err),
 			)
 		} else {
+			logDebug('BottomPlayerBar', '上一曲返回为空，尝试循环到队列尾部曲目')
 			const { queue } = useQueueStore.getState()
 			if (queue.length > 0) {
-				playTrackWithProxy(queue[queue.length - 1], true).catch(() => {})
+				playTrackWithProxy(queue[queue.length - 1], true).catch((err) =>
+					logError('BottomPlayerBar', '循环至队尾播放失败', err),
+				)
 			}
 		}
 	}
 
 	const handleNextTrack = (e?: React.MouseEvent) => {
-		if (e) e.stopPropagation()
-		const nextTrack = next()
+		if (e) {
+			e.preventDefault()
+			e.stopPropagation()
+		}
+		const queueStore = useQueueStore.getState()
+		logMultipart('BottomPlayerBar', '用户点击【下一曲】按钮', {
+			currentIndex: queueStore.currentIndex,
+			queueLength: queueStore.queue.length,
+			playMode: queueStore.playMode,
+			currentTrack: queueStore.currentTrack?.title,
+			engineTrack: desktopAudioEngine.getCurrentTrack()?.title,
+			isPlaying,
+		})
+
+		const nextTrack = next(true)
 		if (nextTrack) {
+			logMultipart('BottomPlayerBar', '切歌定位到下一曲成功', {
+				title: nextTrack.title,
+				uniqueKey: nextTrack.uniqueKey,
+			})
 			playTrackWithProxy(nextTrack, true).catch((err) =>
-				console.error('Failed to play next track:', err),
+				logError('BottomPlayerBar', '切下一曲播放失败', err),
 			)
 		} else {
+			logDebug('BottomPlayerBar', '下一曲返回为空，尝试循环到队列首部曲目')
 			const { queue } = useQueueStore.getState()
 			if (queue.length > 0) {
-				playTrackWithProxy(queue[0], true).catch(() => {})
+				playTrackWithProxy(queue[0], true).catch((err) =>
+					logError('BottomPlayerBar', '循环至队首播放失败', err),
+				)
 			}
 		}
 	}
@@ -497,7 +537,19 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	}, [isPlaying, isDragging, duration, isMainVisible])
 
 
-	const togglePlayPause = async () => {
+	const togglePlayPause = async (e?: React.MouseEvent) => {
+		if (e) {
+			e.preventDefault()
+			e.stopPropagation()
+		}
+		logMultipart('BottomPlayerBar', '用户点击【播放/暂停】按钮', {
+			isPlaying,
+			engineIsPlaying: desktopAudioEngine.isPlaying(),
+			currentTrack: currentTrack?.title,
+			engineTrack: desktopAudioEngine.getCurrentTrack()?.title,
+			hasLoadedSource: desktopAudioEngine.hasLoadedSource(),
+		})
+
 		if (isPlaying) {
 			desktopAudioEngine.pause()
 		} else {
@@ -511,12 +563,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 				try {
 					await playTrackWithProxy(currentTrack)
 				} catch (err) {
-					console.error('Failed to play track:', err)
+					logError('BottomPlayerBar', '播放曲目失败:', err)
 				}
 			} else {
 				try {
 					await desktopAudioEngine.play()
-				} catch {
+				} catch (playErr) {
+					logError('BottomPlayerBar', '引擎恢复播放失败，尝试重新加载曲目:', playErr)
 					if (currentTrack) {
 						await playTrackWithProxy(currentTrack).catch(() => {})
 					}

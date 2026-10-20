@@ -111,7 +111,7 @@ pub fn setup_window_effects(window: &WebviewWindow) {
 /// Tauri Command: Check if app is running in debug mode
 #[tauri::command]
 pub fn is_debug_mode() -> bool {
-    cfg!(debug_assertions)
+    true
 }
 
 /// Tauri Command: Set ignore cursor events (mouse penetration) for lyrics window
@@ -194,19 +194,12 @@ pub fn get_log_file_path() -> std::path::PathBuf {
 }
 
 pub fn write_log_line(message: &str) {
-    #[cfg(debug_assertions)]
-    {
-        eprintln!("{}", message);
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        let path = get_log_file_path();
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-            let _ = writeln!(file, "{}", message);
-        }
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        let _ = message;
+    eprintln!("{}", message);
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let path = get_log_file_path();
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", message);
     }
 }
 
