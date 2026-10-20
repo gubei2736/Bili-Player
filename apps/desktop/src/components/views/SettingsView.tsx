@@ -7,9 +7,6 @@ import {
 	Music,
 	Sparkles,
 	ExternalLink,
-	Compass,
-	Eye,
-	EyeOff,
 } from 'lucide-react'
 import { AudioQualitySettingsCard } from './AudioQualitySettingsCard'
 import { LyricsSettingsCard } from './LyricsSettingsCard'
@@ -119,50 +116,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 					<span>窗口系统行为与关于</span>
 				</div>
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-					{/* Sidebar Explore Visibility Card */}
-					<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs flex flex-col justify-between space-y-3">
-						<div className="space-y-1">
-							<p className="font-semibold text-foreground flex items-center gap-1.5">
-								<Compass className="w-4 h-4 text-sky-400" />
-								<span>侧边栏「发现音乐」</span>
-							</p>
-							<p className="text-[11px] text-muted-foreground">
-								控制侧边栏音乐馆中是否展示推荐与每日精选的发现音乐入口
-							</p>
-						</div>
-
-						<div className="pt-2 border-t border-white/5 flex items-center justify-between">
-							<span className="text-[11px] text-muted-foreground">导航栏显示状态</span>
-							<button
-								onClick={() => {
-									const current = localStorage.getItem('bbplayer_show_explore') !== 'false'
-									const next = !current
-									try {
-										localStorage.setItem('bbplayer_show_explore', String(next))
-									} catch {}
-									window.dispatchEvent(
-										new CustomEvent('bbplayer:show-explore-change', { detail: { show: next } }),
-									)
-									// 强制触发重绘
-									window.dispatchEvent(new Event('storage'))
-								}}
-								className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-foreground font-medium rounded-xl text-xs transition-colors flex items-center gap-1.5"
-							>
-								{localStorage.getItem('bbplayer_show_explore') === 'false' ? (
-									<>
-										<EyeOff className="w-3.5 h-3.5 text-rose-400" />
-										<span>已隐藏 (点击显示)</span>
-									</>
-								) : (
-									<>
-										<Eye className="w-3.5 h-3.5 text-emerald-400" />
-										<span>显示中 (点击隐藏)</span>
-									</>
-								)}
-							</button>
-						</div>
-					</div>
-
 					{/* Window Close Behavior Card */}
 					<div className="rounded-xl bg-white/5 p-4 border border-white/5 text-xs flex flex-col justify-between space-y-3">
 						<div>
@@ -250,7 +203,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 										Bili Player
 									</span>
 									<span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold border border-primary/30">
-										V1.1.2
+										v1.1.3
 									</span>
 								</div>
 								<p className="text-[11px] text-muted-foreground mt-0.5">

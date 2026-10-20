@@ -86,7 +86,7 @@ export const TrayMenuApp: React.FC = () => {
 					</span>
 				</div>
 				<span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-white/10 text-white/50 border border-white/10">
-					v1.1.2
+					v1.1.3
 				</span>
 			</div>
 
