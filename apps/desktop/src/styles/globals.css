@@ -70,15 +70,12 @@ body {
 	overflow: hidden;
 }
 
-/* Debug 模式下解除所有 select-none 限制，允许对任意界面文本进行鼠标拖拽选中与复制 (Ctrl+C / 右键复制) */
-body.is-debug-mode,
-body.is-debug-mode *,
-html.is-debug-mode,
-html.is-debug-mode *,
-.is-debug-mode,
-.is-debug-mode * {
-	user-select: text !important;
-	-webkit-user-select: text !important;
+/* 全局禁止任意界面文本被直接鼠标拖拽选中与复制，维持桌面原生应用纯净听歌体验 */
+input,
+textarea,
+[contenteditable="true"] {
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 /* 确保透明窗口 (桌面歌词/迷你播放器/托盘菜单) 在任何情况下均无默认边框、无外边框、全透明底色与无原生阴影 */

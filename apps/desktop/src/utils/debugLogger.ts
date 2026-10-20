@@ -1,16 +1,18 @@
 import { invoke } from '@tauri-apps/api/core'
 
-let isDebugMode = true
+let isDebugMode = false
 
 if (typeof window !== 'undefined') {
-	;(window as any).__APP_DEBUG_LOGS__ = (window as any).__APP_DEBUG_LOGS__ || []
 	invoke<boolean>('is_debug_mode')
 		.then((debug) => {
 			isDebugMode = debug
 			;(window as any).__IS_DEBUG_MODE__ = debug
+			if (debug) {
+				;(window as any).__APP_DEBUG_LOGS__ = (window as any).__APP_DEBUG_LOGS__ || []
+			}
 		})
 		.catch(() => {
-			isDebugMode = true
+			isDebugMode = false
 		})
 }
 

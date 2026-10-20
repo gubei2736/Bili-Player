@@ -13,34 +13,32 @@ setDefaultHttpClient(new DesktopTauriHttpClient())
 
 import { logError, logDebug } from './utils/debugLogger'
 
-// 检查是否为 Debug 构建模式
+// 全局彻底禁用默认右键上下文菜单（返回、刷新、另存为、打印等），保持桌面播放器原生纯净体验
+document.addEventListener('contextmenu', (e) => {
+	const target = e.target as HTMLElement | null
+	if (
+		target &&
+		(target.tagName === 'INPUT' ||
+			target.tagName === 'TEXTAREA' ||
+			target.isContentEditable)
+	) {
+		return
+	}
+	e.preventDefault()
+}, true)
+
+// 仅在明确的 Debug 构建模式下允许 F12 打开 DevTools
 invoke<boolean>('is_debug_mode')
 	.then((isDebug) => {
 		if (isDebug) {
-			document.body.classList.add('is-debug-mode')
-			document.documentElement.classList.add('is-debug-mode')
-			logDebug('AppInit', 'Debug mode initialized. Press F12 to toggle DevTools.')
-		} else {
-			// 仅在真正的 Release 模式下禁用默认右键菜单
-			document.addEventListener('contextmenu', (e) => {
-				e.preventDefault()
+			window.addEventListener('keydown', (e) => {
+				if (e.key === 'F12') {
+					invoke('toggle_devtools').catch(() => {})
+				}
 			})
 		}
 	})
-	.catch(() => {
-		if (!(import.meta as any).env?.DEV) {
-			document.addEventListener('contextmenu', (e) => {
-				e.preventDefault()
-			})
-		}
-	})
-
-// F12 快捷键切换开发者工具 (DevTools)
-window.addEventListener('keydown', (e) => {
-	if (e.key === 'F12') {
-		invoke('toggle_devtools').catch(() => {})
-	}
-})
+	.catch(() => {})
 
 window.addEventListener('error', (e) => {
 	logError('GlobalWindow', e.message, e.error)
