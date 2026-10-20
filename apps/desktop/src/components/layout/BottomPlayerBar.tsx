@@ -219,6 +219,27 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	isDraggingRef.current = isDragging
 	const seekLockUntilRef = useRef<number>(0)
 
+	const [isMainVisible, setIsMainVisible] = useState(() => !document.hidden)
+
+	useEffect(() => {
+		const handleVisibility = () => {
+			setIsMainVisible(!document.hidden)
+		}
+		document.addEventListener('visibilitychange', handleVisibility)
+
+		const unlistenMiniPromise = listen<boolean>(
+			'mini-player-visibility-change',
+			(event) => {
+				setIsMainVisible(!event.payload && !document.hidden)
+			},
+		)
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibility)
+			unlistenMiniPromise.then((unlisten) => unlisten())
+		}
+	}, [])
+
 	const isLocalTrack =
 		currentTrack?.source === 'local' ||
 		Boolean((currentTrack as any)?.localMetadata?.localPath)
@@ -387,8 +408,18 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 
 	// 5.1 60fps 平滑推进进度条，彻底消除每秒 3-4 次 timeupdate 带来的顿挫感，同时防止高刷屏（180Hz/240Hz）上过载重排
 	// ⚡ 解耦优化：动画帧只操作 DOM style 与秒级文本，不再每帧触发 setCurrentTime 重构组件树
+	// ⚡ 休眠优化：主窗口在后台或隐藏（处于迷你模式）时彻底暂停 60FPS 循环，从根源清零无效 GPU 占用
 	useEffect(() => {
-		if (!isPlaying || isDragging) return
+		if (!isPlaying || isDragging || !isMainVisible) {
+			if (duration > 0 && isPlaying) {
+				const cur = desktopAudioEngine.getCurrentTime()
+				const pct = Math.max(0, Math.min(100, (cur / duration) * 100))
+				if (progressBarFillRef.current) progressBarFillRef.current.style.width = `${pct}%`
+				if (progressThumbRef.current) progressThumbRef.current.style.left = `${pct}%`
+				if (timeTextSpanRef.current) timeTextSpanRef.current.textContent = formatTime(cur)
+			}
+			return
+		}
 
 		let animId: number
 		let lastUpdate = 0
@@ -420,11 +451,20 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			animId = requestAnimationFrame(updateProgress)
 		}
 
+		// 窗口恢复可见时立即刷新一次当前时间与进度
+		const cur = desktopAudioEngine.getCurrentTime()
+		if (duration > 0) {
+			const pct = Math.max(0, Math.min(100, (cur / duration) * 100))
+			if (progressBarFillRef.current) progressBarFillRef.current.style.width = `${pct}%`
+			if (progressThumbRef.current) progressThumbRef.current.style.left = `${pct}%`
+		}
+		if (timeTextSpanRef.current) timeTextSpanRef.current.textContent = formatTime(cur)
+
 		animId = requestAnimationFrame(updateProgress)
 		return () => {
 			if (animId) cancelAnimationFrame(animId)
 		}
-	}, [isPlaying, isDragging, duration])
+	}, [isPlaying, isDragging, duration, isMainVisible])
 
 
 	const togglePlayPause = async () => {
