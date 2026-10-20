@@ -295,6 +295,14 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 	currentLoadingTrackKey = inputTrack.uniqueKey
 	const requestId = ++latestPlayRequestId
 
+	if (typeof window !== 'undefined') {
+		window.dispatchEvent(
+			new CustomEvent('bbplayer:track-loading', {
+				detail: { loading: true, track: inputTrack },
+			}),
+		)
+	}
+
 	// ⚡ 核心修复：切歌瞬间立即暂停上一首音频并广播状态，彻底消灭“4秒切歌期间还在播放旧歌”的问题！
 	desktopAudioEngine.prepareTrackSwitch(inputTrack)
 
@@ -453,7 +461,7 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 				})
 			} else {
 				logDebug('playTrackHelper', '开始向 B 站 API 获取音频流 (getAudioStream)', { bvid, cid, audioQuality, enableDolby, enableHiRes })
-				const streamRes = await bilibiliApi.getAudioStream({
+				let streamRes = await bilibiliApi.getAudioStream({
 					bvid,
 					cid: cid!,
 					audioQuality,
@@ -461,6 +469,20 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 					enableHiRes,
 					preferDolbyFirst,
 				})
+
+				if (streamRes.isErr()) {
+					logDebug('playTrackHelper', `首次获取音频流异常，300ms 后自动重试: ${streamRes.error.message}`)
+					await new Promise((r) => setTimeout(r, 300))
+					if (requestId !== latestPlayRequestId) return
+					streamRes = await bilibiliApi.getAudioStream({
+						bvid,
+						cid: cid!,
+						audioQuality,
+						enableDolby,
+						enableHiRes,
+						preferDolbyFirst,
+					})
+				}
 
 				if (requestId !== latestPlayRequestId) {
 					logDebug('playTrackHelper', '请求已被后续切歌取代，忽略本次响应', { bvid, cid })
@@ -610,5 +632,12 @@ export async function playTrackWithProxy(inputTrack: Track, forceReplay = false)
 		throw err
 	} finally {
 		currentLoadingTrackKey = null
+		if (typeof window !== 'undefined') {
+			window.dispatchEvent(
+				new CustomEvent('bbplayer:track-loading', {
+					detail: { loading: false, track: inputTrack },
+				}),
+			)
+		}
 	}
 }

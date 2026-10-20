@@ -1,5 +1,6 @@
 import type { IHttpClient, HttpRequestOptions, HttpResponse } from '@bbplayer/shared-core'
 import { invoke } from '@tauri-apps/api/core'
+import { logDebug, logError } from '../utils/debugLogger'
 
 interface NativeHttpResponse {
 	ok: boolean
@@ -11,23 +12,43 @@ interface NativeHttpResponse {
 
 export class DesktopTauriHttpClient implements IHttpClient {
 	async fetch(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse> {
-		try {
-			let bodyStr: string | undefined = undefined
-			if (options.body) {
-				bodyStr =
-					typeof options.body === 'string'
-						? options.body
-						: JSON.stringify(options.body)
-			}
+		let bodyStr: string | undefined = undefined
+		if (options.body) {
+			bodyStr =
+				typeof options.body === 'string'
+					? options.body
+					: JSON.stringify(options.body)
+		}
 
-			const res = await invoke<NativeHttpResponse>('native_http_request', {
-				request: {
-					url,
-					method: options.method || 'GET',
-					headers: options.headers || {},
-					body: bodyStr,
-				},
-			})
+		const executeNative = async (attempt: number): Promise<NativeHttpResponse> => {
+			try {
+				return await invoke<NativeHttpResponse>('native_http_request', {
+					request: {
+						url,
+						method: options.method || 'GET',
+						headers: options.headers || {},
+						body: bodyStr,
+					},
+				})
+			} catch (err: any) {
+				if (attempt < 2) {
+					logDebug('DesktopHttpClient', `Native HTTP 请求首发异常，将在 300ms 后自动重试 (1/2): ${err?.message || err}`)
+					await new Promise((r) => setTimeout(r, 300))
+					return await invoke<NativeHttpResponse>('native_http_request', {
+						request: {
+							url,
+							method: options.method || 'GET',
+							headers: options.headers || {},
+							body: bodyStr,
+						},
+					})
+				}
+				throw err
+			}
+		}
+
+		try {
+			const res = await executeNative(1)
 
 			const headerMap = new Map<string, string>()
 			for (const [key, val] of Object.entries(res.headers)) {
@@ -49,23 +70,9 @@ export class DesktopTauriHttpClient implements IHttpClient {
 				text: async () => res.body,
 				arrayBuffer: async () => new TextEncoder().encode(res.body).buffer,
 			}
-		} catch (err) {
-			console.warn('Native HTTP request fallback to global fetch:', err)
-			const fallbackRes = await fetch(url, {
-				method: options.method || 'GET',
-				headers: options.headers,
-				body: options.body,
-				signal: options.signal,
-			})
-			return {
-				ok: fallbackRes.ok,
-				status: fallbackRes.status,
-				statusText: fallbackRes.statusText,
-				headers: fallbackRes.headers,
-				json: () => fallbackRes.json(),
-				text: () => fallbackRes.text(),
-				arrayBuffer: () => fallbackRes.arrayBuffer(),
-			}
+		} catch (err: any) {
+			logError('DesktopHttpClient', `Native HTTP 请求彻底失败 [${url.substring(0, 100)}]`, err)
+			throw new Error(`Native HTTP 请求失败: ${err?.message || err}`)
 		}
 	}
 }

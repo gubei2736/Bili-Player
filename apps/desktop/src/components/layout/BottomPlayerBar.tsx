@@ -23,6 +23,7 @@ import {
 	PictureInPicture2,
 	Globe,
 	SlidersHorizontal,
+	Loader2,
 } from 'lucide-react'
 import { EqualizerModal } from '../modals/EqualizerModal'
 import { getEqualizerSettings } from '../../audio/equalizerSettings'
@@ -73,6 +74,15 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const primaryColor = themeColors?.color || '#00AEEC'
 
 	const [isPlaying, setIsPlaying] = useState(false)
+	const [isLoading, setIsLoading] = useState(false)
+
+	useEffect(() => {
+		const handleTrackLoading = (e: CustomEvent) => {
+			setIsLoading(Boolean(e.detail?.loading))
+		}
+		window.addEventListener('bbplayer:track-loading', handleTrackLoading as EventListener)
+		return () => window.removeEventListener('bbplayer:track-loading', handleTrackLoading as EventListener)
+	}, [])
 	const [currentTime, setCurrentTime] = useState(0)
 	const [duration, setDuration] = useState(0)
 	const [volume, setVolume] = useState<number>(() => {
@@ -1044,10 +1054,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 						{/* PERFECT CIRCULAR HERO PLAY BUTTON - Guaranteed 100% Full Circle, Never Cut Off */}
 						<button
 							onClick={togglePlayPause}
-							title={isPlaying ? '暂停 (Space)' : '播放 (Space)'}
-							className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center bg-[#00AEEC] hover:bg-[#1bbefa] active:bg-[#009fd6] text-white shadow-[0_4px_16px_rgba(0,174,236,0.45)] hover:scale-105 active:scale-95 transition-all duration-200"
+							disabled={isLoading}
+							title={isLoading ? '正在缓冲加载音频流...' : isPlaying ? '暂停 (Space)' : '播放 (Space)'}
+							className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center bg-[#00AEEC] hover:bg-[#1bbefa] active:bg-[#009fd6] text-white shadow-[0_4px_16px_rgba(0,174,236,0.45)] hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-85 disabled:cursor-wait"
 						>
-							{isPlaying ? (
+							{isLoading ? (
+								<Loader2 className="w-4 h-4 animate-spin text-white" />
+							) : isPlaying ? (
 								<Pause className="w-4 h-4 fill-white" />
 							) : (
 								<Play className="w-4 h-4 fill-white ml-0.5" />

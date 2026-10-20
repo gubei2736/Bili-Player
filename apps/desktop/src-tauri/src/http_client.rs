@@ -29,8 +29,8 @@ static PROXY_CLIENT_ENV: OnceLock<Option<reqwest::Client>> = OnceLock::new();
 fn get_direct_client() -> &'static reqwest::Client {
     DIRECT_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
-            .connect_timeout(Duration::from_millis(2000))
-            .timeout(Duration::from_secs(8))
+            .connect_timeout(Duration::from_secs(6))
+            .timeout(Duration::from_secs(20))
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .build()
@@ -39,10 +39,10 @@ fn get_direct_client() -> &'static reqwest::Client {
 }
 
 fn get_active_proxy_client() -> Option<&'static reqwest::Client> {
-    // 1. 动态检测本地代理端口 127.0.0.1:7879 是否在监听（探测耗时通常 <0.5ms）
+    // 1. 动态检测本地代理端口 127.0.0.1:7879 是否在监听（探测超时适度放宽至 300ms，避免偶发抖动误判）
     let is_7879_active = std::net::TcpStream::connect_timeout(
         &std::net::SocketAddr::from(([127, 0, 0, 1], 7879)),
-        Duration::from_millis(50),
+        Duration::from_millis(300),
     )
     .is_ok();
 
@@ -51,8 +51,8 @@ fn get_active_proxy_client() -> Option<&'static reqwest::Client> {
             let proxy = reqwest::Proxy::all("http://127.0.0.1:7879")
                 .expect("valid static proxy string");
             reqwest::Client::builder()
-                .connect_timeout(Duration::from_millis(2000))
-                .timeout(Duration::from_secs(8))
+                .connect_timeout(Duration::from_secs(6))
+                .timeout(Duration::from_secs(20))
                 .proxy(proxy)
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
@@ -72,8 +72,8 @@ fn get_active_proxy_client() -> Option<&'static reqwest::Client> {
             if let Some(ref p) = env_proxy {
                 if let Ok(proxy) = reqwest::Proxy::all(p) {
                     return reqwest::Client::builder()
-                        .connect_timeout(Duration::from_millis(2000))
-                        .timeout(Duration::from_secs(8))
+                        .connect_timeout(Duration::from_secs(6))
+                        .timeout(Duration::from_secs(20))
                         .proxy(proxy)
                         .redirect(reqwest::redirect::Policy::none())
                         .build()
@@ -226,17 +226,42 @@ async fn execute_request_on_client(
 
 #[tauri::command]
 pub async fn native_http_request(request: NativeHttpRequest) -> Result<NativeHttpResponse, String> {
-    // 1. 若本地代理端口 127.0.0.1:7879 或环境变量代理可用（如 Clash 正在运行将域名劫持为 Fake-IP），
-    // 必须优先使用代理通道。Clash 内核在本地即可瞬间完成路由和请求（耗时约 50ms），
-    // 彻底杜绝直接向 Fake-IP 黑洞发包造成的长达数秒挂起超时！
+    let url_preview = if request.url.len() > 90 {
+        format!("{}...", &request.url[..90])
+    } else {
+        request.url.clone()
+    };
+
+    // 1. 若本地代理端口 127.0.0.1:7879 或环境变量代理可用，优先使用代理通道
     if let Some(proxy_client) = get_active_proxy_client() {
-        if let Ok(proxy_res) = execute_request_on_client(proxy_client, &request).await {
-            if proxy_res.ok || (proxy_res.status > 0 && proxy_res.status < 500) {
-                return Ok(proxy_res);
+        match execute_request_on_client(proxy_client, &request).await {
+            Ok(proxy_res) => {
+                if proxy_res.ok || (proxy_res.status > 0 && proxy_res.status < 500) {
+                    return Ok(proxy_res);
+                }
+                crate::window_ext::write_log_line(&format!(
+                    "[NativeHttp] 代理通道返回非正常状态: {}, url: {}",
+                    proxy_res.status, url_preview
+                ));
+            }
+            Err(e) => {
+                crate::window_ext::write_log_line(&format!(
+                    "[NativeHttp] 代理通道请求异常: {}, url: {}",
+                    e, url_preview
+                ));
             }
         }
     }
 
-    // 2. 直连通道（代理未开启、或代理请求失败时执行）
-    execute_request_on_client(get_direct_client(), &request).await
+    // 2. 直连通道（代理未开启、或代理请求失败时执行兜底）
+    match execute_request_on_client(get_direct_client(), &request).await {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            crate::window_ext::write_log_line(&format!(
+                "[NativeHttp] 直连通道请求异常: {}, url: {}",
+                e, url_preview
+            ));
+            Err(e)
+        }
+    }
 }
