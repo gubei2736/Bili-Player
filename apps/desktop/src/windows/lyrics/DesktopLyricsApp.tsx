@@ -46,6 +46,7 @@ const FONT_SIZE_STORAGE_KEY = 'bbplayer_desktop_lyrics_fontsize'
 export const DesktopLyricsApp: React.FC = () => {
 	const [isLocked, setIsLocked] = useState(false)
 	const [showLockToast, setShowLockToast] = useState(false)
+	const [isLyricsVisible, setIsLyricsVisible] = useState(false)
 	const [isPlaying, setIsPlaying] = useState(false)
 	const [displayTimeMs, setDisplayTimeMs] = useState(0)
 	const [title, setTitle] = useState('Bili Player 桌面歌词')
@@ -150,6 +151,13 @@ export const DesktopLyricsApp: React.FC = () => {
 		window.addEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
 		window.addEventListener('bbplayer:lyric-colors-change', handleAllColorsChange)
 
+		const unlistenVisPromise = listen<boolean>(
+			'lyrics-visibility-change',
+			(event) => {
+				setIsLyricsVisible(Boolean(event.payload))
+			},
+		)
+
 		// 窗口挂载时，主动拉取 Rust 端真实的穿透锁定状态，并通知主窗口补发当前歌词状态
 		invoke<boolean>('is_lyrics_locked')
 			.then((locked) => {
@@ -162,6 +170,7 @@ export const DesktopLyricsApp: React.FC = () => {
 		return () => {
 			unlistenSyncPromise.then((unlisten) => unlisten())
 			unlistenLockPromise.then((unlisten) => unlisten())
+			unlistenVisPromise.then((unlisten) => unlisten())
 			window.removeEventListener('bbplayer:desktop-lyrics-color-change', handleLocalColorChange)
 			window.removeEventListener('bbplayer:lyric-colors-change', handleAllColorsChange)
 		}
@@ -183,9 +192,9 @@ export const DesktopLyricsApp: React.FC = () => {
 		return lyricsData.lines[0] || null
 	}, [lyricsData, displayTimeMs])
 
-	// 60FPS 本地平滑插值循环：仅在播放中且存在歌词时运行，限制最高 60FPS 消除高刷屏（180Hz/240Hz）多余重绘与 DWM 混色开销
+	// 60FPS 本地平滑插值循环：仅在播放中、歌词窗口可见且存在歌词时运行，未开启桌面歌词时彻底休眠
 	useEffect(() => {
-		if (!isPlaying || !lyricsData || lyricsData.lines.length === 0) return
+		if (!isPlaying || !lyricsData || lyricsData.lines.length === 0 || !isLyricsVisible) return
 
 		let rafId: number
 		let lastTick = 0
@@ -203,7 +212,7 @@ export const DesktopLyricsApp: React.FC = () => {
 
 		rafId = requestAnimationFrame(tick)
 		return () => cancelAnimationFrame(rafId)
-	}, [isPlaying, lyricsData])
+	}, [isPlaying, lyricsData, isLyricsVisible])
 
 	const toggleLock = async () => {
 		const nextLocked = !isLocked

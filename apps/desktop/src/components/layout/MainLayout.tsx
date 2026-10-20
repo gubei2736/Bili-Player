@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { TitleBar } from './TitleBar'
 import { Sidebar, type NavTab } from './Sidebar'
 import { BottomPlayerBar } from './BottomPlayerBar'
@@ -37,6 +38,26 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 	const uiOpacity = useSkinStore((s) => s.uiOpacity ?? 0.35)
 
 	const videoRef = useRef<HTMLVideoElement | null>(null)
+	const [isMainVisible, setIsMainVisible] = useState(() => !document.hidden)
+
+	useEffect(() => {
+		const handleVisibility = () => {
+			setIsMainVisible(!document.hidden)
+		}
+		document.addEventListener('visibilitychange', handleVisibility)
+
+		const unlistenMiniPromise = listen<boolean>(
+			'mini-player-visibility-change',
+			(event) => {
+				setIsMainVisible(!event.payload && !document.hidden)
+			},
+		)
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibility)
+			unlistenMiniPromise.then((unlisten) => unlisten())
+		}
+	}, [])
 
 	// 视频壁纸后台停止播放、前台自动恢复播放机制
 	useEffect(() => {
@@ -44,7 +65,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 		if (!video || customBgType !== 'video') return
 
 		const handleVisibility = () => {
-			if (document.hidden) {
+			if (document.hidden || !isMainVisible) {
 				video.pause()
 			} else {
 				video.play().catch(() => {})
@@ -70,7 +91,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 			window.removeEventListener('blur', handleWindowBlur)
 			window.removeEventListener('focus', handleWindowFocus)
 		}
-	}, [customBgUrl, customBgType])
+	}, [customBgUrl, customBgType, isMainVisible])
 
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden bg-[#07090e] text-foreground border border-white/10 shadow-2xl relative select-none">
@@ -104,24 +125,26 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 				</div>
 			)}
 
-			{/* 1. Ambient Dynamic Cover Glow (随当前播放歌曲封面实时晕染底层环境光) */}
-			<div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-				{currentTrack?.coverUrl && !customBgUrl && (
-					<img
-						src={currentTrack.coverUrl}
-						alt=""
-						referrerPolicy="no-referrer"
-						className="absolute -top-1/4 -left-1/4 w-[150%] h-[150%] object-cover blur-[120px] opacity-[0.16] saturate-200 scale-125 transition-all duration-1000"
-					/>
-				)}
-				{/* 顶部主题色微光 (有自定义壁纸时淡化避免遮挡细节) */}
-				{!customBgUrl && (
-					<>
-						<div className="absolute -top-32 left-1/3 w-[600px] h-[320px] rounded-full bg-primary/20 blur-[110px] opacity-60 transition-colors duration-700" />
-						<div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
-					</>
-				)}
-			</div>
+			{/* 1. Ambient Dynamic Cover Glow (随当前播放歌曲封面实时晕染底层环境光，窗口隐藏时完全卸载以省电) */}
+			{isMainVisible && (
+				<div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+					{currentTrack?.coverUrl && !customBgUrl && (
+						<img
+							src={currentTrack.coverUrl}
+							alt=""
+							referrerPolicy="no-referrer"
+							className="absolute -top-1/4 -left-1/4 w-[150%] h-[150%] object-cover blur-[120px] opacity-[0.16] saturate-200 scale-125 transition-all duration-1000"
+						/>
+					)}
+					{/* 顶部主题色微光 (有自定义壁纸时淡化避免遮挡细节) */}
+					{!customBgUrl && (
+						<>
+							<div className="absolute -top-32 left-1/3 w-[600px] h-[320px] rounded-full bg-primary/20 blur-[110px] opacity-60 transition-colors duration-700" />
+							<div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
+						</>
+					)}
+				</div>
+			)}
 
 			{/* 2. Top frameless title bar */}
 			<TitleBar onSearch={onSearch} />

@@ -68,7 +68,28 @@ export const MiniPlayerApp: React.FC = () => {
 	const [isDragging, setIsDragging] = useState(false)
 	const [dragProgress, setDragProgress] = useState(0)
 	const [hoverProgress, setHoverProgress] = useState<number | null>(null)
-	const [displayTime, setDisplayTime] = useState(state.currentTime)
+	const lastDisplaySecRef = useRef<number>(-1)
+	const [isMiniVisible, setIsMiniVisible] = useState(true)
+
+	// 监听迷你播放器窗口显隐，隐藏时停止动画帧以省电降低 GPU 负载
+	useEffect(() => {
+		const handleVisibility = () => {
+			setIsMiniVisible(!document.hidden)
+		}
+		document.addEventListener('visibilitychange', handleVisibility)
+
+		const unlistenPromise = listen<boolean>(
+			'mini-player-visibility-change',
+			(event) => {
+				setIsMiniVisible(Boolean(event.payload) && !document.hidden)
+			},
+		)
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibility)
+			unlistenPromise.then((unlisten) => unlisten())
+		}
+	}, [])
 
 	// 本地 60FPS 平滑插值锚点
 	const syncAnchorRef = useRef({
@@ -87,7 +108,18 @@ export const MiniPlayerApp: React.FC = () => {
 						syncAnchorRef.current.baseTime = event.payload.currentTime
 						syncAnchorRef.current.perfNow = performance.now()
 						if (!isDragging) {
-							setDisplayTime(event.payload.currentTime)
+							const cur = event.payload.currentTime
+							if (progressBarFillRef.current && state.duration > 0) {
+								const pct = Math.max(0, Math.min(100, (cur / state.duration) * 100))
+								progressBarFillRef.current.style.width = `${pct}%`
+							}
+							if (progressThumbRef.current && state.duration > 0) {
+								const pct = Math.max(0, Math.min(100, (cur / state.duration) * 100))
+								progressThumbRef.current.style.left = `${pct}%`
+							}
+							if (timeTextSpanRef.current) {
+								timeTextSpanRef.current.textContent = formatTime(cur)
+							}
 						}
 					}
 					if (event.payload.isPlaying !== undefined) {
@@ -107,9 +139,9 @@ export const MiniPlayerApp: React.FC = () => {
 		}
 	}, [isDragging])
 
-	// 60FPS 本地平滑推进循环：消除跨窗口广播频率限制带来的顿挫感，与主界面完全一致
+	// 60FPS 本地平滑推进循环：纯 DOM 操作，彻底解耦 setDisplayTime React State，解除每秒 60 次全量 Re-render
 	useEffect(() => {
-		if (!state.isPlaying || isDragging) return
+		if (!state.isPlaying || isDragging || !isMiniVisible) return
 
 		let animId: number
 		let lastTick = 0
@@ -121,16 +153,19 @@ export const MiniPlayerApp: React.FC = () => {
 					if (isPlaying && state.duration > 0) {
 						const elapsed = (performance.now() - perfNow) / 1000
 						const cur = Math.min(state.duration, baseTime + elapsed)
-						setDisplayTime(cur)
-						const pct = (cur / state.duration) * 100
+						const pct = Math.max(0, Math.min(100, (cur / state.duration) * 100))
 						if (progressBarFillRef.current) {
 							progressBarFillRef.current.style.width = `${pct}%`
 						}
 						if (progressThumbRef.current) {
 							progressThumbRef.current.style.left = `${pct}%`
 						}
-						if (timeTextSpanRef.current) {
-							timeTextSpanRef.current.textContent = formatTime(cur)
+						const curSec = Math.floor(cur)
+						if (curSec !== lastDisplaySecRef.current) {
+							lastDisplaySecRef.current = curSec
+							if (timeTextSpanRef.current) {
+								timeTextSpanRef.current.textContent = formatTime(cur)
+							}
 						}
 					}
 				}
@@ -142,7 +177,7 @@ export const MiniPlayerApp: React.FC = () => {
 		return () => {
 			if (animId) cancelAnimationFrame(animId)
 		}
-	}, [state.isPlaying, isDragging, state.duration])
+	}, [state.isPlaying, isDragging, state.duration, isMiniVisible])
 
 	// 当列表展开或当前曲目变更时，自动平滑滚动到当前曲目视口
 	useEffect(() => {
@@ -227,7 +262,6 @@ export const MiniPlayerApp: React.FC = () => {
 		const p = calculateProgressFromPointer(e)
 		setDragProgress(p)
 		const targetSec = p * state.duration
-		setDisplayTime(targetSec)
 		if (timeTextSpanRef.current) {
 			timeTextSpanRef.current.textContent = formatTime(targetSec)
 		}
@@ -263,7 +297,6 @@ export const MiniPlayerApp: React.FC = () => {
 			const p = calculateProgressFromPointer(e)
 			setIsDragging(false)
 			const targetSec = p * state.duration
-			setDisplayTime(targetSec)
 			syncAnchorRef.current.baseTime = targetSec
 			syncAnchorRef.current.perfNow = performance.now()
 			setState((prev) => ({ ...prev, currentTime: targetSec }))
@@ -278,7 +311,7 @@ export const MiniPlayerApp: React.FC = () => {
 		isDragging
 			? dragProgress
 			: state.duration > 0
-			? Math.max(0, Math.min(1, displayTime / state.duration))
+			? Math.max(0, Math.min(1, state.currentTime / state.duration))
 			: 0
 
 	const currentQueue = state.queue || []
@@ -433,7 +466,7 @@ export const MiniPlayerApp: React.FC = () => {
 						ref={timeTextSpanRef}
 						className="text-[10px] font-mono font-bold text-[#00AEEC] min-w-[32px] text-right shrink-0 select-none"
 					>
-						{formatTime(isDragging ? dragProgress * state.duration : displayTime)}
+						{formatTime(isDragging ? dragProgress * state.duration : state.currentTime)}
 					</span>
 
 					{/* Straight Progress Track */}
