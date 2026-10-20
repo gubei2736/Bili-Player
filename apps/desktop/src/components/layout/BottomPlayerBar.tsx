@@ -395,21 +395,33 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 		return unsubscribe
 	}, [next])
 
-	const handlePrevTrack = () => {
+	const handlePrevTrack = (e?: React.MouseEvent) => {
+		if (e) e.stopPropagation()
 		const prevTrack = prev()
 		if (prevTrack) {
 			playTrackWithProxy(prevTrack, true).catch((err) =>
 				console.error('Failed to play prev track:', err),
 			)
+		} else {
+			const { queue } = useQueueStore.getState()
+			if (queue.length > 0) {
+				playTrackWithProxy(queue[queue.length - 1], true).catch(() => {})
+			}
 		}
 	}
 
-	const handleNextTrack = () => {
+	const handleNextTrack = (e?: React.MouseEvent) => {
+		if (e) e.stopPropagation()
 		const nextTrack = next()
 		if (nextTrack) {
 			playTrackWithProxy(nextTrack, true).catch((err) =>
 				console.error('Failed to play next track:', err),
 			)
+		} else {
+			const { queue } = useQueueStore.getState()
+			if (queue.length > 0) {
+				playTrackWithProxy(queue[0], true).catch(() => {})
+			}
 		}
 	}
 
@@ -998,10 +1010,10 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							<SkipForward className="w-5 h-5 fill-current" />
 						</button>
 
-						{/* Multi-band EQ & Vocal Enhancer (EQ 均衡器与人声增强) */}
+						{/* Multi-band EQ & Vocal Enhancer (EQ 均衡器) */}
 						<button
 							onClick={() => setEqualizerOpen(true)}
-							title="EQ 均衡器与人声增强"
+							title="EQ 均衡器"
 							className={`p-1.5 rounded-full transition-all active:scale-90 ${
 								equalizerActive
 									? 'text-[#00AEEC] bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 shadow-[0_0_8px_rgba(0,174,236,0.35)]'

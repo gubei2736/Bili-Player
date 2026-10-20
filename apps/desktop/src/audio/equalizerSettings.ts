@@ -13,7 +13,7 @@ export const EQ_PRESETS: EQPreset[] = [
 		id: 'flat',
 		name: '默认平直',
 		gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-		desc: '原汁原味，无任何频段增益渲染',
+		desc: '',
 	},
 	{
 		id: 'vocal',

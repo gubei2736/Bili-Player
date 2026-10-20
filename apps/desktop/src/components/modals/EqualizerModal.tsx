@@ -141,14 +141,16 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 						</div>
 						<div>
 							<h2 className="text-base font-semibold text-white flex items-center gap-2">
-								EQ 均衡器与人声增强
+								EQ 均衡器
 								<span className="text-[11px] font-normal px-2 py-0.5 rounded-full bg-white/10 text-muted-foreground">
-									Web Audio 32-bit DSP
+									DSP
 								</span>
 							</h2>
-							<p className="text-xs text-muted-foreground mt-0.5">
-								{activePreset?.desc || '自由微调 10 频段增益与听觉声场'}
-							</p>
+							{activePreset?.desc ? (
+								<p className="text-xs text-muted-foreground mt-0.5">
+									{activePreset.desc}
+								</p>
+							) : null}
 						</div>
 					</div>
 
@@ -204,9 +206,6 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 												: 'bg-white/5 hover:bg-white/10 text-foreground/80 hover:text-white border border-white/5'
 										}`}
 									>
-										{preset.id === 'vocal' && (
-											<Sparkles className="w-3 h-3 inline-block mr-1 -mt-0.5 text-amber-300" />
-										)}
 										{preset.name}
 									</button>
 								)
@@ -401,9 +400,6 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 										</span>
 									)}
 								</h4>
-								<p className="text-[11px] text-muted-foreground">
-									双 Audio 乒乓槽位交替预热，切歌无感无爆音，软暂停淡出
-								</p>
 							</div>
 						</div>
 

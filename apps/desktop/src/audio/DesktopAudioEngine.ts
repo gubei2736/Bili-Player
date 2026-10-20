@@ -87,6 +87,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	// 淡出防重计时器
 	private crossfadeCleanupTimer: any = null
+	private pauseTimer: any = null
 
 	constructor() {
 		try {
@@ -571,21 +572,25 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	 * 在准备切歌时调用：以柔和的 120ms 软淡出上一首，杜绝音爆与刺耳截断
 	 */
 	public prepareTrackSwitch(track?: Track): void {
+		if (this.crossfadeCleanupTimer) {
+			clearTimeout(this.crossfadeCleanupTimer)
+			this.crossfadeCleanupTimer = null
+		}
+		if (this.pauseTimer) {
+			clearTimeout(this.pauseTimer)
+			this.pauseTimer = null
+		}
+
 		const activeSlot = this.activeSlot
 		if (this.audioCtx && activeSlot.fadeGainNode && this.isPlaying()) {
 			const now = this.audioCtx.currentTime
 			activeSlot.fadeGainNode.gain.cancelScheduledValues(now)
-			activeSlot.fadeGainNode.gain.setTargetAtTime(0.0001, now, 0.03)
-			setTimeout(() => {
-				try {
-					activeSlot.audio.pause()
-				} catch {}
-			}, 120)
-		} else {
-			try {
-				activeSlot.audio.pause()
-			} catch {}
+			activeSlot.fadeGainNode.gain.setValueAtTime(activeSlot.fadeGainNode.gain.value, now)
+			activeSlot.fadeGainNode.gain.setTargetAtTime(0.0001, now, 0.02)
 		}
+		try {
+			activeSlot.audio.pause()
+		} catch {}
 
 		if (track) {
 			this.currentTrack = track
@@ -653,36 +658,40 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			await this.audioCtx.resume()
 		}
 
-		const eq = getEqualizerSettings()
-		const isCurrentlyPlaying = this.isPlaying()
-		const isSameTrack = this.currentTrack?.uniqueKey === track.uniqueKey
-		const prevSlot = this.activeSlot
-
-		// 判断是否触发交叉淡入淡出 (Crossfade)
-		const canCrossfade =
-			isCurrentlyPlaying &&
-			!isSameTrack &&
-			eq.crossfadeEnabled &&
-			prevSlot.audio.currentTime > 0
-
-		const crossfadeDuration = canCrossfade
-			? Math.max(0.3, Math.min(3.5, eq.crossfadeDuration || 1.2))
-			: 0.15
-
-		// 清理旧的淡出定时器
 		if (this.crossfadeCleanupTimer) {
 			clearTimeout(this.crossfadeCleanupTimer)
 			this.crossfadeCleanupTimer = null
 		}
+		if (this.pauseTimer) {
+			clearTimeout(this.pauseTimer)
+			this.pauseTimer = null
+		}
 
-		// 切换目标槽位
+		const eq = getEqualizerSettings()
+		const prevSlot = this.slots[this.activeSlotIndex]
+		const isSameTrack =
+			prevSlot.track?.uniqueKey === track.uniqueKey &&
+			prevSlot.proxyStreamUrl === proxyStreamUrl
+
+		// 双 Audio 乒乓切换：只要不是同一首歌曲，始终切到另一个槽位
 		let targetSlot: AudioSlot
-		if (canCrossfade) {
-			targetSlot = this.idleSlot
+		if (!isSameTrack) {
+			targetSlot = this.slots[1 - this.activeSlotIndex]
 			this.activeSlotIndex = targetSlot.id
 		} else {
-			targetSlot = this.activeSlot
+			targetSlot = prevSlot
 		}
+
+		// 判断是否可交叉淡入淡出 (旧音频在出声且与新音频不是同一槽位)
+		const canCrossfade =
+			eq.crossfadeEnabled &&
+			prevSlot.id !== targetSlot.id &&
+			prevSlot.audio.currentTime > 0 &&
+			!prevSlot.audio.ended
+
+		const crossfadeDuration = canCrossfade
+			? Math.max(0.3, Math.min(3.5, eq.crossfadeDuration || 1.2))
+			: 0.12
 
 		this.currentTrack = track
 		this.currentLoudnessGainDb = loudnessGainDb
@@ -697,7 +706,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			track,
 		})
 
-		// 仅当音频流地址变动时才为 audio.src 赋值，防止重复从 0 开始
+		// 赋值音频地址
 		const isTargetSameSrc = targetSlot.audio.src === proxyStreamUrl
 		if (!isTargetSameSrc) {
 			targetSlot.audio.src = proxyStreamUrl
@@ -712,7 +721,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 		const now = this.audioCtx ? this.audioCtx.currentTime : 0
 
-		// 执行交叉淡入淡出调度
+		// 执行交叉淡入淡出或切歌调度
 		if (canCrossfade && this.audioCtx && prevSlot.fadeGainNode && targetSlot.fadeGainNode) {
 			logDebug('AudioEngine', `[Crossfade] 启动平滑交叉淡入淡出，时长: ${crossfadeDuration}s`)
 
@@ -723,7 +732,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 			// 2. 新歌曲平滑淡入
 			targetSlot.fadeGainNode.gain.cancelScheduledValues(now)
-			targetSlot.fadeGainNode.gain.setValueAtTime(0.0001, now)
+			targetSlot.fadeGainNode.gain.setValueAtTime(0.001, now)
 			await targetSlot.audio.play()
 			targetSlot.fadeGainNode.gain.exponentialRampToValueAtTime(1.0, now + crossfadeDuration)
 
@@ -740,12 +749,25 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				} catch {}
 			}, crossfadeDuration * 1000 + 50)
 		} else {
+			// 如果不是同一槽位，确保旧槽位静音停播
+			if (prevSlot.id !== targetSlot.id) {
+				try {
+					prevSlot.audio.pause()
+					prevSlot.audio.currentTime = 0
+					prevSlot.isPreloaded = false
+					if (this.audioCtx && prevSlot.fadeGainNode) {
+						prevSlot.fadeGainNode.gain.cancelScheduledValues(now)
+						prevSlot.fadeGainNode.gain.setValueAtTime(0.0, now)
+					}
+				} catch {}
+			}
+
 			// 单槽位软启动起播
 			if (this.audioCtx && targetSlot.fadeGainNode) {
 				targetSlot.fadeGainNode.gain.cancelScheduledValues(now)
 				targetSlot.fadeGainNode.gain.setValueAtTime(0.001, now)
 				await targetSlot.audio.play()
-				targetSlot.fadeGainNode.gain.exponentialRampToValueAtTime(1.0, now + 0.15)
+				targetSlot.fadeGainNode.gain.exponentialRampToValueAtTime(1.0, now + 0.12)
 			} else {
 				await targetSlot.audio.play()
 			}
@@ -782,6 +804,10 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	 * 软恢复播放 (带 120ms 平滑淡入，彻底消灭突然出声的听觉冲击)
 	 */
 	public async play(): Promise<void> {
+		if (this.pauseTimer) {
+			clearTimeout(this.pauseTimer)
+			this.pauseTimer = null
+		}
 		if (this.audioCtx?.state === 'suspended') {
 			await this.audioCtx.resume()
 		}
@@ -802,9 +828,14 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	}
 
 	/**
-	 * 软暂停 (带 100ms 柔和淡出，彻底消灭骤停爆音)
+	 * 软暂停 (带 80ms 柔和淡出，彻底消灭骤停爆音)
 	 */
 	public pause(): void {
+		if (this.pauseTimer) {
+			clearTimeout(this.pauseTimer)
+			this.pauseTimer = null
+		}
+
 		const active = this.activeSlot
 		if (!this.audioCtx || !active.fadeGainNode) {
 			active.audio.pause()
@@ -822,7 +853,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		active.fadeGainNode.gain.setValueAtTime(active.fadeGainNode.gain.value, now)
 		active.fadeGainNode.gain.setTargetAtTime(0.0001, now, 0.03)
 
-		setTimeout(() => {
+		this.pauseTimer = setTimeout(() => {
 			active.audio.pause()
 			if (this.audioCtx && active.fadeGainNode) {
 				active.fadeGainNode.gain.cancelScheduledValues(this.audioCtx.currentTime)
@@ -834,7 +865,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				duration: this.getDuration(),
 				track: this.currentTrack,
 			})
-		}, 90)
+		}, 80)
 	}
 
 	public stop(): void {
