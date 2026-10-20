@@ -492,14 +492,20 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 		return 0
 	}, [lyricsData, currentTimeMs])
 
-	// Auto scroll to active line
+	// Auto scroll to active line with smooth fluid easing & golden ratio viewport alignment
 	useEffect(() => {
 		if (!isOpen) return
 		const el = lineRefs.current.get(activeIndex)
-		if (el && lyricsContainerRef.current) {
-			el.scrollIntoView({
+		const container = lyricsContainerRef.current
+		if (el && container) {
+			const containerHeight = container.clientHeight
+			const elTop = el.offsetTop
+			const elHeight = el.clientHeight
+			// 黄金视线分割点：歌词主体居中略微偏上（42% 视口高度），带来更具动感的推移感
+			const targetScrollTop = Math.max(0, elTop - containerHeight * 0.42 + elHeight * 0.5)
+			container.scrollTo({
+				top: targetScrollTop,
 				behavior: 'smooth',
-				block: 'center',
 			})
 		}
 	}, [activeIndex, isOpen])
@@ -756,9 +762,11 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 								lyricsData.lines.map((line, idx) => {
 									const isActive = idx === activeIndex
 									const distance = Math.abs(idx - activeIndex)
-									// 彻底去除高斯模糊 (blur)，仅使用清晰的明度与透明度阶梯保持主次分明与清晰易读
+									// 优雅流体动效阶梯：结合景深透明度、缩放聚焦与水平平滑位移，产生如水流推移般的层次感
 									const opacity =
-										distance === 0 ? 1 : distance === 1 ? 0.75 : distance === 2 ? 0.55 : 0.35
+										distance === 0 ? 1 : distance === 1 ? 0.72 : distance === 2 ? 0.48 : 0.28
+									const scale = isActive ? 1.06 : distance === 1 ? 1.0 : distance === 2 ? 0.97 : 0.94
+									const translateX = isActive ? 12 : distance === 1 ? 0 : distance === 2 ? -4 : -8
 
 									return (
 										<div
@@ -772,13 +780,24 @@ export const ImmersiveLyricsView: React.FC<ImmersiveLyricsViewProps> = ({
 												if (el) lineRefs.current.set(idx, el)
 												else lineRefs.current.delete(idx)
 											}}
-											className="transition-all duration-300 transform origin-left cursor-pointer hover:opacity-100"
+											className="relative transition-all cursor-pointer hover:opacity-100 group/line py-1.5 transform origin-left"
 											style={{
 												filter: 'none',
 												opacity,
-												scale: isActive ? 1.05 : 1.0,
+												transform: `translateX(${translateX}px) scale(${scale})`,
+												transition: 'transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1)',
 											}}
 										>
+											{/* 活跃歌词左侧动态流光微光条 */}
+											{isActive && (
+												<span
+													className="absolute -left-4 top-2 bottom-2 w-1 rounded-full animate-pulse transition-all duration-300"
+													style={{
+														backgroundColor: lyricColors.main,
+														boxShadow: `0 0 12px ${lyricColors.main}`,
+													}}
+												/>
+											)}
 											{/* Main line with syllable highlight */}
 											<p
 												className="font-bold tracking-wide leading-relaxed"
