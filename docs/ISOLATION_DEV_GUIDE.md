@@ -1,199 +1,175 @@
-# Bili Player 稳定性单功能隔离开发指南 (MVP 阶段规范)
+# Bili Player 稳定性单功能隔离开发指南 (MVP 阶段自动推进规范)
 
-> **版本**：v1.1.0  
-> **适用阶段**：项目已进入 MVP 稳定运行期，后续所有功能迭代、Bug 修复及 UI 优化必须遵循本规范。  
-> **核心原则**：**单点修改、最小爆炸半径、强类型约束、可控回退**。
+> **版本**：v2.0.0 (MVP 自动推进版)  
+> **适用说明**：新会话中用户只需告知 Agent：“**请阅读 `docs/ISOLATION_DEV_GUIDE.md`，本次我要修改【功能名称】**”，Agent 必须**严格按照本文档第 1 节的标准协议自动推进全流程**。  
+> **核心原则**：**单点修改、最小爆炸半径、精准查表、自动校验、安全回退**。
 
 ---
 
 ## 目录
-1. [系统全景拓扑与模块分类](#1-系统全景拓扑与模块分类)
-2. [模块风险等级与修改爆炸半径](#2-模块风险等级与修改爆炸半径)
-3. [六大常见开发场景隔离指引](#3-六大常见开发场景隔离指引)
-4. [新会话单功能开发 SOP (标准操作流程)](#4-新会话单功能开发-sop-标准操作流程)
-5. [分层轻量校验与构建矩阵](#5-分层轻量校验与构建矩阵)
-6. [故障隔离与回退机制 (Rollback Playbook)](#6-故障隔离与回退机制-rollback-playbook)
+1. [🤖 Agent 新会话自动执行协议 (强制遵照)](#1--agent-新会话自动执行协议-强制遵照)
+2. [🗺️ 超细粒度功能模块与文件映射表](#2-️-超细粒度功能模块与文件映射表)
+3. [🛡️ 模块风险等级与边界防线](#3-️-模块风险等级与边界防线)
+4. [⚡ 分层秒级校验与测试矩阵](#4--分层秒级校验与测试矩阵)
+5. [🔄 故障隔离与秒级回退手册](#5--故障隔离与秒级回退手册)
 
 ---
 
-## 1. 系统全景拓扑与模块分类
+## 1. 🤖 Agent 新会话自动执行协议 (强制遵照)
 
-整个代码库基于 **pnpm Monorepo + Tauri 2.0 原生多进程** 架构设计，共划分为四大层级：
+当用户在新开启的 Antigravity 会话中发出类似指令时：
+> *“请阅读 docs/ISOLATION_DEV_GUIDE.md，本次我需要修改【xxx功能】”*
 
-```mermaid
-graph TD
-    UI["【视图与交互层】<br/>apps/desktop/src/components/*<br/>(Views, Modals, Layout)"]
-    MultiWin["【多窗口独立层】<br/>apps/desktop/src/windows/*<br/>(Lyrics, Mini, Tray)"]
-    AudioCore["【音频与前端业务层】<br/>apps/desktop/src/audio/*<br/>apps/desktop/src/services/*"]
-    SharedCore["【领域状态与数据层】<br/>packages/shared-core/src/*<br/>(Stores, SQLite DB, Types, Matcher)"]
-    TauriRust["【Tauri 2.0 原生系统层】<br/>apps/desktop/src-tauri/src/*<br/>(Stream Proxy, Exporter, Win32 Ext)"]
-
-    UI --> AudioCore
-    UI --> SharedCore
-    MultiWin --> SharedCore
-    AudioCore --> SharedCore
-    AudioCore --> TauriRust
-    SharedCore --> TauriRust
-```
-
-### 模块详细清单与职能边界
-
-| 分类层级 | 对应路径 | 核心文件 / 模块 | 职责说明 |
-| :--- | :--- | :--- | :--- |
-| **A. 视图表现层 (Views & Layout)** | `apps/desktop/src/components/views/`<br/>`apps/desktop/src/components/layout/` | `LibraryView.tsx`<br/>`SettingsView.tsx`<br/>`HistoryHeatmapView.tsx`<br/>`BottomPlayerBar.tsx` | 各功能页面展示、列表渲染、按钮交互、用户操作分发，不直接包含网络请求算法或底层文件 IO。 |
-| **B. 弹窗与交互层 (Modals)** | `apps/desktop/src/components/modals/` | `PlaylistImportModal.tsx`<br/>`BatchExportModal.tsx`<br/>`LoginModal.tsx` | 模态弹窗、表单输入、导出配置、登录扫码弹窗。与主界面松耦合，仅通过 Props/回调通信。 |
-| **C. 多窗口体系 (Windows)** | `apps/desktop/src/windows/` | `lyrics/DesktopLyricsApp.tsx`<br/>`mini/MiniPlayerApp.tsx`<br/>`tray/TrayMenuApp.tsx` | 独立 Webview 实例（桌面歌词、Mini 悬浮窗、托盘菜单），通过 Tauri Event 监听全局播放状态与动作。 |
-| **D. 前端播放引擎层 (Audio Engine)** | `apps/desktop/src/audio/`<br/>`apps/desktop/src/services/` | `DesktopAudioEngine.ts`<br/>`audioSettings.ts`<br/>`lyricService.ts` | HTML5 Audio / Web Audio API 处理、音量均衡归一化、格式解析、双平台在线歌词获取。 |
-| **E. 共享数据与接口层 (Shared Core)** | `packages/shared-core/src/` | `api/bilibili/` (WBI签名/API)<br/>`api/matcher/` (歌曲匹配)<br/>`stores/` (Zustand状态)<br/>`db/` (SQLite 数据库) | 跨端通用的领域逻辑、数据模型定义、B 站 WBI 鉴权、网易云/QQ 歌单适配、本地 SQLite 表结构及增删改查。 |
-| **F. 原生系统能力层 (Tauri Core)** | `apps/desktop/src-tauri/src/` | `lib.rs` (命令路由)<br/>`window_ext.rs` (窗口/注册表)<br/>`stream_proxy.rs` (本地流代理)<br/>`exporter.rs` (无损容器导出) | Rust 编写的原生核心：Windows 注册表开机自启、窗口特效、环回代理服务器（解防盗链与分块缓存）、音频原生解封装与重打包。 |
-
----
-
-## 2. 模块风险等级与修改爆炸半径
-
-进行需求评估时，首先判定该功能所属模块的风险等级，严格限制修改波及面：
-
-| 风险等级 | 所属模块 | 潜在破坏后果 | 隔离规则 |
-| :---: | :--- | :--- | :--- |
-| 🟢 **低风险**<br/>(安全区) | • `components/views/*`<br/>• `components/modals/*`<br/>• `styles/*` | 仅影响单一 UI 样式或局部弹窗展示，不会造成数据丢失或崩溃。 | • 仅在当前组件文件内做自包含修改。<br/>• 禁止在 UI 组件中直接修改全局 Store 的底层 Schema。 |
-| 🟡 **中风险**<br/>(受控区) | • `services/lyricService.ts`<br/>• `api/matcher/*`<br/>• `audio/audioSettings.ts` | 可能导致歌词不匹配、歌单导入速度变慢、音质切换异常。 | • 保持接口入参与返回值类型签名不变。<br/>• 对任何网络请求严格保留延时防风控参数。 |
-| 🔴 **高风险**<br/>(核心区) | • `packages/shared-core/src/stores/*`<br/>• `packages/shared-core/src/db/*`<br/>• `audio/DesktopAudioEngine.ts` | 可能引发跨多组件的级联渲染异常、播放进度不同步、本地数据库读取失败。 | • **禁止直接重构数据结构**。<br/>• 如需新增字段，必须采用**可选字段 (`?`)** 或默认值兼容策略。 |
-| ⛔ **极高风险**<br/>(原子区) | • `apps/desktop/src-tauri/src/*`<br/>• `shared-core/src/api/bilibili/wbi.ts` | 应用程序启动失败、CORS 拦截、B 站 IP 封禁、全屏无边框拖拽失效。 | • 必须经过 `cargo check` 零告警校验。<br/>• 禁止在没有明确需求时改动 `stream_proxy.rs` 的端口或请求头规则。 |
-
----
-
-## 3. 六大常见开发场景隔离指引
-
-### 场景 1：仅修改某个页面或组件的 UI 样式/布局
-- **受影响文件**：对应视图文件（如 `LibraryView.tsx` 或 `SettingsView.tsx`）。
-- **隔离守则**：
-  1. 仅限在该 `.tsx` 内部增删 Tailwind 类名或局部 State。
-  2. 严禁改动组件上游传入的 `Props` 接口定义，除非所有父级调用方已做好向下兼容。
-  3. 严禁改动全局 `globals.css` 中已有的全局原子规则。
-
-### 场景 2：在偏好设置中增加一个新的系统/行为开关
-- **受影响文件**：
-  - 前端：`SettingsView.tsx`（新增选项卡片与状态）
-  - 后端：`apps/desktop/src-tauri/src/window_ext.rs`（增加 Tauri 接口）、`lib.rs`（注册路由）
-- **隔离守则**：
-  1. 后端新增的命令必须设置安全默认值（如未配置时默认返回 `false`）。
-  2. 前端组件挂载时通过 `.catch()` 兜底捕获异常，确保即便后端命令未生效，设置界面依然能平稳降级渲染。
-
-### 场景 3：调整歌词呈现或在线匹配算法
-- **受影响文件**：`apps/desktop/src/services/lyricService.ts`、`packages/shared-core/src/api/matcher/`。
-- **隔离守则**：
-  1. **绝对禁止移除节流保护**（`MIN_DELAY` 与串行请求机制），防风控是整个外链导入的基石。
-  2. 对外输出的 `LyricLine` 或匹配结果对象结构必须保持不变。
-
-### 场景 4：修改音频播放或音量引擎
-- **受影响文件**：`apps/desktop/src/audio/DesktopAudioEngine.ts`。
-- **隔离守则**：
-  1. 音频引擎是整个播放器的生命线，修改时严禁改动现有的事件广播名（如 `track-change`、`timeupdate`、`play-state`）。
-  2. 涉及 Web Audio 滤镜或增益调节，必须保留全局静音、快速切歌时的旧 Source 释放（`disconnect()` / `stop()`）逻辑，防止音频内存泄露。
-
-### 场景 5：修改或新增 B 站 API
-- **受影响文件**：`packages/shared-core/src/api/bilibili/`。
-- **隔离守则**：
-  1. 所有敏感搜索接口统一走 `wbi.ts` 的 `getWbiEncodedParams` 签名。
-  2. 批量非关键查询必须保留 `skipCookie: true`，严格隔离用户主账号风险。
-
-### 场景 6：更新本地 SQLite 数据库字段
-- **受影响文件**：`packages/shared-core/src/db/`。
-- **隔离守则**：
-  1. 严禁直接修改已有表的列类型或删除已有列（会导致老用户本地数据库无法读取）。
-  2. 必须使用 `ALTER TABLE ... ADD COLUMN` 进行增量字段平滑迁移，并提供 `DEFAULT` 初始值。
-
----
-
-## 4. 新会话单功能开发 SOP (标准操作流程)
-
-当开启新的 Antigravity 会话进行特定功能开发时，请严格按照以下标准流程推进：
+**Agent 必须自动且严格按以下 5 步标准化流水线推进，严禁跳步或任意泛化修改：**
 
 ```mermaid
 flowchart TD
-    A["1. 开新会话前：建立专用 Git 特性分支"] --> B["2. 发送首条提示词：明确指定受限范围"]
-    B --> C["3. 仅在目标文件内编码：不扩展无关重构"]
-    C --> D["4. 分层执行快速语法与编译检查"]
-    D --> E["5. 提交原子 Commit，记录 Commit ID"]
-    E --> F["6. 合并至 dev 主线并删除临时特性分支"]
+    S1["第 1 步：查表定位<br/>查阅第 2 节映射表，锁定目标文件与风险等级"] --> S2["第 2 步：分支隔离<br/>自动检查并切换至对应 feat/* 特性分支"]
+    S2 --> S3["第 3 步：边界声明<br/>明确告知用户受影响文件，承诺不碰无关代码"]
+    S3 --> S4["第 4 步：单点实现与局部校验<br/>修改目标文件，自动运行分层秒级校验"]
+    S4 --> S5["第 5 步：原子提交与交付<br/>git add 具体文件，提交并展示 Commit ID"]
 ```
 
-### 步骤详解
+### 自动化执行细则：
 
-#### 阶段 1：分支隔离（开新会话前）
-在终端中从 `dev` 检出专属特性分支：
+1. **第 1 步：查表定位（Target Identification）**
+   - 立即检索本文档第 2 节的 [超细粒度功能模块映射表](#2-️-超细粒度功能模块与文件映射表)，定位用户指定功能对应的：
+     - **目标代码文件路径**（严格限定范围）；
+     - **风险等级**（🟢 低风险 / 🟡 中风险 / 🔴 高风险 / ⛔ 极高风险）；
+     - **禁止改动的关联依赖**。
+2. **第 2 步：分支隔离（Branch Isolation）**
+   - Agent 自动在终端执行分支检查：
+     ```powershell
+     Set-Location "G:\Project\Gemini\Bili Player"
+     git checkout dev
+     git checkout -b feat/<feature-slug>
+     ```
+   - 若已有同名分支则直接检出，确保修改不会直接落入主分支。
+3. **第 3 步：边界声明（Scope Declaration）**
+   - 在开始编码前，用简炼的语言向用户声明：
+     - 本次操作的目标文件清单；
+     - 承诺**绝不修改清单之外的任何文件**；
+     - 采取的兼容性保护措施。
+4. **第 4 步：单点修改与自动校验（Local Verification）**
+   - 仅对目标文件进行精细化修改，保留所有无关注释与逻辑。
+   - 修改完成后，**自动根据所属层级执行秒级校验**（前端仅跑 `pnpm --filter desktop build`，后端仅跑 `cargo check`，**绝不可盲目全量打包**）。
+5. **第 5 步：原子提交与交付（Atomic Commit & Reporting）**
+   - 校验通过后，自动仅添加变动的文件并提交：
+     ```powershell
+     git add <目标文件1> <目标文件2>
+     git commit -m "feat(<模块名>): <具体改动简述>"
+     ```
+   - 向用户清晰汇报：**修改完成说明、当前 Commit ID、校验结果**，并询问用户是否验收合并回 `dev`。
+
+---
+
+## 2. 🗺️ 超细粒度功能模块与文件映射表
+
+在此查找对应功能，获取其**专属目标文件**与**防破坏红线**：
+
+### 2.1 播放控制与播放栏模块
+| 细分子功能 | 专属修改文件 | 风险等级 | 对应校验命令 | 防破坏红线 / 注意事项 |
+| :--- | :--- | :---: | :--- | :--- |
+| **底栏播放条 UI 与按钮** | `apps/desktop/src/components/layout/BottomPlayerBar.tsx` | 🟢 低 | `pnpm --filter desktop build` | 严禁直接改动 `DesktopAudioEngine` 内部状态，仅通过 helper 触发动作。 |
+| **播放进度条/音量波浪滑块** | `apps/desktop/src/components/player/WavySlider.tsx` | 🟢 低 | `pnpm --filter desktop build` | 保持拖拽松手回调与即时拖动回调的参数一致。 |
+| **播放队列与播放模式** | `packages/shared-core/src/stores/useQueueStore.ts` | 🔴 高 | `pnpm --filter shared-core build` | 保持循环/单曲/随机三种模式的枚举值兼容，勿丢失持久化字段。 |
+| **播放引擎核心与事件** | `apps/desktop/src/audio/DesktopAudioEngine.ts` | 🔴 高 | `pnpm --filter desktop build` | 严禁修改已有的事件广播名称（如 `timeupdate`、`track-change` 等）。 |
+| **音量响度标准化 (Normalization)** | `apps/desktop/src/audio/DesktopAudioEngine.ts`<br/>`apps/desktop/src/components/views/AudioQualitySettingsCard.tsx` | 🟡 中 | `pnpm --filter desktop build` | 保持 Web Audio 节点的 disconnect/connect 释放逻辑，防止内存泄漏。 |
+| **音质规格档位配置** | `apps/desktop/src/audio/audioSettings.ts`<br/>`packages/shared-core/src/api/bilibili/client.ts` | 🟡 中 | `pnpm --filter desktop build` | 严格保持音质 ID（如 30280、30251 等）与 B 站 API 规格定义一致。 |
+
+### 2.2 歌词系统模块
+| 细分子功能 | 专属修改文件 | 风险等级 | 对应校验命令 | 防破坏红线 / 注意事项 |
+| :--- | :--- | :---: | :--- | :--- |
+| **全屏沉浸歌词与滚动动效** | `apps/desktop/src/components/player/ImmersiveLyricsView.tsx` | 🟢 低 | `pnpm --filter desktop build` | 字体缩放动效勿阻塞主线程；保护顶部控制栏显隐逻辑。 |
+| **独立透明置顶桌面歌词窗口** | `apps/desktop/src/windows/lyrics/DesktopLyricsApp.tsx`<br/>`apps/desktop/src-tauri/src/window_ext.rs` | 🟡 中 | 前端 build + `cargo check` | 穿透（Ignore Cursor）与锁定状态的同步需维持双向 Tauri 事件通讯。 |
+| **在线歌词双平台智能匹配** | `apps/desktop/src/services/lyricService.ts` | 🟡 中 | `pnpm --filter desktop build` | 优先检查本地缓存；第三方请求必须有超时熔断机制。 |
+| **歌词偏好设置 (字号/模式)** | `apps/desktop/src/components/views/LyricsSettingsCard.tsx` | 🟢 低 | `pnpm --filter desktop build` | 保存至 localStorage 时键名必须维持向下兼容。 |
+
+### 2.3 媒体库与内容浏览模块
+| 细分子功能 | 专属修改文件 | 风险等级 | 对应校验命令 | 防破坏红线 / 注意事项 |
+| :--- | :--- | :---: | :--- | :--- |
+| **我的音乐库与自建歌单** | `apps/desktop/src/components/views/LibraryView.tsx` | 🟢 低 | `pnpm --filter desktop build` | 歌单增删改查走 shared-core DB 接口，不改动数据库底层表。 |
+| **默认收藏夹视图** | `apps/desktop/src/components/views/FavoritesView.tsx` | 🟢 低 | `pnpm --filter desktop build` | 收藏状态需与侧边栏以及底部播放栏的红心按钮保持同步。 |
+| **追更合集与分 P 选集** | `apps/desktop/src/components/views/CollectionsView.tsx`<br/>`apps/desktop/src/components/modals/VideoPartsModal.tsx` | 🟢 低 | `pnpm --filter desktop build` | 分 P 列表多选与批量播放逻辑保持轻量。 |
+| **收听足迹与热度日历分布** | `apps/desktop/src/components/views/HistoryHeatmapView.tsx`<br/>`packages/shared-core/src/stores/useHistoryStore.ts` | 🟡 中 | `pnpm --filter desktop build` | 日期筛选与热度矩阵跳转算法勿破坏已有的按天聚合数据结构。 |
+| **本地歌曲扫描与管理** | `apps/desktop/src/components/views/LocalMusicView.tsx`<br/>`apps/desktop/src-tauri/src/local_scanner.rs` | 🟡 中 | 前端 build + `cargo check` | 文件夹递归扫描与 ID3 元数据解析需做好大文件容错。 |
+| **B 站全网音视频检索** | `apps/desktop/src/components/views/SearchView.tsx`<br/>`packages/shared-core/src/api/bilibili/api.ts` | 🟡 中 | `pnpm --filter desktop build` | 搜索调用必须带 WBI 签名，严格禁止移除防抖（Debounce）。 |
+| **侧边栏导航与主框架** | `apps/desktop/src/components/layout/MainLayout.tsx`<br/>`apps/desktop/src/components/layout/TitleBar.tsx` | 🟢 低 | `pnpm --filter desktop build` | 视图 Tab 切换与窗口控制按钮（最小化/最大化/关闭）逻辑保持独立。 |
+
+### 2.4 导入与导出模块
+| 细分子功能 | 专属修改文件 | 风险等级 | 对应校验命令 | 防破坏红线 / 注意事项 |
+| :--- | :--- | :---: | :--- | :--- |
+| **外部歌单智能匹配与导入** | `apps/desktop/src/components/modals/PlaylistImportModal.tsx`<br/>`packages/shared-core/src/api/matcher/externalPlaylist.ts` | 🟡 中 | `pnpm --filter desktop build` | **严禁移除 `MIN_DELAY` 延迟与串行处理，必须带 `skipCookie: true` 防封号防封IP**。 |
+| **歌单文本清洗与打分模型** | `packages/shared-core/src/api/matcher/matching.ts` | 🟢 低 | `pnpm --filter shared-core build` | 维持时长高斯打分与 LCS 编辑距离算子的纯函数特性。 |
+| **单曲/批量高清音频导出** | `apps/desktop/src/components/modals/BatchExportModal.tsx`<br/>`apps/desktop/src/components/modals/ExportTrackModal.tsx`<br/>`apps/desktop/src-tauri/src/exporter.rs` | 🔴 高 | 前端 build + `cargo check` | 保留无损容器 remux 解封装合并，避免重编码导致音质降级。 |
+
+### 2.5 窗口交互与系统托盘
+| 细分子功能 | 专属修改文件 | 风险等级 | 对应校验命令 | 防破坏红线 / 注意事项 |
+| :--- | :--- | :---: | :--- | :--- |
+| **Mini 胶囊悬浮小窗** | `apps/desktop/src/windows/mini/MiniPlayerApp.tsx`<br/>`apps/desktop/src-tauri/src/window_ext.rs` | 🟡 中 | 前端 build + `cargo check` | 维持 Mini 模式与主窗口互斥展开收起状态机。 |
+| **系统托盘与右键菜单** | `apps/desktop/src/windows/tray/TrayMenuApp.tsx`<br/>`apps/desktop/src-tauri/src/lib.rs` | 🟡 中 | 前端 build + `cargo check` | 保持失去焦点时自动隐藏窗口的 Win32 事件监听。 |
+| **全局快捷键响应与配置** | `apps/desktop/src/components/views/ShortcutsSettingsView.tsx`<br/>`apps/desktop/src-tauri/src/shortcuts.rs` | 🟡 中 | 前端 build + `cargo check` | 避免单键与系统组合键冲突，处理快捷键被占用时的错误回退。 |
+| **开机自启动设置** | `apps/desktop/src/components/views/SettingsView.tsx`<br/>`apps/desktop/src-tauri/src/window_ext.rs` | 🟡 中 | 前端 build + `cargo check` | 注册表操作必须使用静默后台子进程，不弹任何 CMD 黑框。 |
+| **窗口圆角与毛玻璃原生特效** | `apps/desktop/src-tauri/src/window_ext.rs` | ⛔ 极高 | `cargo check` | 涉及 Windows Win32 API 与 DwmSetWindowAttribute，非必要绝不改动。 |
+
+### 2.6 账号体系、网络底层与数据库
+| 细分子功能 | 专属修改文件 | 风险等级 | 对应校验命令 | 防破坏红线 / 注意事项 |
+| :--- | :--- | :---: | :--- | :--- |
+| **B 站扫码登录与凭证保存** | `apps/desktop/src/components/modals/LoginModal.tsx`<br/>`apps/desktop/src/services/loginQrService.ts`<br/>`packages/shared-core/src/stores/useAuthStore.ts` | 🔴 高 | `pnpm --filter desktop build` | 保持轮询超时与二维码状态自动销毁机制。 |
+| **WBI 加盐加密防反爬核心** | `packages/shared-core/src/api/bilibili/wbi.ts` | ⛔ 极高 | `pnpm --filter shared-core build` | 保持 B 站官方字符打乱编码与时间戳加签算式绝对一致。 |
+| **本地环回音频流代理** | `apps/desktop/src-tauri/src/stream_proxy.rs` | ⛔ 极高 | `cargo check` | 严格保证本地 127.0.0.1 代理服务器的防盗链 Referer 伪造与 Range 缓存分块逻辑。 |
+| **存储缓存管理与清理** | `apps/desktop/src/components/views/CacheSettingsCard.tsx`<br/>`apps/desktop/src-tauri/src/window_ext.rs` | 🟡 中 | 前端 build + `cargo check` | 递归计算缓存目录大小必须异步执行，清理时避免误删运行中数据库。 |
+| **SQLite 数据库表结构与 CRUD** | `packages/shared-core/src/db/` | 🔴 高 | `pnpm --filter shared-core build` | 新增字段必须使用可选字段与平滑迁移，严禁删除已有用户数据列。 |
+| **主题换肤与色板** | `apps/desktop/src/components/views/SkinStoreView.tsx` | 🟢 低 | `pnpm --filter desktop build` | 纯 CSS 变量与 Tailwind 类动态绑定，勿修改非换肤容器。 |
+
+---
+
+## 3. 🛡️ 模块风险等级与边界防线
+
+每次修改前根据功能所处级别采取对应的防范措施：
+
+- 🟢 **低风险 (安全区)**：自包含在单独 `.tsx` 内部，只动局部 state/JSX/Tailwind，严禁改动外部 Props 接口定义。
+- 🟡 **中风险 (受控区)**：涉及辅助服务或跨端逻辑，必须保持输入输出类型不变；涉及第三方网络请求严格保留防风控节流参数。
+- 🔴 **高风险 (核心区)**：涉及全局状态（Zustand）、数据持久化（SQLite）或音频主引擎，必须提供默认值容错，禁止直接破坏既有结构。
+- ⛔ **极高风险 (原子区)**：涉及 Tauri 底层 Rust 代码、WBI 核心签名或环回代理服务，必须经过严谨语法校验，禁止随意重构。
+
+---
+
+## 4. ⚡ 分层秒级校验与测试矩阵
+
+日常单功能开发严禁使用耗时的全量打包，**按需选用对应秒级校验**：
+
 ```powershell
-Set-Location "G:\Project\Gemini\Bili Player"
-git checkout dev
-git pull
-git checkout -b feat/<your-feature-name>
-```
+# 1. 仅修改前端 UI/组件时 (约 5 秒)
+pnpm --filter desktop build
 
-#### 阶段 2：输入新会话精准提示词（开新会话首条消息）
-向新会话发送如下约束模板：
-```text
-你好！我们在 feat/<your-feature-name> 分支上进行开发。
-本次任务目标：【详细描述具体修改项】
-【受限边界要求】：
-1. 范围限定：仅允许修改与本功能直接相关的目标文件【列出目标文件/目录】，严禁改动其他模块。
-2. 稳定性优先：保持接口入参、返回值与现有调用方 100% 向下兼容。
-3. 验证步骤：修改后仅执行局部类型检查与编译，不可盲目全量打包。
-4. 提交规范：确认无误后使用 Git 提交并提示 Commit ID。
-```
+# 2. 仅修改 shared-core 数据或 API 时 (约 3 秒)
+pnpm --filter shared-core build
 
-#### 阶段 3：原子提交（开发完成）
-每次功能点实现后，只 `git add` 变动文件：
-```powershell
-git add <target-file-1> <target-file-2>
-git commit -m "feat(scope): descriptive summary"
-```
+# 3. 涉及 Rust 后端修改时 (约 2 秒)
+cmd /c "call D:\VS\VC\Auxiliary\Build\vcvars64.bat && cd /d G:\Project\Gemini\Bili Player\apps\desktop\src-tauri && cargo check"
 
-#### 阶段 4：主线合并（合并验证）
-```powershell
-git checkout dev
-git merge feat/<your-feature-name>
-git branch -d feat/<your-feature-name>
+# 4. 全功能验收通过后的最终 Release 编译打包 (约 50 秒)
+cmd /c "call D:\VS\VC\Auxiliary\Build\vcvars64.bat && cd /d G:\Project\Gemini\Bili Player && pnpm --filter desktop tauri build"
 ```
 
 ---
 
-## 5. 分层轻量校验与构建矩阵
+## 5. 🔄 故障隔离与秒级回退手册
 
-日常开发中，**严禁频繁运行耗时 1~2 分钟的完整 `tauri build`**。应根据修改层级选择最小校验命令：
+如遇修改不符合预期或引入偶发 Bug，可立即执行以下命令瞬间复原：
 
-| 修改范围 | 快速校验命令 | 耗时 | 校验目标 |
-| :--- | :--- | :---: | :--- |
-| **仅前端修改** (`apps/desktop/src/*`) | `pnpm --filter desktop build` | ~5秒 | Vite 模块打包、TypeScript 类型推导、Tailwind 编译、语法静态检查。 |
-| **仅共享库修改** (`packages/shared-core/*`) | `pnpm --filter shared-core build` | ~3秒 | 领域模型、API 适配器和数据类型编译。 |
-| **仅 Rust 原生修改** (`apps/desktop/src-tauri/*`) | `cmd /c "call D:\VS\VC\Auxiliary\Build\vcvars64.bat && cd /d G:\Project\Gemini\Bili Player\apps\desktop\src-tauri && cargo check"` | ~2秒 | Rust 语法、Borrow Checker 内存安全借用、Tauri 路由宏展开。 |
-| **全量打包发布** (功能完成验收后) | `cmd /c "call D:\VS\VC\Auxiliary\Build\vcvars64.bat && cd /d G:\Project\Gemini\Bili Player && pnpm --filter desktop tauri build"` | ~50秒 | 最终生成 MSI、NSIS 安装包及绿色免安装单文件。 |
-
----
-
-## 6. 故障隔离与回退机制 (Rollback Playbook)
-
-当某个新会话的修改出现意外冲突、性能退化或破坏现有功能时，可在 10 秒内执行以下灾备恢复：
-
-### 方案 A：单文件精准还原（推荐）
-如果仅某个文件改乱了：
 ```powershell
-git checkout -- apps/desktop/src/components/views/TargetView.tsx
-```
+# 方案 1：仅撤销单个文件的误改
+git checkout -- <file-path>
 
-### 方案 B：按 Commit ID 一键秒级穿梭回滚
-凭借提交前记录的 Commit ID，直接强制还原至修改前的状态：
-```powershell
-# 放弃最近的所有破坏性改动，彻底还原至稳定点
+# 方案 2：利用提交 Commit ID 秒级强制穿梭回稳定点
 git reset --hard <STABLE_COMMIT_ID>
-```
 
-### 方案 C：丢弃临时特性分支
-如果在特性分支上改动过大且难以理清，直接一键切换回 `dev`：
-```powershell
+# 方案 3：直接丢弃整个异常的临时特性分支
 git checkout dev
 git branch -D feat/<failed-feature-name>
 ```
-主线未受任何污染，系统瞬间恢复 100% 稳定运行态。
 
 ---
-*本文档由开发团队维护，新增模块或重构底层架构时需同步更新本规范。*
+*本规范文档为 Antigravity 自动化单功能迭代的标准驱动协议，日常迭代中请严格依此推进。*
