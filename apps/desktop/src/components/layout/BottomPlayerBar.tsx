@@ -209,13 +209,13 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [equalizerOpen, setEqualizerOpen] = useState(false)
 	const [equalizerActive, setEqualizerActive] = useState(() => {
 		const s = getEqualizerSettings()
-		return s.enabled || s.vocalEnhancerEnabled
+		return s.enabled || s.vocalEnhancerEnabled || s.spatialSurroundEnabled
 	})
 
 	useEffect(() => {
 		const handler = (e: any) => {
 			const s = e.detail || getEqualizerSettings()
-			setEqualizerActive(s.enabled || s.vocalEnhancerEnabled)
+			setEqualizerActive(s.enabled || s.vocalEnhancerEnabled || s.spatialSurroundEnabled)
 		}
 		window.addEventListener('bbplayer:equalizer-changed', handler)
 		return () =>

@@ -91,7 +91,7 @@ git commit -m "feat(<模块名>): <具体改动描述>"
 | **播放队列与播放模式** | `packages/shared-core/src/stores/useQueueStore.ts` | [高] | `pnpm --filter shared-core typecheck` | 保持循环/单曲/随机三种模式的枚举值兼容，勿丢失持久化字段。 |
 | **播放引擎核心与事件** | `apps/desktop/src/audio/DesktopAudioEngine.ts` | [高] | 语法检查 / 合入前 build | 严禁修改已有的事件广播名称（如 `timeupdate`、`track-change` 等）。 |
 | **音量响度标准化 (Normalization)** | `apps/desktop/src/audio/DesktopAudioEngine.ts`<br/>`apps/desktop/src/components/views/AudioQualitySettingsCard.tsx` | [中] | 语法检查 / 合入前 build | 保持 Web Audio 节点的 disconnect/connect 释放逻辑，防止内存泄漏。 |
-| **10 段专业均衡器与音效预设 (Equalizer)** | `apps/desktop/src/components/modals/EqualizerModal.tsx`<br/>`apps/desktop/src/audio/equalizerSettings.ts`<br/>`apps/desktop/src/audio/DesktopAudioEngine.ts` | [中] | 语法检查 / 合入前 build | 严格维持 10 个频段标称频率与增益范围 [-12dB, +12dB]；预设持久化键兼容；滤波节点切换时避免爆音。 |
+| **10 段专业均衡器与全景环绕音效 (Equalizer & Spatial)** | `apps/desktop/src/components/modals/EqualizerModal.tsx`<br/>`apps/desktop/src/audio/equalizerSettings.ts`<br/>`apps/desktop/src/audio/DesktopAudioEngine.ts`<br/>`apps/desktop/src/audio/SpatialSurroundProcessor.ts` | [中] | 语法检查 / 合入前 build | 严格维持 10 个频段标称频率与增益范围 [-12dB, +12dB]；电脑音箱模式严禁套用耳机 HRTF 滤波器；平滑切换参数避免爆音。 |
 | **音质规格档位配置** | `apps/desktop/src/audio/audioSettings.ts`<br/>`packages/shared-core/src/api/bilibili/client.ts` | [中] | `pnpm --filter shared-core typecheck` | 严格保持音质 ID（如 30280、30251 等）与 B 站 API 规格定义一致。 |
 
 ### 2.2 歌词系统模块 (Lyrics System)

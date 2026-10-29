@@ -5,6 +5,7 @@ import {
 	EQ_FREQUENCIES,
 	type EqualizerSettings,
 } from './equalizerSettings'
+import { SpatialSurroundProcessor } from './SpatialSurroundProcessor'
 
 export interface AudioEngineContract {
 	loadAndPlay(
@@ -71,6 +72,9 @@ export class DesktopAudioEngine implements AudioEngineContract {
 	private vocalFilterMid: BiquadFilterNode | null = null
 	private vocalFilterLow: BiquadFilterNode | null = null
 	private vocalFilterHigh: BiquadFilterNode | null = null
+
+	// 全景环绕音效处理器 (HRTF / DTS / HeSuVi / 电脑音箱立体声拉宽与微交叉延迟)
+	private spatialSurroundProcessor: SpatialSurroundProcessor | null = null
 
 	// EBU R128 响度增益节点与防削波限制器
 	private gainNode: GainNode | null = null
@@ -272,6 +276,11 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		this.vocalFilterLow.connect(this.vocalFilterHigh)
 		lastNode = this.vocalFilterHigh
 
+		// 6.1 接入全景环绕音效处理器 (HRTF / DTS / HeSuVi / 电脑音箱立体声拉宽与微交叉延迟)
+		this.spatialSurroundProcessor = new SpatialSurroundProcessor(this.audioCtx)
+		lastNode.connect(this.spatialSurroundProcessor.inputNode)
+		lastNode = this.spatialSurroundProcessor.outputNode
+
 		// 7. GainNode (EBU R128 响度均衡前置增益)
 		this.gainNode = this.audioCtx.createGain()
 		lastNode.connect(this.gainNode)
@@ -342,6 +351,11 @@ export class DesktopAudioEngine implements AudioEngineContract {
 				now,
 				0.03,
 			)
+		}
+
+		// 4. 全景环绕音效 (HRTF / DTS / HeSuVi / 电脑音箱立体声拉宽与微交叉延迟)
+		if (this.spatialSurroundProcessor) {
+			this.spatialSurroundProcessor.updateSettings(s)
 		}
 	}
 

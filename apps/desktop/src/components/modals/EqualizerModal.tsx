@@ -5,6 +5,8 @@ import {
 	SlidersHorizontal,
 	Sparkles,
 	Headphones,
+	Volume2,
+	Compass,
 	RotateCcw,
 	Info,
 	Check,
@@ -28,6 +30,8 @@ import {
 	MAX_CUSTOM_PRESETS,
 	type EqualizerSettings,
 	type EQPreset,
+	type SpatialDeviceType,
+	type SpatialHeadphoneMode,
 } from '../../audio/equalizerSettings'
 import { desktopAudioEngine } from '../../audio/DesktopAudioEngine'
 
@@ -157,6 +161,41 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 		updateSettings({
 			...settings,
 			crossfeedEnabled: !settings.crossfeedEnabled,
+		})
+	}
+
+	const handleSpatialToggle = () => {
+		updateSettings({
+			...settings,
+			spatialSurroundEnabled: !settings.spatialSurroundEnabled,
+		})
+	}
+
+	const handleDeviceTypeChange = (type: SpatialDeviceType) => {
+		updateSettings({
+			...settings,
+			spatialDeviceType: type,
+		})
+	}
+
+	const handleHeadphoneModeChange = (mode: SpatialHeadphoneMode) => {
+		updateSettings({
+			...settings,
+			spatialHeadphoneMode: mode,
+		})
+	}
+
+	const handleSpeakerWideningChange = (val: number) => {
+		updateSettings({
+			...settings,
+			spatialSpeakerWidening: Math.max(0, Math.min(1, val)),
+		})
+	}
+
+	const handleSpeakerCrossDelayChange = (val: number) => {
+		updateSettings({
+			...settings,
+			spatialSpeakerCrossDelay: Math.max(0, Math.min(1, val)),
 		})
 	}
 
@@ -490,6 +529,249 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 								微延迟交叉模拟立体声音箱扩散，消除耳机头中效应（使用音箱外放请关闭）。
 							</p>
 						</div>
+					</div>
+
+					{/* 全景环绕空间音效面板 (Spatial Surround) */}
+					<div
+						className={`p-4 rounded-xl border transition-all ${
+							settings.spatialSurroundEnabled
+								? 'bg-gradient-to-br from-[#00AEEC]/12 via-[#1e1e24] to-indigo-500/10 border-[#00AEEC]/50 shadow-[0_4px_20px_rgba(0,174,236,0.15)]'
+								: 'bg-white/[0.02] border-white/10'
+						}`}
+					>
+						{/* 标题栏与总开关 */}
+						<div className="flex items-center justify-between mb-3.5">
+							<div className="flex items-center gap-2.5">
+								<div
+									className={`p-2 rounded-xl transition-colors ${
+										settings.spatialSurroundEnabled
+											? 'bg-[#00AEEC] text-white shadow-md'
+											: 'bg-white/10 text-muted-foreground'
+									}`}
+								>
+									<Compass className="w-4 h-4" />
+								</div>
+								<div>
+									<div className="flex items-center gap-2">
+										<h4 className="text-xs font-semibold text-white">
+											全景环绕空间音效
+										</h4>
+										<span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#00AEEC]/20 text-[#00AEEC] border border-[#00AEEC]/30">
+											3D Spatial
+										</span>
+									</div>
+									<p className="text-[11px] text-muted-foreground mt-0.5">
+										{settings.spatialDeviceType === 'headphone'
+											? '耳机双耳空间化定位与声场扩展算法，消除耳道局促与头中效应'
+											: '电脑音箱近场声学优化：M/S 声场拉宽与微交叉延迟（已停用耳机 HRTF）'}
+									</p>
+								</div>
+							</div>
+
+							<button
+								type="button"
+								onClick={handleSpatialToggle}
+								className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+									settings.spatialSurroundEnabled
+										? 'bg-[#00AEEC] text-white shadow-[0_2px_10px_rgba(0,174,236,0.35)]'
+										: 'bg-white/10 text-muted-foreground hover:bg-white/15 hover:text-white'
+								}`}
+								title={settings.spatialSurroundEnabled ? '点击关闭全景环绕' : '点击开启全景环绕'}
+							>
+								<div
+									className={`w-2 h-2 rounded-full ${
+										settings.spatialSurroundEnabled
+											? 'bg-white animate-pulse'
+											: 'bg-muted-foreground/60'
+									}`}
+								/>
+								{settings.spatialSurroundEnabled ? '全景已开启' : '全景已关闭'}
+							</button>
+						</div>
+
+						{/* 设备类型分段切换器 */}
+						<div className="grid grid-cols-2 gap-2 p-1 bg-black/30 rounded-xl border border-white/5 mb-3.5">
+							<button
+								type="button"
+								onClick={() => handleDeviceTypeChange('headphone')}
+								className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+									settings.spatialDeviceType === 'headphone'
+										? 'bg-[#00AEEC] text-white shadow-sm'
+										: 'text-muted-foreground hover:text-white hover:bg-white/5'
+								}`}
+							>
+								<Headphones className="w-3.5 h-3.5" />
+								<span>耳机 / 入耳</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => handleDeviceTypeChange('speaker')}
+								className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+									settings.spatialDeviceType === 'speaker'
+										? 'bg-[#00AEEC] text-white shadow-sm'
+										: 'text-muted-foreground hover:text-white hover:bg-white/5'
+								}`}
+							>
+								<Volume2 className="w-3.5 h-3.5" />
+								<span>电脑音箱</span>
+							</button>
+						</div>
+
+						{/* 耳机预设算法分支 */}
+						{settings.spatialDeviceType === 'headphone' ? (
+							<div className="space-y-2">
+								<div className="text-[11px] text-muted-foreground font-medium flex items-center justify-between">
+									<span>耳机空间算法模式</span>
+									<span className="text-[#00AEEC]">
+										{settings.spatialHeadphoneMode === 'dts'
+											? 'DTS Headphone:X'
+											: settings.spatialHeadphoneMode === 'hrtf'
+											? 'HRTF 双耳定位'
+											: 'HeSuVi 7.1 虚拟声场'}
+									</span>
+								</div>
+
+								<div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+									{/* DTS Headphone:X */}
+									<button
+										type="button"
+										onClick={() => handleHeadphoneModeChange('dts')}
+										className={`p-2.5 rounded-xl border text-left transition-all ${
+											settings.spatialHeadphoneMode === 'dts'
+												? 'bg-[#00AEEC]/15 border-[#00AEEC]/60 text-white shadow-sm'
+												: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:text-white hover:bg-white/5'
+										}`}
+									>
+										<div className="flex items-center justify-between mb-1">
+											<span className="text-xs font-semibold text-white">
+												DTS Headphone:X
+											</span>
+											{settings.spatialHeadphoneMode === 'dts' && (
+												<Check className="w-3.5 h-3.5 text-[#00AEEC]" />
+											)}
+										</div>
+										<p className="text-[10px] text-muted-foreground/90 leading-tight">
+											影院全景声拟真，宽视角前置声场与早期环境微混响，氛围沉浸
+										</p>
+									</button>
+
+									{/* HRTF */}
+									<button
+										type="button"
+										onClick={() => handleHeadphoneModeChange('hrtf')}
+										className={`p-2.5 rounded-xl border text-left transition-all ${
+											settings.spatialHeadphoneMode === 'hrtf'
+												? 'bg-[#00AEEC]/15 border-[#00AEEC]/60 text-white shadow-sm'
+												: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:text-white hover:bg-white/5'
+										}`}
+									>
+										<div className="flex items-center justify-between mb-1">
+											<span className="text-xs font-semibold text-white">
+												HRTF 双耳定位
+											</span>
+											{settings.spatialHeadphoneMode === 'hrtf' && (
+												<Check className="w-3.5 h-3.5 text-[#00AEEC]" />
+											)}
+										</div>
+										<p className="text-[10px] text-muted-foreground/90 leading-tight">
+											纯净头部相关传输函数，耳廓滤波与头影低通衰减，自然消除压迫感
+										</p>
+									</button>
+
+									{/* HeSuVi */}
+									<button
+										type="button"
+										onClick={() => handleHeadphoneModeChange('hesuvi')}
+										className={`p-2.5 rounded-xl border text-left transition-all ${
+											settings.spatialHeadphoneMode === 'hesuvi'
+												? 'bg-[#00AEEC]/15 border-[#00AEEC]/60 text-white shadow-sm'
+												: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:text-white hover:bg-white/5'
+										}`}
+									>
+										<div className="flex items-center justify-between mb-1">
+											<span className="text-xs font-semibold text-white">
+												HeSuVi 7.1
+											</span>
+											{settings.spatialHeadphoneMode === 'hesuvi' && (
+												<Check className="w-3.5 h-3.5 text-[#00AEEC]" />
+											)}
+										</div>
+										<p className="text-[10px] text-muted-foreground/90 leading-tight">
+											7.1 虚拟声场多声道混合仿真，侧后方离散延迟还原环绕包围感
+										</p>
+									</button>
+								</div>
+							</div>
+						) : (
+							/* 电脑音箱分支 */
+							<div className="space-y-3">
+								{/* 醒目说明：严禁套用耳机 HRTF */}
+								<div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] leading-relaxed">
+									<Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+									<span>
+										<strong>桌面音箱专属防干涉策略</strong>：电脑音箱处于真实房间环境，空气中已具备天然双耳串扰。本模式<strong>已严格停用耳机 HRTF 滤波器</strong>（避免耳廓模型在音箱叠加引发梳状滤波失真与中频空洞），专享<strong>立体声拉宽</strong>与<strong>近场微交叉延迟</strong>。
+									</span>
+								</div>
+
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+									{/* 调节项 1: 立体声拉宽 */}
+									<div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+										<div className="flex items-center justify-between">
+											<span className="text-xs font-medium text-white">
+												立体声拉宽 (Stereo Widener)
+											</span>
+											<span className="text-xs font-mono font-semibold text-[#00AEEC]">
+												{Math.round(settings.spatialSpeakerWidening * 100)}%
+											</span>
+										</div>
+										<p className="text-[10px] text-muted-foreground leading-normal">
+											M/S 侧向声场展开，突破桌面音箱狭窄间距限制；低频居中锁定，防止相位抵消。
+										</p>
+										<input
+											type="range"
+											min="0"
+											max="1"
+											step="0.05"
+											value={settings.spatialSpeakerWidening}
+											disabled={!settings.spatialSurroundEnabled}
+											onChange={(e) =>
+												handleSpeakerWideningChange(parseFloat(e.target.value))
+											}
+											className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+											style={{ accentColor: '#00AEEC' }}
+										/>
+									</div>
+
+									{/* 调节项 2: 轻微交叉延迟 */}
+									<div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+										<div className="flex items-center justify-between">
+											<span className="text-xs font-medium text-white">
+												轻微交叉延迟 (Crossfeed Delay)
+											</span>
+											<span className="text-xs font-mono font-semibold text-[#00AEEC]">
+												{Math.round(settings.spatialSpeakerCrossDelay * 100)}%
+											</span>
+										</div>
+										<p className="text-[10px] text-muted-foreground leading-normal">
+											近场微延时与高频柔化串扰补充，消除两端生硬剥离，让声像自然凝聚在眼前。
+										</p>
+										<input
+											type="range"
+											min="0"
+											max="1"
+											step="0.05"
+											value={settings.spatialSpeakerCrossDelay}
+											disabled={!settings.spatialSurroundEnabled}
+											onChange={(e) =>
+												handleSpeakerCrossDelayChange(parseFloat(e.target.value))
+											}
+											className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+											style={{ accentColor: '#00AEEC' }}
+										/>
+									</div>
+								</div>
+							</div>
+						)}
 					</div>
 
 					{/* 10-Band Graphic EQ Board */}

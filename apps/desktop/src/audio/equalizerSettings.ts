@@ -59,6 +59,9 @@ export const EQ_PRESETS: EQPreset[] = [
 	},
 ]
 
+export type SpatialDeviceType = 'headphone' | 'speaker'
+export type SpatialHeadphoneMode = 'hrtf' | 'dts' | 'hesuvi'
+
 export interface EqualizerSettings {
 	enabled: boolean
 	presetId: string
@@ -68,6 +71,12 @@ export interface EqualizerSettings {
 	crossfeedEnabled: boolean
 	crossfadeEnabled: boolean
 	crossfadeDuration: number // seconds, default 1.2
+	// 全景环绕配置
+	spatialSurroundEnabled: boolean
+	spatialDeviceType: SpatialDeviceType
+	spatialHeadphoneMode: SpatialHeadphoneMode
+	spatialSpeakerWidening: number // 0.0 ~ 1.0, 电脑音箱立体声拉宽程度
+	spatialSpeakerCrossDelay: number // 0.0 ~ 1.0, 电脑音箱轻微交叉延迟深度
 }
 
 export const DEFAULT_EQ_SETTINGS: EqualizerSettings = {
@@ -79,6 +88,11 @@ export const DEFAULT_EQ_SETTINGS: EqualizerSettings = {
 	crossfeedEnabled: false,
 	crossfadeEnabled: true,
 	crossfadeDuration: 1.2,
+	spatialSurroundEnabled: false,
+	spatialDeviceType: 'headphone',
+	spatialHeadphoneMode: 'dts',
+	spatialSpeakerWidening: 0.6,
+	spatialSpeakerCrossDelay: 0.4,
 }
 
 const EQ_STORAGE_KEY = 'bbplayer_equalizer_settings_v1'
