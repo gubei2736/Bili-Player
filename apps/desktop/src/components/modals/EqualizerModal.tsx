@@ -174,6 +174,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 	const handleDeviceTypeChange = (type: SpatialDeviceType) => {
 		updateSettings({
 			...settings,
+			spatialSurroundEnabled: true,
 			spatialDeviceType: type,
 		})
 	}
@@ -181,6 +182,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 	const handleHeadphoneModeChange = (mode: SpatialHeadphoneMode) => {
 		updateSettings({
 			...settings,
+			spatialSurroundEnabled: true,
 			spatialHeadphoneMode: mode,
 		})
 	}
