@@ -92,6 +92,7 @@ git commit -m "feat(<模块名>): <具体改动描述>"
 | **播放引擎核心与事件** | `apps/desktop/src/audio/DesktopAudioEngine.ts` | [高] | 语法检查 / 合入前 build | 严禁修改已有的事件广播名称（如 `timeupdate`、`track-change` 等）。 |
 | **音量响度标准化 (Normalization)** | `apps/desktop/src/audio/DesktopAudioEngine.ts`<br/>`apps/desktop/src/components/views/AudioQualitySettingsCard.tsx` | [中] | 语法检查 / 合入前 build | 保持 Web Audio 节点的 disconnect/connect 释放逻辑，防止内存泄漏。 |
 | **10 段专业均衡器与全景环绕音效 (Equalizer & Spatial)** | `apps/desktop/src/components/modals/EqualizerModal.tsx`<br/>`apps/desktop/src/audio/equalizerSettings.ts`<br/>`apps/desktop/src/audio/DesktopAudioEngine.ts`<br/>`apps/desktop/src/audio/SpatialSurroundProcessor.ts` | [中] | 语法检查 / 合入前 build | 严格维持 10 个频段标称频率与增益范围 [-12dB, +12dB]；电脑音箱模式严禁套用耳机 HRTF 滤波器；平滑切换参数避免爆音。 |
+| **播放扩展项 (自定义倍速与睡眠定时)** | `apps/desktop/src/components/modals/PlaybackExtensionsModal.tsx`<br/>`apps/desktop/src/services/sleepTimerService.ts`<br/>`apps/desktop/src/audio/DesktopAudioEngine.ts`<br/>`apps/desktop/src/components/layout/BottomPlayerBar.tsx` | [中] | 语法检查 / 合入前 build | 保持倍速在 0.25x~3.0x 范围切歌不丢失；定时关闭平滑淡出音量后正确还原基准音量。 |
 | **音质规格档位配置** | `apps/desktop/src/audio/audioSettings.ts`<br/>`packages/shared-core/src/api/bilibili/client.ts` | [中] | `pnpm --filter shared-core typecheck` | 严格保持音质 ID（如 30280、30251 等）与 B 站 API 规格定义一致。 |
 
 ### 2.2 歌词系统模块 (Lyrics System)

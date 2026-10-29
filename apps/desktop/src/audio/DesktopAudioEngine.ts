@@ -21,6 +21,8 @@ export interface AudioEngineContract {
 	isMuted(): boolean
 	setMuted(muted: boolean): void
 	setLoudnessNormalization(enabled: boolean): void
+	setPlaybackRate(rate: number): void
+	getPlaybackRate(): number
 	getFrequencyData(buffer: Uint8Array): void
 	getCurrentTime(): number
 	getDuration(): number
@@ -88,6 +90,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	private currentVolume = 0.5
 	private currentMuted = false
+	private currentPlaybackRate = 1.0
 
 	// 淡出防重计时器
 	private crossfadeCleanupTimer: any = null
@@ -110,6 +113,16 @@ export class DesktopAudioEngine implements AudioEngineContract {
 			this.loudnessNormalizationEnabled = false
 		}
 
+		try {
+			const savedRate = localStorage.getItem('bbplayer_playback_rate')
+			this.currentPlaybackRate =
+				savedRate !== null
+					? Math.max(0.25, Math.min(3.0, parseFloat(savedRate)))
+					: 1.0
+		} catch {
+			this.currentPlaybackRate = 1.0
+		}
+
 		// 创建两个独立的 Audio 槽位
 		this.slots = [this.createSlot(0), this.createSlot(1)]
 		this.setupSlotEventListeners(this.slots[0])
@@ -128,6 +141,8 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		audio.crossOrigin = 'anonymous'
 		audio.volume = this.currentVolume
 		audio.muted = this.currentMuted
+		audio.playbackRate = this.currentPlaybackRate
+		audio.defaultPlaybackRate = this.currentPlaybackRate
 		return {
 			id,
 			audio,
@@ -372,6 +387,8 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		})
 
 		audio.addEventListener('loadedmetadata', () => {
+			audio.playbackRate = this.currentPlaybackRate
+			audio.defaultPlaybackRate = this.currentPlaybackRate
 			if (this.activeSlotIndex === id) {
 				logDebug('AudioEngine', `[Slot ${id}] 元数据已加载`, {
 					duration: audio.duration,
@@ -413,6 +430,7 @@ export class DesktopAudioEngine implements AudioEngineContract {
 		})
 
 		audio.addEventListener('play', () => {
+			audio.playbackRate = this.currentPlaybackRate
 			this.isSwitchingTrack = false
 			if (this.activeSlotIndex === id) {
 				if ('mediaSession' in navigator) {
@@ -991,6 +1009,29 @@ export class DesktopAudioEngine implements AudioEngineContract {
 
 	public isLoudnessNormalizationEnabled(): boolean {
 		return this.loudnessNormalizationEnabled
+	}
+
+	public setPlaybackRate(rate: number): void {
+		const clamped = Math.max(0.25, Math.min(3.0, Number(rate.toFixed(2))))
+		this.currentPlaybackRate = clamped
+		for (const slot of this.slots) {
+			slot.audio.playbackRate = clamped
+			slot.audio.defaultPlaybackRate = clamped
+		}
+		try {
+			localStorage.setItem('bbplayer_playback_rate', clamped.toString())
+		} catch {}
+		if (typeof window !== 'undefined') {
+			window.dispatchEvent(
+				new CustomEvent('bbplayer:playback-rate-changed', {
+					detail: { playbackRate: clamped },
+				}),
+			)
+		}
+	}
+
+	public getPlaybackRate(): number {
+		return this.currentPlaybackRate
 	}
 
 	public getFrequencyData(buffer: Uint8Array): void {

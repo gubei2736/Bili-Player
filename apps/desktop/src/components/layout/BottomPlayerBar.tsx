@@ -24,8 +24,11 @@ import {
 	Globe,
 	SlidersHorizontal,
 	Loader2,
+	LayoutGrid,
 } from 'lucide-react'
 import { EqualizerModal } from '../modals/EqualizerModal'
+import { PlaybackExtensionsModal } from '../modals/PlaybackExtensionsModal'
+import { sleepTimerService, type SleepTimerState } from '../../services/sleepTimerService'
 import { getEqualizerSettings } from '../../audio/equalizerSettings'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -207,6 +210,34 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 	const [queueOpen, setQueueOpen] = useState(false)
 	const [partsModalOpen, setPartsModalOpen] = useState(false)
 	const [equalizerOpen, setEqualizerOpen] = useState(false)
+	const [extensionsModalOpen, setExtensionsModalOpen] = useState(false)
+	const [playbackRate, setPlaybackRate] = useState<number>(() =>
+		desktopAudioEngine.getPlaybackRate(),
+	)
+	const [sleepTimerState, setSleepTimerState] = useState<SleepTimerState>(() =>
+		sleepTimerService.getState(),
+	)
+
+	useEffect(() => {
+		const handleRateChange = (e: any) => {
+			if (e.detail?.playbackRate) {
+				setPlaybackRate(e.detail.playbackRate)
+			}
+		}
+		window.addEventListener('bbplayer:playback-rate-changed', handleRateChange)
+		const unsubscribeTimer = sleepTimerService.subscribe((s) => {
+			setSleepTimerState({ ...s })
+		})
+		return () => {
+			window.removeEventListener(
+				'bbplayer:playback-rate-changed',
+				handleRateChange,
+			)
+			unsubscribeTimer()
+		}
+	}, [])
+
+	const hasActiveExtension = playbackRate !== 1.0 || sleepTimerState.isActive
 	const [equalizerActive, setEqualizerActive] = useState(() => {
 		const s = getEqualizerSettings()
 		return s.enabled || s.vocalEnhancerEnabled || s.spatialSurroundEnabled
@@ -1123,6 +1154,26 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 						>
 							<Globe className="w-4 h-4" />
 						</button>
+
+						{/* Playback Extensions (播放扩展项: 倍速 · 定时关闭) */}
+						<button
+							onClick={() => setExtensionsModalOpen(true)}
+							title={
+								hasActiveExtension
+									? `播放扩展项已激活 (${playbackRate !== 1.0 ? `${playbackRate.toFixed(2)}x` : ''}${playbackRate !== 1.0 && sleepTimerState.isActive ? ' · ' : ''}${sleepTimerState.isActive ? (sleepTimerState.mode === 'end_of_track' ? '单曲后停止' : `${Math.ceil(sleepTimerState.remainingSeconds / 60)}分后停止`) : ''})`
+									: '播放扩展项 (播放速度 · 睡眠定时)'
+							}
+							className={`p-1.5 rounded-full transition-all active:scale-90 relative ${
+								hasActiveExtension
+									? 'text-[#00AEEC] bg-[#00AEEC]/15 hover:bg-[#00AEEC]/25 shadow-[0_0_8px_rgba(0,174,236,0.35)]'
+									: 'text-foreground/85 hover:text-white hover:bg-white/10'
+							}`}
+						>
+							<LayoutGrid className="w-4 h-4" />
+							{hasActiveExtension && (
+								<span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#00AEEC] ring-2 ring-black animate-pulse" />
+							)}
+						</button>
 					</div>
 				</div>
 
@@ -1382,6 +1433,12 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 			<EqualizerModal
 				isOpen={equalizerOpen}
 				onClose={() => setEqualizerOpen(false)}
+			/>
+
+			{/* Playback Extensions Modal (Speed & Sleep Timer) */}
+			<PlaybackExtensionsModal
+				isOpen={extensionsModalOpen}
+				onClose={() => setExtensionsModalOpen(false)}
 			/>
 		</footer>
 	)
