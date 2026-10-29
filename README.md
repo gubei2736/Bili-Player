@@ -15,7 +15,7 @@
   <sub><b>Author & Maintainer: <a href="https://github.com/gubei2736">gubei2736</a></b></sub>
 </p>
 
-[![Release](https://img.shields.io/badge/Release-v1.1.3-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.4-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
 [![Maintainer](https://img.shields.io/badge/Maintainer-gubei2736-EA4AAA?style=flat-square&logo=github&logoColor=white)](https://github.com/gubei2736)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/gubei2736/Bili-Player)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://v2.tauri.app/)
@@ -37,11 +37,30 @@
 
 </details>
 
+## 更新日志 (Changelog)
+
+### v1.1.4 (2026-10-30)
+- **音频与空间声场**：
+  - 均衡器全新搭载全景空间环绕音效（集成耳机 HRTF 全景算法与电脑音箱立体声声场拉宽）；
+  - 播放底栏新增扩展控制入口，支持自定义播放倍速（0.5x ~ 2.0x）与智能睡眠定时（支持 15/30/45/60 分钟倒计时或播完当前歌曲后退出）。
+- **收听足迹与播放统计**：
+  - 收听足迹中歌曲列表项全面展示“总播放 N 次”累计统计徽标；
+  - 顶部总览卡片联动展示歌曲总播放次数与独立收听曲目数。
+- **界面质感与偏好设置精简**：
+  - 偏好设置中心精简优化，去除音频清晰度规格参考卡片与冗余引导文案；
+  - 本地歌曲空状态优化，呈现更克制纯净的极简留白界面；
+  - 产品定位标语更新为“基于 Bilibili 音视频生态的沉浸式桌面播放器”。
+- **系统集成能力**：
+  - 原生集成 Windows 注册表静默开机自启动服务（无黑框弹窗）。
+
+
 ## 功能特性
 
 ### 音频播放与音质管理
 - **账号同步**：支持二维码扫码登录，自动同步账号内的个人收藏夹、合集与订阅列表。
 - **音质档位选择**：支持切换高音质、无损及 B 站原声规格音轨（Hi-Res 无损 FLAC、杜比全景声 Dolby Atmos、标准 AAC）。
+- **全景空间环绕音效**：在均衡器中搭载硬件级空间音频处理链路，支持耳机 HRTF 3D 虚拟全景环绕与音箱立体声拉宽/微交叉延迟，赋予双耳极富层次的现场感。
+- **底栏播放扩展与睡眠定时**：播放底栏配备专属扩展抽屉，支持 0.5x~2.0x 任意倍速调节与智能睡眠定时（支持倒计时或当前歌曲播完后自动退出应用）。
 - **音频响度平衡优化**：支持基于 EBU R128 标准重构音频增益；默认关闭以完整保留录音室母带原本的动态与听感，可在偏好设置中自由按需开启。
 - **一键原网页直达**：播放控制栏直接配备“在浏览器打开原网页”快捷按钮，并支持精准带分 P（Part）参数直达目标视频。
 - **60FPS 平滑进度条**：底栏直线进度条与动画循环均锁频至 60FPS，搭载 Pointer Events 指针捕获体系与悬停时间胶囊，拖拽丝滑且杜绝高刷屏（180Hz/240Hz）过载重绘。
@@ -63,7 +82,7 @@
 - **本地专属歌单**：支持纯本地自建独立歌单，支持编辑歌单信息（自定义标题、简介与封面图实时预览）。
 - **歌曲自由拖拽排序**：歌单列表支持原生拖拽排序，按住曲目抓手即可上下自由拖动排列并即时持久化。
 - **音频源手动搜索替换**：歌单曲目支持一键发起 B 站搜索并替换音频源，外部导入未匹配或版本不理想时可快速自选手选版本。
-- **收听足迹与热度分布联动**：按日期（今天、昨天、更早具体天数）分类归档收听足迹，支持一键折叠隐藏；点击“近三个月收听热度分布”日历格子，自动平滑滚动并高亮聚焦跳转到对应日期的收听记录。
+- **收听足迹与歌曲总播放次数统计**：精准记录每首歌曲在播放器中的累计总播放次数，在足迹列表右侧实时呈现“总播放 N 次”徽标；支持近 3 个月日历矩阵热度分布联动与按天聚合归档。
 - **外部歌单导入**：支持解析网易云音乐、QQ 音乐歌单链接，按严格的分区黑名单与时长误差比对自动跨平台匹配 B 站对应音视频。
 
 ### 高规格音频导出与批量下载

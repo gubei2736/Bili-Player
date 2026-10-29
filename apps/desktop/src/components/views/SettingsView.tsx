@@ -263,7 +263,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 										Bili Player
 									</span>
 									<span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold border border-primary/30">
-										v1.1.3
+										v1.1.4
 									</span>
 								</div>
 								<p className="text-[11px] text-muted-foreground mt-0.5">

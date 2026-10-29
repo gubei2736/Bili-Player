@@ -262,7 +262,7 @@ export const HistoryHeatmapView: React.FC = () => {
 				<div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-1">
 					<div className="flex items-center gap-1.5 text-muted-foreground text-xs">
 						<TrendingUp className="w-3.5 h-3.5 text-primary" />
-						<span>累计播放次数</span>
+						<span>歌曲总播放次数</span>
 					</div>
 					<p className="text-xl font-bold text-foreground">
 						{stats.totalPlayCount}{' '}
@@ -461,7 +461,7 @@ export const HistoryHeatmapView: React.FC = () => {
 
 												<div className="flex items-center gap-2.5 flex-shrink-0 text-right">
 													<span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#00AEEC]/10 text-[#00AEEC] border border-[#00AEEC]/20 font-mono font-medium">
-														播放 {item.playCount || 1} 次
+														总播放 {item.playCount || 1} 次
 													</span>
 													<span className="text-[10px] text-muted-foreground font-mono">
 														{formatRelativeTime(item.playedAt)}
