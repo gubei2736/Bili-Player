@@ -154,7 +154,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 					Bili Player
 				</span>
 				<span className="text-[9px] px-1.5 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/25 font-mono font-medium tracking-tight">
-					v1.1.3
+					v1.1.4
 				</span>
 			</div>
 
