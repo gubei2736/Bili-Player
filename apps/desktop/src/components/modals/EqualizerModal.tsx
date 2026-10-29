@@ -565,7 +565,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 									<p className="text-[11px] text-muted-foreground mt-0.5">
 										{settings.spatialDeviceType === 'headphone'
 											? '耳机双耳空间化定位与声场扩展算法，消除耳道局促与头中效应'
-											: '电脑音箱近场声学优化：M/S 声场拉宽与微交叉延迟（已停用耳机 HRTF）'}
+											: '音箱近场声学优化：M/S 声场拉宽与微交叉延迟（已停用耳机 HRTF）'}
 									</p>
 								</div>
 							</div>
@@ -603,7 +603,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 								}`}
 							>
 								<Headphones className="w-3.5 h-3.5" />
-								<span>耳机 / 入耳</span>
+								<span>耳机</span>
 							</button>
 							<button
 								type="button"
@@ -615,7 +615,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 								}`}
 							>
 								<Volume2 className="w-3.5 h-3.5" />
-								<span>电脑音箱</span>
+								<span>音箱</span>
 							</button>
 						</div>
 
@@ -711,7 +711,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 								<div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] leading-relaxed">
 									<Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
 									<span>
-										<strong>桌面音箱专属防干涉策略</strong>：电脑音箱处于真实房间环境，空气中已具备天然双耳串扰。本模式<strong>已严格停用耳机 HRTF 滤波器</strong>（避免耳廓模型在音箱叠加引发梳状滤波失真与中频空洞），专享<strong>立体声拉宽</strong>与<strong>近场微交叉延迟</strong>。
+										<strong>音箱专属防干涉策略</strong>：音箱处于真实房间环境，空气中已具备天然双耳串扰。本模式<strong>已严格停用耳机 HRTF 滤波器</strong>（避免耳廓模型在音箱叠加引发梳状滤波失真与中频空洞），专享<strong>立体声拉宽</strong>与<strong>近场微交叉延迟</strong>。
 									</span>
 								</div>
 

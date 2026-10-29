@@ -1161,7 +1161,7 @@ export const BottomPlayerBar: React.FC<BottomPlayerBarProps> = ({
 							title={
 								hasActiveExtension
 									? `播放扩展项已激活 (${playbackRate !== 1.0 ? `${playbackRate.toFixed(2)}x` : ''}${playbackRate !== 1.0 && sleepTimerState.isActive ? ' · ' : ''}${sleepTimerState.isActive ? (sleepTimerState.mode === 'end_of_track' ? '单曲后停止' : `${Math.ceil(sleepTimerState.remainingSeconds / 60)}分后停止`) : ''})`
-									: '播放扩展项 (播放速度 · 睡眠定时)'
+									: '播放扩展项 (播放速度 · 定时关闭)'
 							}
 							className={`p-1.5 rounded-full transition-all active:scale-90 relative ${
 								hasActiveExtension

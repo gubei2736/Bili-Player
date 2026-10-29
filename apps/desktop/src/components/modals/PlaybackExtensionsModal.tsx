@@ -28,7 +28,6 @@ const TIMER_PRESETS = [
 	{ label: '30 分钟', minutes: 30 },
 	{ label: '45 分钟', minutes: 45 },
 	{ label: '60 分钟', minutes: 60 },
-	{ label: '90 分钟', minutes: 90 },
 ]
 
 export const PlaybackExtensionsModal: React.FC<PlaybackExtensionsModalProps> = ({
@@ -136,7 +135,7 @@ export const PlaybackExtensionsModal: React.FC<PlaybackExtensionsModalProps> = (
 								</span>
 							</h3>
 							<p className="text-xs text-muted-foreground mt-0.5">
-								自定义播放速率与睡眠定时关闭
+								自定义播放速率与定时关闭
 							</p>
 						</div>
 					</div>
@@ -235,7 +234,7 @@ export const PlaybackExtensionsModal: React.FC<PlaybackExtensionsModalProps> = (
 								</div>
 								<div>
 									<h4 className="text-xs font-semibold text-white">
-										睡眠定时关闭 (Sleep Timer)
+										定时关闭 (Sleep Timer)
 									</h4>
 									<span className="text-[10px] text-muted-foreground">
 										定时平滑停止播放，助你安心入眠
@@ -369,7 +368,7 @@ export const PlaybackExtensionsModal: React.FC<PlaybackExtensionsModalProps> = (
 						<div className="flex items-start gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/5 text-[11px] text-muted-foreground leading-relaxed">
 							<AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#00AEEC]" />
 							<span>
-								倒计时结束前 10 秒将自动平滑渐隐音量，防止突兀骤停打扰您的入眠。
+								倒计时结束前 10 秒将自动平滑渐隐音量。
 							</span>
 						</div>
 					</div>
