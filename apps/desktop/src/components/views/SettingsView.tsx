@@ -267,7 +267,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 									</span>
 								</div>
 								<p className="text-[11px] text-muted-foreground mt-0.5">
-									基于 Bilibili 音视频生态的沉浸式桌面 Hi-Fi 播放器
+									基于 Bilibili 音视频生态的沉浸式桌面播放器
 								</p>
 							</div>
 						</div>

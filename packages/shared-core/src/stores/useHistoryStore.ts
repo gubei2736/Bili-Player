@@ -9,10 +9,12 @@ export interface PlayHistoryItem {
 	playedAt: number // Timestamp in milliseconds
 	durationPlayed: number // In seconds
 	completed: boolean
+	playCount?: number // 歌曲累计播放次数
 }
 
 export interface HistoryStats {
 	totalPlays: number
+	totalPlayCount: number
 	todayPlays: number
 	todayDurationMinutes: number
 	matrix: number[][] // 7 days x 12 weeks
@@ -27,20 +29,24 @@ export interface HistoryState {
 	getStats: () => HistoryStats
 }
 
+function getTrackKey(track: Track): string {
+	return track.source === 'bilibili' && (track as any).bilibiliMetadata?.bvid
+		? `bili_${(track as any).bilibiliMetadata.bvid}_${(track as any).bilibiliMetadata.cid || (track as any).bilibiliMetadata.pageIndex || 1}`
+		: track.uniqueKey
+}
+
 function deduplicateRecords(records: PlayHistoryItem[]): PlayHistoryItem[] {
-	const seen = new Set<string>()
-	const result: PlayHistoryItem[] = []
+	const map = new Map<string, PlayHistoryItem>()
 	for (const r of records) {
-		const key =
-			r.track.source === 'bilibili' && (r.track as any).bilibiliMetadata?.bvid
-				? `bili_${(r.track as any).bilibiliMetadata.bvid}_${(r.track as any).bilibiliMetadata.cid || (r.track as any).bilibiliMetadata.pageIndex || 1}`
-				: r.track.uniqueKey
-		if (!seen.has(key)) {
-			seen.add(key)
-			result.push(r)
+		const key = getTrackKey(r.track)
+		if (!map.has(key)) {
+			map.set(key, { ...r, playCount: r.playCount || 1 })
+		} else {
+			const prev = map.get(key)!
+			prev.playCount = (prev.playCount || 1) + (r.playCount || 1)
 		}
 	}
-	return result
+	return Array.from(map.values())
 }
 
 export const useHistoryStore = create<HistoryState>()(
@@ -50,20 +56,26 @@ export const useHistoryStore = create<HistoryState>()(
 
 			addRecord: (track, durationPlayed = 0, completed = false) => {
 				const now = Date.now()
-				const newRecord: PlayHistoryItem = {
-					id: `hist_${now}_${Math.random().toString(36).substring(2, 6)}`,
-					track,
-					playedAt: now,
-					durationPlayed,
-					completed,
-				}
+				const key = getTrackKey(track)
 
 				set((state) => {
-					// 严格去重：同一首歌只保留最新播放记录，并将最新收听置顶
-					const deduplicated = deduplicateRecords([newRecord, ...state.records])
-					// 最多保留 500 条收听记录
+					// 查找历史记录中是否已有该歌曲，继承并递增播放次数
+					const existing = state.records.find((r) => getTrackKey(r.track) === key)
+					const playCount = (existing?.playCount || 1) + (existing ? 1 : 0)
+
+					const newRecord: PlayHistoryItem = {
+						id: `hist_${now}_${Math.random().toString(36).substring(2, 6)}`,
+						track,
+						playedAt: now,
+						durationPlayed,
+						completed,
+						playCount,
+					}
+
+					// 过滤掉同名旧记录，将带有最新播放次数的新记录置顶
+					const remaining = state.records.filter((r) => getTrackKey(r.track) !== key)
 					return {
-						records: deduplicated.slice(0, 500),
+						records: [newRecord, ...remaining].slice(0, 500),
 					}
 				})
 			},
@@ -88,6 +100,9 @@ export const useHistoryStore = create<HistoryState>()(
 				const todayDurationMinutes = Math.round(
 					todayRecords.reduce((acc, r) => acc + (r.durationPlayed || r.track.duration || 180), 0) / 60,
 				)
+
+				// 累计播放总次数（所有歌曲独立播放次数之和）
+				const totalPlayCount = records.reduce((acc, r) => acc + (r.playCount || 1), 0)
 
 				// 计算 12 周 x 7 天热力图矩阵
 				// 列 0 为 11 周前，列 11 为本周；行 0~6 分别为周一至周日
@@ -122,6 +137,7 @@ export const useHistoryStore = create<HistoryState>()(
 
 				return {
 					totalPlays: records.length,
+					totalPlayCount,
 					todayPlays,
 					todayDurationMinutes,
 					matrix,

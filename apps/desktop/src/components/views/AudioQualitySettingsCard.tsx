@@ -65,9 +65,6 @@ export const AudioQualitySettingsCard: React.FC = () => {
 					播放音频质量偏好
 				</h3>
 			</div>
-			<p className="text-[11px] text-muted-foreground leading-relaxed">
-				选择从 B 站请求音频流时的目标码率清晰度，优先匹配当前账号最高权限规格，播放下一首歌曲时立即生效。
-			</p>
 
 			<div className="space-y-2 pt-1">
 				{options.map((opt) => {
@@ -119,39 +116,6 @@ export const AudioQualitySettingsCard: React.FC = () => {
 						</button>
 					)
 				})}
-			</div>
-
-			{/* Specifications Quick Reference Card */}
-			<div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1.5">
-				<p className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-wider">
-					官方音频清晰度规格参考
-				</p>
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 text-[11px]">
-					<div className="p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-0.5">
-						<div className="flex items-center justify-between">
-							<span className="font-semibold text-amber-300">Hi-Res 无损</span>
-							<span className="text-[9px] px-1 rounded bg-amber-500/20 text-amber-300">大会员</span>
-						</div>
-						<p className="text-muted-foreground/90 text-[10px]">FLAC 48kHz/24bit 或 96kHz/24bit</p>
-						<p className="text-muted-foreground/60 text-[9px]">稿件含合规无损音轨且 UP 主勾选</p>
-					</div>
-					<div className="p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-0.5">
-						<div className="flex items-center justify-between">
-							<span className="font-semibold text-purple-300">杜比全景声</span>
-							<span className="text-[9px] px-1 rounded bg-purple-500/20 text-purple-300">大会员</span>
-						</div>
-						<p className="text-muted-foreground/90 text-[10px]">EC-3 / E-AC-3 JOC，最高 768kbps</p>
-						<p className="text-muted-foreground/60 text-[9px]">稿件标注杜比标识 + 设备支持解码</p>
-					</div>
-					<div className="p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-0.5">
-						<div className="flex items-center justify-between">
-							<span className="font-semibold text-sky-300">常规 AAC</span>
-							<span className="text-[9px] px-1 rounded bg-sky-500/20 text-sky-300">免费</span>
-						</div>
-						<p className="text-muted-foreground/90 text-[10px]">AAC-LC，约 64–320kbps</p>
-						<p className="text-muted-foreground/60 text-[9px]">所有稿件，随清晰度档位分发</p>
-					</div>
-				</div>
 			</div>
 
 			{/* Audio Volume Balance Normalization Switch */}

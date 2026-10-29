@@ -389,22 +389,7 @@ export const LocalMusicView: React.FC = () => {
 					</div>
 					<div className="space-y-1">
 						<p className="text-sm font-semibold text-foreground">尚未导入本地音乐</p>
-						<p className="text-xs text-muted-foreground">
-							点击下方按钮选择电脑中存放音乐的文件夹，播放器将自动递归检索并导入所有音频文件。
-						</p>
 					</div>
-					<button
-						onClick={handleScanLocalMusic}
-						disabled={isScanning}
-						className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00AEEC] hover:bg-[#1bbefa] text-white text-xs font-semibold shadow-lg shadow-[#00AEEC]/25 transition-all mt-2"
-					>
-						{isScanning ? (
-							<Loader2 className="w-4 h-4 animate-spin" />
-						) : (
-							<FolderSearch className="w-4 h-4" />
-						)}
-						<span>{isScanning ? '正在扫描...' : '选择并扫描音乐文件夹'}</span>
-					</button>
 				</div>
 			) : filteredTracks.length === 0 ? (
 				<div className="py-16 text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.01] text-muted-foreground space-y-2">
