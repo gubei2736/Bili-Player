@@ -506,10 +506,12 @@ export class BilibiliApi {
 	getFavoriteListContents({
 		favoriteId,
 		pn,
+		ps = 40,
 		signal,
 	}: {
 		favoriteId: number
 		pn: number
+		ps?: number
 		signal?: AbortSignal
 	}): ResultAsync<BilibiliFavoriteListContents, BilibiliApiError> {
 		return this.client.get<BilibiliFavoriteListContents>({
@@ -517,7 +519,7 @@ export class BilibiliApi {
 			params: {
 				media_id: favoriteId.toString(),
 				pn: pn.toString(),
-				ps: '40',
+				ps: ps.toString(),
 			},
 			signal,
 		})

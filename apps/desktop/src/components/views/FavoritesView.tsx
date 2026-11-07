@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
 	Heart,
 	Play,
@@ -67,9 +67,22 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 	})
 	const [searchKeyword, setSearchKeyword] = useState('')
 	const [loadingTracks, setLoadingTracks] = useState(false)
+	const [isLoadingMore, setIsLoadingMore] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [hiddenIds, setHiddenIds] = useState<number[]>(getHiddenFavoriteIds())
 	const [showManageModal, setShowManageModal] = useState(false)
+
+	const activeFavoriteIdRef = useRef<number | null>(null)
+	const abortControllerRef = useRef<AbortController | null>(null)
+
+	// Abort active background fetch on unmount
+	useEffect(() => {
+		return () => {
+			if (abortControllerRef.current) {
+				abortControllerRef.current.abort()
+			}
+		}
+	}, [])
 
 	const filteredTracks = tracks.filter((t) => {
 		if (!searchKeyword.trim()) return true
@@ -97,38 +110,125 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 		(p) => !hiddenIds.includes(p.id),
 	)
 
-	// Fetch tracks when selectedPlaylistId changes (cache-first)
+	// Fetch tracks when selectedPlaylistId changes (cache-first + progressive pagination)
 	const fetchPlaylistTracks = async (favoriteId: number, forceRefresh = false) => {
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort()
+		}
+		const abortController = new AbortController()
+		abortControllerRef.current = abortController
+		activeFavoriteIdRef.current = favoriteId
+
+		setError(null)
+
+		const currentPl = favoritePlaylists.find((p) => p.id === favoriteId)
+		const expectedCount = currentPl?.media_count ?? 0
 		const cached = playlistTracksCache[favoriteId]
+
+		// 缓存判断：已有缓存先立即呈现，无缓存则触发首屏加载
 		if (cached && cached.length > 0 && !forceRefresh) {
 			setTracks(cached)
 			setLoadingTracks(false)
-			return
+			// 若缓存曲目数已达到预期总量，直接复用无需网络请求
+			if (expectedCount > 0 && cached.length >= expectedCount) {
+				setIsLoadingMore(false)
+				return
+			}
+			// 若缓存数量少于当前收藏夹总量（如之前仅存了40首或远端有新增），继续后台增量补全
+		} else {
+			setTracks([])
+			setLoadingTracks(true)
 		}
 
-		setLoadingTracks(true)
-		setError(null)
+		let page = 1
+		let hasMore = true
+		const allCollectedTracks: BilibiliTrack[] = []
+		const seenUniqueKeys = new Set<string>()
+
 		try {
-			const res = await bilibiliApi.getFavoriteListContents({
-				favoriteId,
-				pn: 1,
-			})
-			if (res.isOk()) {
-				const medias = res.value.medias || []
-				const converted = medias.map((m, idx) =>
-					convertFavoriteItemToTrack(m, idx),
-				)
-				setTracks(converted)
-				setPlaylistTracksCache(favoriteId, converted)
-			} else {
-				setError(res.error.message || '获取收藏夹内容失败')
-				if (!cached) setTracks([])
+			while (hasMore && page <= 50) {
+				if (abortController.signal.aborted || activeFavoriteIdRef.current !== favoriteId) {
+					return
+				}
+
+				if (page > 1) {
+					setIsLoadingMore(true)
+				}
+
+				const res = await bilibiliApi.getFavoriteListContents({
+					favoriteId,
+					pn: page,
+					ps: 40,
+					signal: abortController.signal,
+				})
+
+				if (abortController.signal.aborted || activeFavoriteIdRef.current !== favoriteId) {
+					return
+				}
+
+				if (res.isOk()) {
+					const data = res.value
+					const medias = data.medias || []
+					const pageTracks: BilibiliTrack[] = []
+
+					medias.forEach((m) => {
+						const track = convertFavoriteItemToTrack(
+							m,
+							allCollectedTracks.length + pageTracks.length,
+						)
+						if (!seenUniqueKeys.has(track.uniqueKey)) {
+							seenUniqueKeys.add(track.uniqueKey)
+							pageTracks.push(track)
+						}
+					})
+
+					allCollectedTracks.push(...pageTracks)
+
+					// 第一页完成：立即结束整页 Loading 展现首批曲目
+					if (page === 1) {
+						setTracks([...allCollectedTracks])
+						setLoadingTracks(false)
+					} else {
+						// 后续页面：平滑追加
+						setTracks([...allCollectedTracks])
+					}
+
+					const totalFromApi = data.info?.media_count ?? expectedCount
+					if (
+						!data.has_more ||
+						medias.length === 0 ||
+						(totalFromApi > 0 && allCollectedTracks.length >= totalFromApi)
+					) {
+						hasMore = false
+					} else {
+						page += 1
+						await new Promise((resolve) => setTimeout(resolve, 60))
+					}
+				} else {
+					if (page === 1 && (!cached || forceRefresh)) {
+						setError(res.error.message || '获取收藏夹内容失败')
+					}
+					hasMore = false
+				}
 			}
-		} catch (err) {
-			setError(err instanceof Error ? err.message : '网络请求异常')
-			if (!cached) setTracks([])
+
+			// 全量拉取就绪，写入持久化缓存
+			if (activeFavoriteIdRef.current === favoriteId && allCollectedTracks.length > 0) {
+				setTracks(allCollectedTracks)
+				setPlaylistTracksCache(favoriteId, allCollectedTracks)
+			}
+		} catch (err: any) {
+			if (err?.name === 'AbortError' || abortController.signal.aborted) {
+				return
+			}
+			if (page === 1 && (!cached || forceRefresh)) {
+				setError(err instanceof Error ? err.message : '网络请求异常')
+			}
 		} finally {
-			setLoadingTracks(false)
+			if (activeFavoriteIdRef.current === favoriteId) {
+				setLoadingTracks(false)
+				setIsLoadingMore(false)
+			}
 		}
 	}
 
@@ -270,15 +370,20 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 
 					<button
 						onClick={handleRefresh}
-						disabled={isSyncingPlaylists || loadingTracks}
+						disabled={isSyncingPlaylists || loadingTracks || isLoadingMore}
 						className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-foreground transition-all duration-150 disabled:opacity-50"
+						title={isLoadingMore ? '正在后台增量拉取更多歌曲...' : '全量刷新当前收藏夹'}
 					>
 						<RefreshCw
 							className={`w-3.5 h-3.5 ${
-								isSyncingPlaylists || loadingTracks ? 'animate-spin' : ''
+								isSyncingPlaylists || loadingTracks || isLoadingMore ? 'animate-spin' : ''
 							}`}
 						/>
-						<span>刷新</span>
+						<span>
+							{isLoadingMore
+								? `加载中 (${tracks.length}/${currentPlaylist?.media_count || '...'})`
+								: '刷新'}
+						</span>
 					</button>
 
 					{filteredTracks.length > 0 && (
@@ -391,7 +496,9 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 					<div className="grid grid-cols-12 px-3 py-2 text-[11px] font-semibold text-muted-foreground border-b border-white/5">
 						<span className="col-span-1 text-center">#</span>
 						<span className="col-span-7">
-							歌曲标题 {searchKeyword.trim() && `(匹配 ${filteredTracks.length} / 共 ${tracks.length} 首)`}
+							歌曲标题 {searchKeyword.trim()
+								? `(匹配 ${filteredTracks.length} / 共 ${tracks.length} 首)`
+								: `(共 ${tracks.length} 首${currentPlaylist && currentPlaylist.media_count > tracks.length ? ` · 正在同步至 ${currentPlaylist.media_count} 首` : ''})`}
 						</span>
 						<span className="col-span-2">UP主</span>
 						<span className="col-span-2 text-right">时长 / 操作</span>
@@ -462,6 +569,15 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({
 							)
 						})}
 					</div>
+
+					{isLoadingMore && (
+						<div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground animate-pulse border-t border-white/5 mt-1">
+							<Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+							<span>
+								正在同步其余收藏歌曲 ({tracks.length} / {currentPlaylist?.media_count || '...'} 首)...
+							</span>
+						</div>
+					)}
 				</div>
 			)}
 
