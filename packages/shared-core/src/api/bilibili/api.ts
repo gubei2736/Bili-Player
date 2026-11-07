@@ -426,9 +426,16 @@ export class BilibiliApi {
 				}
 
 				const getTime = Date.now() + 60 * 1000
-				const sortedAudios = [...dash.audio].sort((a, b) => b.id - a.id)
+				// 优先筛选匹配目标清晰度的音频流，并在同档位中严格按 bandwidth 降序优先选取最高码率流
+				const candidateAudios = dash.audio.filter((audio) => audio.id === audioQuality)
 				const targetAudio =
-					dash.audio.find((audio) => audio.id === audioQuality) || sortedAudios[0]
+					candidateAudios.length > 0
+						? candidateAudios.sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))[0]
+						: [...dash.audio].sort((a, b) =>
+								b.id !== a.id
+									? b.id - a.id
+									: (b.bandwidth || 0) - (a.bandwidth || 0),
+						  )[0]
 
 				if (targetAudio) {
 					return okAsync({

@@ -77,23 +77,18 @@ export function getQualityBadgeInfo(
 					: 'Dolby Atmos (E-AC-3 JOC, 最高 768kbps)',
 			}
 		case 30280: {
-			// B站 30280 为常规高码率档位：日常投稿普遍为 192kbps，高规格投稿可达 320kbps
-			let text = '192Kbps AAC'
-			if (measuredKbps) {
-				if (measuredKbps >= 260) {
-					text = '320Kbps AAC'
-				} else if (measuredKbps >= 150) {
-					text = `${measuredKbps >= 180 && measuredKbps <= 200 ? 192 : measuredKbps}Kbps AAC`
-				} else {
-					text = `${measuredKbps}Kbps AAC`
-				}
+			// B站 30280 为官方最高常规音频档位 (标称 320Kbps AAC)
+			// B站转码采用 VBR 动态压缩，实测平均带宽通常在 192k ~ 320k 之间 (如 238k)
+			let text = '320Kbps AAC'
+			if (measuredKbps && measuredKbps < 210) {
+				text = '192Kbps AAC'
 			}
 			return {
 				text,
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',
-				tooltip: `高品质常规 AAC (${measuredKbps ? measuredKbps + 'Kbps' : '192~320Kbps'} / ID: 30280)`,
+				tooltip: `高品质常规 AAC · 320K 档位 (${measuredKbps ? `当前动态流码率: ${measuredKbps}Kbps` : '标称 320Kbps'} / ID: 30280)`,
 			}
 		}
 		case 30232: {
