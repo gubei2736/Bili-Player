@@ -122,7 +122,7 @@ export class SpatialSurroundProcessor {
 
 	// ---------- 1.4 8D 动态公转全景环绕引擎 ----------
 	private eightDSplitter: ChannelSplitterNode
-	private eightDMerger: ChannelMergerNode
+	private eightDOutputGain: GainNode
 	private pannerL: PannerNode
 	private pannerR: PannerNode
 
@@ -469,33 +469,56 @@ export class SpatialSurroundProcessor {
 
 		this.hesuviMerger.connect(this.wetGain)
 
+		// 确保 Listener 原点朝向校准 (正前方为 -Z)
+		try {
+			const listener = this.audioCtx.listener
+			if (listener.positionX) {
+				listener.positionX.setValueAtTime(0, now)
+				listener.positionY.setValueAtTime(0, now)
+				listener.positionZ.setValueAtTime(0, now)
+				listener.forwardX.setValueAtTime(0, now)
+				listener.forwardY.setValueAtTime(0, now)
+				listener.forwardZ.setValueAtTime(-1, now)
+				listener.upX.setValueAtTime(0, now)
+				listener.upY.setValueAtTime(1, now)
+				listener.upZ.setValueAtTime(0, now)
+			} else if ((listener as any).setPosition) {
+				;(listener as any).setPosition(0, 0, 0)
+				;(listener as any).setOrientation(0, 0, -1, 0, 1, 0)
+			}
+		} catch {}
+
 		// ==================== 1.4 构建 8D 动态公转全景环绕网络 ====================
 		this.eightDSplitter = this.audioCtx.createChannelSplitter(2)
-		this.eightDMerger = this.audioCtx.createChannelMerger(2)
+		// 注意：八维环绕的输出必须是标准的立体声 Gain 混音节点，绝不可使用 ChannelMerger 截断右声道！
+		this.eightDOutputGain = this.audioCtx.createGain()
+		this.eightDOutputGain.gain.setValueAtTime(1.25, now) // 1.25x 响度补偿，杜绝 8D 切换时音量衰减
 		this.eightDSubGain.connect(this.eightDSplitter)
 
-		// 左右声道各配置独立的高精度 HRTF Panner
+		// 左右声道各配置独立的高精度立体声 HRTF Panner
 		this.pannerL = this.audioCtx.createPanner()
 		this.pannerL.panningModel = 'HRTF'
 		this.pannerL.distanceModel = 'inverse'
-		this.pannerL.refDistance = 1.0
+		this.pannerL.refDistance = 2.2
 		this.pannerL.maxDistance = 1000
-		this.pannerL.rolloffFactor = 0.4
+		this.pannerL.rolloffFactor = 0.25
 		this.pannerL.coneInnerAngle = 360
 
 		this.pannerR = this.audioCtx.createPanner()
 		this.pannerR.panningModel = 'HRTF'
 		this.pannerR.distanceModel = 'inverse'
-		this.pannerR.refDistance = 1.0
+		this.pannerR.refDistance = 2.2
 		this.pannerR.maxDistance = 1000
-		this.pannerR.rolloffFactor = 0.4
+		this.pannerR.rolloffFactor = 0.25
 		this.pannerR.coneInnerAngle = 360
 
-		// 左通道送入 pannerL，右通道送入 pannerR
+		// 左通道送入 pannerL，右通道送入 pannerR (两路各生成完整的双耳 HRTF 立体声)
 		this.eightDSplitter.connect(this.pannerL, 0)
 		this.eightDSplitter.connect(this.pannerR, 1)
-		this.pannerL.connect(this.eightDMerger)
-		this.pannerR.connect(this.eightDMerger)
+
+		// 左右 Panner 生成的完整双耳立体声汇流至 eightDOutputGain
+		this.pannerL.connect(this.eightDOutputGain)
+		this.pannerR.connect(this.eightDOutputGain)
 
 		// 8D 漫射空间微混响 (营造环绕房间深度，避免干涩)
 		this.eightDReverbGain = this.audioCtx.createGain()
@@ -516,10 +539,9 @@ export class SpatialSurroundProcessor {
 		this.eightDReverbDelayL.connect(this.eightDReverbFilter)
 		this.eightDReverbDelayR.connect(this.eightDReverbFilter)
 		this.eightDReverbFilter.connect(this.eightDReverbGain)
-		this.eightDReverbGain.connect(this.eightDMerger, 0, 0)
-		this.eightDReverbGain.connect(this.eightDMerger, 0, 1)
+		this.eightDReverbGain.connect(this.eightDOutputGain)
 
-		this.eightDMerger.connect(this.wetGain)
+		this.eightDOutputGain.connect(this.wetGain)
 
 		// 初始化 Panner 默认坐标
 		this.update8dPannerPositions(0)
@@ -748,23 +770,24 @@ export class SpatialSurroundProcessor {
 	}
 
 	private update8dPannerPositions(angle: number): void {
-		// 公转半径 (米)，立体声左右分轨夹角 ±30°
-		const R = 2.4
-		const sepAngle = (30 * Math.PI) / 180
+		// 公转半径 R = 2.2米，立体声左右分轨夹角 ±25°
+		const R = 2.2
+		const sepAngle = (25 * Math.PI) / 180
 
 		const angleL = angle - sepAngle
 		const angleR = angle + sepAngle
 
-		// 视线为 -Z，正右为 +X，后方为 +Z
+		// 听者面朝 -Z 轴，正右为 +X，后方为 +Z
+		// angle 顺时针旋转：0(正前) -> PI/2(正右) -> PI(正后) -> 3PI/2(正左) -> 2PI(正前)
 		const xL = R * Math.sin(angleL)
 		const zL = -R * Math.cos(angleL)
 
 		const xR = R * Math.sin(angleR)
 		const zR = -R * Math.cos(angleR)
 
-		// 轻微三维俯仰：在身前略微上抬(+0.35m)，在身后略微下沉(-0.25m)，三维轨迹更丰富
-		const yL = 0.35 * Math.cos(angleL)
-		const yR = 0.35 * Math.cos(angleR)
+		// 轻微三维俯仰：在身前略微上抬(+0.30m)，在身后略微下沉(-0.20m)，三维轨迹更丰富
+		const yL = 0.30 * Math.cos(angleL)
+		const yR = 0.30 * Math.cos(angleR)
 
 		const nowAudio = this.audioCtx.currentTime
 
