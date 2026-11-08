@@ -58,29 +58,30 @@ export function getQualityBadgeInfo(
 	switch (qualityId) {
 		case 30251:
 			return {
-				text: 'Hi-Res 无损',
+				text: measuredKbps ? `Hi-Res · ${measuredKbps}Kbps` : 'Hi-Res 无损',
 				bg: 'bg-amber-500/20',
 				border: 'border-amber-400/30',
 				color: 'text-amber-300',
 				tooltip: measuredKbps
-					? `FLAC 无损音轨 (${measuredKbps}Kbps, 最高 96kHz/24bit)`
+					? `FLAC 无损音轨 (实时流物理带宽: ${measuredKbps}Kbps, 最高 96kHz/24bit)`
 					: 'FLAC 无损音轨 (最高 96kHz/24bit)',
 			}
 		case 30250:
 			return {
-				text: '杜比全景声',
+				text: measuredKbps ? `杜比 · ${measuredKbps}Kbps` : '杜比全景声',
 				bg: 'bg-purple-500/20',
 				border: 'border-purple-400/30',
 				color: 'text-purple-300',
 				tooltip: measuredKbps
-					? `Dolby Atmos (${measuredKbps}Kbps E-AC-3 JOC)`
+					? `Dolby Atmos (实时流物理带宽: ${measuredKbps}Kbps E-AC-3 JOC)`
 					: 'Dolby Atmos (E-AC-3 JOC, 最高 768kbps)',
 			}
 		case 30280: {
 			// B站 30280 为官方最高常规音频档位 (标称 320Kbps AAC)
-			// B站音频采用 AAC-LC VBR 动态压缩编码，各歌曲实际平均物理流带宽根据频谱自适应决定 (通常在 180k~320k 之间)
+			// B站音频采用 AAC-LC VBR 动态压缩编码，在播放栏中直观呈现「320K 档位 · 实时流物理带宽」
+			const text = measuredKbps ? `320K · ${measuredKbps}Kbps` : '320Kbps AAC'
 			return {
-				text: '320Kbps AAC',
+				text,
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',
@@ -88,27 +89,23 @@ export function getQualityBadgeInfo(
 			}
 		}
 		case 30232: {
-			const text = measuredKbps
-				? `${measuredKbps >= 125 && measuredKbps <= 140 ? 132 : measuredKbps}Kbps AAC`
-				: '132Kbps AAC'
+			const text = measuredKbps ? `132K · ${measuredKbps}Kbps` : '132Kbps AAC'
 			return {
 				text,
 				bg: 'bg-teal-500/20',
 				border: 'border-teal-400/30',
 				color: 'text-teal-300',
-				tooltip: `中等品质常规 AAC (${measuredKbps ? measuredKbps + 'Kbps' : '132Kbps'} / ID: 30232)`,
+				tooltip: `中等品质常规 AAC · 132K 档位 (${measuredKbps ? `实时流物理带宽: ${measuredKbps}Kbps` : '132Kbps'} / B站音频ID: 30232)`,
 			}
 		}
 		case 30216: {
-			const text = measuredKbps
-				? `${measuredKbps >= 60 && measuredKbps <= 70 ? 64 : measuredKbps}Kbps AAC`
-				: '64Kbps AAC'
+			const text = measuredKbps ? `64K · ${measuredKbps}Kbps` : '64Kbps AAC'
 			return {
 				text,
 				bg: 'bg-zinc-500/20',
 				border: 'border-zinc-400/30',
 				color: 'text-zinc-300',
-				tooltip: `普通品质常规 AAC (${measuredKbps ? measuredKbps + 'Kbps' : '64Kbps'} / ID: 30216)`,
+				tooltip: `普通品质常规 AAC · 64K 档位 (${measuredKbps ? `实时流物理带宽: ${measuredKbps}Kbps` : '64Kbps'} / B站音频ID: 30216)`,
 			}
 		}
 		default:
