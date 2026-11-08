@@ -15,7 +15,7 @@
   <sub><b>Author & Maintainer: <a href="https://github.com/gubei2736">gubei2736</a></b></sub>
 </p>
 
-[![Release](https://img.shields.io/badge/Release-v1.1.4-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.5-blue?style=flat-square)](https://github.com/gubei2736/Bili-Player/releases)
 [![Maintainer](https://img.shields.io/badge/Maintainer-gubei2736-EA4AAA?style=flat-square&logo=github&logoColor=white)](https://github.com/gubei2736)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/gubei2736/Bili-Player)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://v2.tauri.app/)
@@ -38,6 +38,15 @@
 </details>
 
 ## 更新日志 (Changelog)
+
+### v1.1.5 (2026-11-08)
+- **UP 主搜索与空间浏览**：
+  - 顶部搜索框全新支持“单曲/视频”与“UP 主”双模式切换，随模式动态切换提示词与历史记录；
+  - 搜索结果支持 UP 主网格卡片浏览，点击即可直达 UP 主空间主页；
+  - UP 主空间支持浏览 UP 主全部投稿歌曲/视频，支持单曲播放、一键播放全部歌曲、添加到歌单与分 P 选集；
+  - UP 主空间支持展示所有视频合集（Seasons）与系列（Series），解除网页专有接口风控，支持展开浏览合集选集并一键整套合集播放。
+- **状态栏流媒体规格透传**：
+  - 播放底栏实时展示物理音频流规格与动态码率徽标。
 
 ### v1.1.4 (2026-10-30)
 - **音频与空间声场**：
