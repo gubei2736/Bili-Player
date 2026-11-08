@@ -25,6 +25,8 @@ import type {
 	BilibiliSearchSuggestionItem,
 	BilibiliSearchUser,
 	BilibiliSearchVideo,
+	BilibiliSeasonItem,
+	BilibiliSeriesItem,
 	BilibiliSeasonsSeriesListResponse,
 	BilibiliSeriesArchives,
 	BilibiliSeriesMetadata,
@@ -709,6 +711,7 @@ export class BilibiliApi {
 		pageSize?: number
 		signal?: AbortSignal
 	}): ResultAsync<BilibiliSeasonsSeriesListResponse['items_lists'], BilibiliApiError> {
+		const safePageSize = Math.min(Math.max(pageSize, 1), 20)
 		return this.client
 			.get<{
 				items_lists: BilibiliSeasonsSeriesListResponse['items_lists']
@@ -717,7 +720,7 @@ export class BilibiliApi {
 				params: {
 					mid: mid.toString(),
 					page_num: pageNumber.toString(),
-					page_size: pageSize.toString(),
+					page_size: safePageSize.toString(),
 				},
 				headers: {
 					'User-Agent':
@@ -726,7 +729,48 @@ export class BilibiliApi {
 				},
 				signal,
 			})
-			.map((res) => res?.items_lists || { page: { page_num: 1, page_size: pageSize, total: 0 }, seasons_list: [], series_list: [] })
+			.map((res) => res?.items_lists || { page: { page_num: 1, page_size: safePageSize, total: 0 }, seasons_list: [], series_list: [] })
+	}
+
+	getUserAllSeasonsSeriesList({
+		mid,
+		signal,
+	}: {
+		mid: number
+		signal?: AbortSignal
+	}): ResultAsync<
+		{
+			seasons_list: BilibiliSeasonItem[]
+			series_list: BilibiliSeriesItem[]
+			total: number
+		},
+		BilibiliApiError
+	> {
+		return this.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 20, signal }).andThen(
+			(firstPage) => {
+				const seasons = [...(firstPage.seasons_list || [])]
+				const series = [...(firstPage.series_list || [])]
+				const total = firstPage.page?.total || seasons.length + series.length
+				const totalPages = Math.ceil(total / 20)
+
+				if (totalPages <= 1) {
+					return okAsync({ seasons_list: seasons, series_list: series, total })
+				}
+
+				const remainingPageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+				const remainingRequests = remainingPageNumbers.map((pn) =>
+					this.getUserSeasonsSeriesList({ mid, pageNumber: pn, pageSize: 20, signal })
+				)
+
+				return ResultAsync.combine(remainingRequests).map((pages) => {
+					for (const page of pages) {
+						if (page.seasons_list) seasons.push(...page.seasons_list)
+						if (page.series_list) series.push(...page.series_list)
+					}
+					return { seasons_list: seasons, series_list: series, total }
+				})
+			}
+		)
 	}
 
 	getComments({

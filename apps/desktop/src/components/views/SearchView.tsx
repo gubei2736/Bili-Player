@@ -278,9 +278,10 @@ export const SearchView: React.FC<SearchViewProps> = ({
 		setLoadingCollections(true)
 		setCollectionsError(null)
 
-		let res = await bilibiliApi.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 50 })
+		let res = await bilibiliApi.getUserAllSeasonsSeriesList({ mid })
 		if (!res.isOk()) {
-			res = await bilibiliApi.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 50 })
+			// 回退单页拉取，严格维持 pageSize <= 20
+			res = await bilibiliApi.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 20 })
 		}
 		setLoadingCollections(false)
 
