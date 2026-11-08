@@ -60,7 +60,7 @@ export const EQ_PRESETS: EQPreset[] = [
 ]
 
 export type SpatialDeviceType = 'headphone' | 'speaker'
-export type SpatialHeadphoneMode = 'hrtf' | 'dts' | 'hesuvi'
+export type SpatialHeadphoneMode = 'hrtf' | 'dts' | 'hesuvi' | '8d'
 
 export interface EqualizerSettings {
 	enabled: boolean
@@ -77,6 +77,7 @@ export interface EqualizerSettings {
 	spatialHeadphoneMode: SpatialHeadphoneMode
 	spatialSpeakerWidening: number // 0.0 ~ 1.0, 电脑音箱立体声拉宽程度
 	spatialSpeakerCrossDelay: number // 0.0 ~ 1.0, 电脑音箱轻微交叉延迟深度
+	spatial8dSpeed: number // 8D 环绕公转速度 (秒/圈)，默认 12 秒
 }
 
 export const DEFAULT_EQ_SETTINGS: EqualizerSettings = {
@@ -93,6 +94,7 @@ export const DEFAULT_EQ_SETTINGS: EqualizerSettings = {
 	spatialHeadphoneMode: 'dts',
 	spatialSpeakerWidening: 0.6,
 	spatialSpeakerCrossDelay: 0.4,
+	spatial8dSpeed: 12,
 }
 
 const EQ_STORAGE_KEY = 'bbplayer_equalizer_settings_v1'

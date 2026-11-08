@@ -187,6 +187,13 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 		})
 	}
 
+	const handle8dSpeedChange = (val: number) => {
+		updateSettings({
+			...settings,
+			spatial8dSpeed: Math.max(5, Math.min(30, val)),
+		})
+	}
+
 	const handleSpeakerWideningChange = (val: number) => {
 		updateSettings({
 			...settings,
@@ -621,7 +628,7 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 
 						{/* 耳机预设算法分支 */}
 						{settings.spatialDeviceType === 'headphone' ? (
-							<div className="space-y-2">
+							<div className="space-y-2.5">
 								<div className="text-[11px] text-muted-foreground font-medium flex items-center justify-between">
 									<span>耳机空间算法模式</span>
 									<span className="text-[#00AEEC]">
@@ -629,11 +636,13 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 											? 'DTS Headphone:X'
 											: settings.spatialHeadphoneMode === 'hrtf'
 											? 'HRTF 双耳定位'
+											: settings.spatialHeadphoneMode === '8d'
+											? '8D 动态全景环绕'
 											: 'HeSuVi 7.1 虚拟声场'}
 									</span>
 								</div>
 
-								<div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+								<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
 									{/* DTS Headphone:X */}
 									<button
 										type="button"
@@ -646,14 +655,14 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 									>
 										<div className="flex items-center justify-between mb-1">
 											<span className="text-xs font-semibold text-white">
-												DTS Headphone:X
+												DTS 影院
 											</span>
 											{settings.spatialHeadphoneMode === 'dts' && (
 												<Check className="w-3.5 h-3.5 text-[#00AEEC]" />
 											)}
 										</div>
 										<p className="text-[10px] text-muted-foreground/90 leading-tight">
-											影院全景声拟真，宽视角前置声场与早期环境微混响，氛围沉浸
+											影院大空间，前置宽声场与微混响
 										</p>
 									</button>
 
@@ -669,14 +678,14 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 									>
 										<div className="flex items-center justify-between mb-1">
 											<span className="text-xs font-semibold text-white">
-												HRTF 双耳定位
+												HRTF 定位
 											</span>
 											{settings.spatialHeadphoneMode === 'hrtf' && (
 												<Check className="w-3.5 h-3.5 text-[#00AEEC]" />
 											)}
 										</div>
 										<p className="text-[10px] text-muted-foreground/90 leading-tight">
-											纯净头部相关传输函数，耳廓滤波与头影低通衰减，自然消除压迫感
+											纯净头部传输函数，消除头中效应
 										</p>
 									</button>
 
@@ -699,10 +708,89 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({
 											)}
 										</div>
 										<p className="text-[10px] text-muted-foreground/90 leading-tight">
-											7.1 虚拟声场多声道混合仿真，侧后方离散延迟还原环绕包围感
+											7.1 虚拟声场，侧后多声道环绕包围
+										</p>
+									</button>
+
+									{/* 8D 动态全景环绕 */}
+									<button
+										type="button"
+										onClick={() => handleHeadphoneModeChange('8d')}
+										className={`p-2.5 rounded-xl border text-left transition-all ${
+											settings.spatialHeadphoneMode === '8d'
+												? 'bg-[#00AEEC]/15 border-[#00AEEC]/60 text-white shadow-sm ring-1 ring-[#00AEEC]/40'
+												: 'bg-white/[0.02] border-white/5 text-muted-foreground hover:text-white hover:bg-white/5'
+										}`}
+									>
+										<div className="flex items-center justify-between mb-1">
+											<span className="text-xs font-semibold text-white flex items-center gap-1">
+												<span>8D 动态环绕</span>
+											</span>
+											{settings.spatialHeadphoneMode === '8d' && (
+												<Check className="w-3.5 h-3.5 text-[#00AEEC]" />
+											)}
+										</div>
+										<p className="text-[10px] text-muted-foreground/90 leading-tight">
+											360° 颅周动态公转，声像绕脑盘旋流动
 										</p>
 									</button>
 								</div>
+
+								{/* 8D 专属速度调节与状态面板 */}
+								{settings.spatialHeadphoneMode === '8d' && (
+									<div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 mt-2 animate-in fade-in duration-150">
+										<div className="flex items-center justify-between">
+											<span className="text-xs font-medium text-white flex items-center gap-1.5">
+												<span>8D 绕脑公转周期</span>
+												<span className="text-[10px] text-muted-foreground">(越小转速越快)</span>
+											</span>
+											<span className="text-xs font-mono font-semibold text-[#00AEEC]">
+												{settings.spatial8dSpeed || 12} 秒 / 圈
+											</span>
+										</div>
+										<div className="flex items-center gap-3">
+											<span className="text-[10px] text-muted-foreground font-mono">5s (极速)</span>
+											<input
+												type="range"
+												min="5"
+												max="24"
+												step="1"
+												value={settings.spatial8dSpeed || 12}
+												disabled={!settings.spatialSurroundEnabled}
+												onChange={(e) => handle8dSpeedChange(parseFloat(e.target.value))}
+												className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+												style={{ accentColor: '#00AEEC' }}
+											/>
+											<span className="text-[10px] text-muted-foreground font-mono">24s (舒缓)</span>
+										</div>
+										<div className="flex items-center justify-between pt-1">
+											<div className="flex items-center gap-1.5">
+												{[
+													{ label: '动感 8s', speed: 8 },
+													{ label: '标准 12s', speed: 12 },
+													{ label: '沉浸 16s', speed: 16 },
+												].map((preset) => (
+													<button
+														key={preset.speed}
+														type="button"
+														onClick={() => handle8dSpeedChange(preset.speed)}
+														className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+															(settings.spatial8dSpeed || 12) === preset.speed
+																? 'bg-[#00AEEC] text-white shadow-sm'
+																: 'bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white'
+														}`}
+													>
+														{preset.label}
+													</button>
+												))}
+											</div>
+											<span className="text-[10px] text-sky-400/90 font-medium flex items-center gap-1">
+												<span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping inline-block mr-0.5" />
+												360° 空间动态公转中
+											</span>
+										</div>
+									</div>
+								)}
 							</div>
 						) : (
 							/* 电脑音箱分支 */
