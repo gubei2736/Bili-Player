@@ -25,6 +25,7 @@ import type {
 	BilibiliSearchSuggestionItem,
 	BilibiliSearchUser,
 	BilibiliSearchVideo,
+	BilibiliSeasonsSeriesListResponse,
 	BilibiliSeriesArchives,
 	BilibiliSeriesMetadata,
 	BilibiliSmsLoginData,
@@ -695,6 +696,32 @@ export class BilibiliApi {
 				signal,
 			})
 		})
+	}
+
+	getUserSeasonsSeriesList({
+		mid,
+		pageNumber = 1,
+		pageSize = 20,
+		signal,
+	}: {
+		mid: number
+		pageNumber?: number
+		pageSize?: number
+		signal?: AbortSignal
+	}): ResultAsync<BilibiliSeasonsSeriesListResponse['items_lists'], BilibiliApiError> {
+		return this.client
+			.get<{
+				items_lists: BilibiliSeasonsSeriesListResponse['items_lists']
+			}>({
+				endpoint: '/x/polymer/web-space/seasons_series_list',
+				params: {
+					mid: mid.toString(),
+					page_num: pageNumber.toString(),
+					page_size: pageSize.toString(),
+				},
+				signal,
+			})
+			.map((res) => res.items_lists)
 	}
 
 	getComments({

@@ -8,20 +8,43 @@ import {
 	History,
 	Trash2,
 	Minimize2,
+	Music,
+	User,
+	ChevronDown,
 } from 'lucide-react'
 import { BiliPlayerLogo } from '../common/BiliPlayerLogo'
 
+export type SearchMode = 'video' | 'up'
+
 export interface TitleBarProps {
-	onSearch?: (query: string) => void
+	onSearch?: (query: string, mode?: SearchMode) => void
 	onToggleLyricsWindow?: () => void
+	searchMode?: SearchMode
+	onSearchModeChange?: (mode: SearchMode) => void
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
 	onSearch,
+	searchMode,
+	onSearchModeChange,
 }) => {
 	const [query, setQuery] = useState('')
 	const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false)
 	const [isMaximized, setIsMaximized] = useState(false)
+
+	const [internalMode, setInternalMode] = useState<SearchMode>('video')
+	const mode = searchMode ?? internalMode
+	const [showModeDropdown, setShowModeDropdown] = useState(false)
+	const modeDropdownRef = useRef<HTMLDivElement | null>(null)
+
+	const handleModeSelect = (newMode: SearchMode) => {
+		setInternalMode(newMode)
+		onSearchModeChange?.(newMode)
+		setShowModeDropdown(false)
+		if (query.trim() && onSearch) {
+			onSearch(query.trim(), newMode)
+		}
+	}
 
 	const handleMinimize = async () => {
 		try {
@@ -100,6 +123,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 		const handleClickOutside = (e: MouseEvent) => {
 			if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
 				setShowHistory(false)
+				setShowModeDropdown(false)
 			}
 		}
 		window.addEventListener('mousedown', handleClickOutside)
@@ -131,14 +155,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 		setQuery(keyword)
 		saveSearchHistory(keyword)
 		setShowHistory(false)
-		if (onSearch) onSearch(keyword)
+		if (onSearch) onSearch(keyword, mode)
 	}
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (e.key === 'Enter' && onSearch && query.trim()) {
 			saveSearchHistory(query)
 			setShowHistory(false)
-			onSearch(query.trim())
+			onSearch(query.trim(), mode)
 		}
 	}
 
@@ -163,8 +187,64 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 				ref={searchContainerRef}
 				className="relative flex-1 max-w-sm focus-within:max-w-md transition-all duration-300 mx-4 pointer-events-auto"
 			>
-				<div className="relative flex items-center group">
-					<Search className="w-3.5 h-3.5 absolute left-3.5 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
+				<div className="relative flex items-center group rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus-within:bg-[#0d121f]/95 border border-white/[0.08] focus-within:border-primary/50 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] focus-within:ring-2 focus-within:ring-primary/15 transition-all duration-200 h-8 px-1">
+					{/* Mode Toggle Button */}
+					<div className="relative flex-shrink-0" ref={modeDropdownRef}>
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation()
+								setShowModeDropdown(!showModeDropdown)
+							}}
+							className="flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-[11px] font-medium text-foreground/80 hover:text-white transition-colors cursor-pointer select-none"
+							title={`当前搜索模式：${mode === 'video' ? '单曲/视频' : 'UP主'}（点击切换）`}
+						>
+							{mode === 'video' ? (
+								<>
+									<Music className="w-3 h-3 text-primary" />
+									<span className="hidden sm:inline">视频</span>
+								</>
+							) : (
+								<>
+									<User className="w-3 h-3 text-[#00AEEC]" />
+									<span className="hidden sm:inline">UP主</span>
+								</>
+							)}
+							<ChevronDown className="w-2.5 h-2.5 text-muted-foreground opacity-60" />
+						</button>
+
+						{/* Mode Switch Menu */}
+						{showModeDropdown && (
+							<div className="absolute top-full left-0 mt-2 w-32 p-1.5 rounded-xl bg-[#0b0f19]/95 backdrop-blur-xl border border-white/10 shadow-[0_12px_32px_rgba(0,0,0,0.6)] z-50 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
+								<button
+									type="button"
+									onClick={() => handleModeSelect('video')}
+									className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors ${
+										mode === 'video'
+											? 'bg-primary/20 text-primary font-medium'
+											: 'text-foreground/80 hover:bg-white/5 hover:text-white'
+									}`}
+								>
+									<Music className="w-3.5 h-3.5" />
+									<span>单曲 / 视频</span>
+								</button>
+								<button
+									type="button"
+									onClick={() => handleModeSelect('up')}
+									className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors ${
+										mode === 'up'
+											? 'bg-[#00AEEC]/20 text-[#00AEEC] font-medium'
+											: 'text-foreground/80 hover:bg-white/5 hover:text-white'
+									}`}
+								>
+									<User className="w-3.5 h-3.5" />
+									<span>B 站 UP 主</span>
+								</button>
+							</div>
+						)}
+					</div>
+
+					<Search className="w-3.5 h-3.5 ml-1.5 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none flex-shrink-0" />
 					<input
 						type="text"
 						value={query}
@@ -174,13 +254,13 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 							setShowHistory(true)
 						}}
 						onKeyDown={handleKeyDown}
-						placeholder="搜索 B 站音乐、歌手、BV号..."
-						className="w-full h-8 pl-9 pr-8 text-xs rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus:bg-[#0d121f]/95 border border-white/[0.08] focus:border-primary/50 text-foreground placeholder:text-muted-foreground/70 outline-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] focus:ring-2 focus:ring-primary/15 transition-all duration-200"
+						placeholder={mode === 'video' ? '搜索 B 站音乐、歌手、BV号...' : '搜索 UP 主昵称或 UID...'}
+						className="w-full h-full pl-2 pr-2 text-xs bg-transparent text-foreground placeholder:text-muted-foreground/70 outline-none"
 					/>
 					{query && (
 						<button
 							onClick={() => setQuery('')}
-							className="absolute right-2.5 p-0.5 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+							className="p-1 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors mr-1 flex-shrink-0"
 						>
 							<X className="w-3 h-3" />
 						</button>

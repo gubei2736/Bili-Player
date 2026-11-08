@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { desktopDir } from '@tauri-apps/api/path'
 import { MainLayout } from './components/layout/MainLayout'
+import type { SearchMode } from './components/layout/TitleBar'
 import type { NavTab } from './components/layout/Sidebar'
 import { LoginModal } from './components/modals/LoginModal'
 import { PlaylistImportModal } from './components/modals/PlaylistImportModal'
@@ -85,6 +86,7 @@ export const App: React.FC = () => {
 	const [fullscreenLyricsOpen, setFullscreenLyricsOpen] = useState(false)
 	const [activeTab, setActiveTab] = useState<NavTab>('explore')
 	const [searchQuery, setSearchQuery] = useState('')
+	const [searchMode, setSearchMode] = useState<SearchMode>('video')
 	const [dbReady, setDbReady] = useState(false)
 	const [closeAction, setCloseAction] = useState<'tray' | 'exit'>(() => {
 		return (
@@ -844,8 +846,9 @@ export const App: React.FC = () => {
 		broadcastFullLyricsState()
 	}, [currentTrack, activeSplContent, broadcastFullLyricsState])
 
-	const handleSearch = (query: string) => {
+	const handleSearch = (query: string, mode: SearchMode = searchMode) => {
 		if (!query.trim()) return
+		setSearchMode(mode)
 		setSearchQuery(query)
 		setActiveTab('search')
 	}
@@ -864,6 +867,8 @@ export const App: React.FC = () => {
 				activeTab={activeTab}
 				onSelectTab={setActiveTab}
 				onSearch={handleSearch}
+				searchMode={searchMode}
+				onSearchModeChange={setSearchMode}
 				onToggleLyricsWindow={handleToggleLyricsWindow}
 				onToggleFullscreenLyrics={() =>
 					setFullscreenLyricsOpen(!fullscreenLyricsOpen)
@@ -961,6 +966,8 @@ export const App: React.FC = () => {
 						{tab === 'search' && (
 							<SearchView
 								keyword={searchQuery}
+								mode={searchMode}
+								onModeChange={setSearchMode}
 								onExportTrack={setExportModalTrack}
 							/>
 						)}

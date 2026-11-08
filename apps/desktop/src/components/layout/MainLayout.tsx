@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { TitleBar } from './TitleBar'
+import { TitleBar, type SearchMode } from './TitleBar'
 import { Sidebar, type NavTab } from './Sidebar'
 import { BottomPlayerBar } from './BottomPlayerBar'
 import { useQueueStore, useCurrentTrack, useSkinStore } from '@bbplayer/shared-core'
@@ -9,7 +9,9 @@ export interface MainLayoutProps {
 	children: (activeTab: NavTab) => React.ReactNode
 	activeTab?: NavTab
 	onSelectTab?: (tab: NavTab) => void
-	onSearch?: (query: string) => void
+	onSearch?: (query: string, mode?: SearchMode) => void
+	searchMode?: SearchMode
+	onSearchModeChange?: (mode: SearchMode) => void
 	onToggleLyricsWindow?: () => void
 	onToggleFullscreenLyrics?: () => void
 	onOpenLoginModal?: () => void
@@ -20,6 +22,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 	activeTab: externalActiveTab,
 	onSelectTab,
 	onSearch,
+	searchMode,
+	onSearchModeChange,
 	onToggleLyricsWindow,
 	onToggleFullscreenLyrics,
 	onOpenLoginModal,
@@ -147,7 +151,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 			)}
 
 			{/* 2. Top frameless title bar */}
-			<TitleBar onSearch={onSearch} />
+			<TitleBar
+				onSearch={onSearch}
+				searchMode={searchMode}
+				onSearchModeChange={onSearchModeChange}
+			/>
 
 			{/* 3. Middle area: Sidebar + Inset Glass Main Viewport */}
 			<div className="flex flex-1 overflow-hidden relative z-10 px-2 pb-1.5 gap-2">

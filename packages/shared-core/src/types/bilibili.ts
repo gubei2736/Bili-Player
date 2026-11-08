@@ -640,3 +640,62 @@ export type {
 	BilibiliGarbBenefitResponse,
 	BilibiliGarbSuitDetailResponse,
 }
+
+export interface BilibiliSeasonArchive {
+	aid: number
+	bvid: string
+	ctime: number
+	duration: number
+	pic: string
+	pubdate: number
+	title: string
+}
+
+export interface BilibiliSeasonMeta {
+	category: number
+	cover: string
+	description: string
+	mid: number
+	name: string
+	season_id: number
+	total: number
+	title?: string
+}
+
+export interface BilibiliSeasonItem {
+	archives: BilibiliSeasonArchive[]
+	meta: BilibiliSeasonMeta
+	recent_aids?: number[]
+}
+
+export interface BilibiliSeriesMeta {
+	category: number
+	cover: string
+	creator?: string
+	ctime: number
+	description: string
+	mid: number
+	name: string
+	series_id: number
+	state?: number
+	total: number
+}
+
+export interface BilibiliSeriesItem {
+	archives: BilibiliSeasonArchive[]
+	meta: BilibiliSeriesMeta
+	recent_aids?: number[]
+}
+
+export interface BilibiliSeasonsSeriesListResponse {
+	items_lists: {
+		page: {
+			page_num: number
+			page_size: number
+			total: number
+		}
+		seasons_list: BilibiliSeasonItem[]
+		series_list: BilibiliSeriesItem[]
+	}
+}
+
