@@ -78,17 +78,13 @@ export function getQualityBadgeInfo(
 			}
 		case 30280: {
 			// B站 30280 为官方最高常规音频档位 (标称 320Kbps AAC)
-			// B站转码采用 VBR 动态压缩，实测平均带宽通常在 192k ~ 320k 之间 (如 238k)
-			let text = '320Kbps AAC'
-			if (measuredKbps && measuredKbps < 210) {
-				text = '192Kbps AAC'
-			}
+			// B站音频采用 AAC-LC VBR 动态压缩编码，各歌曲实际平均物理流带宽根据频谱自适应决定 (通常在 180k~320k 之间)
 			return {
-				text,
+				text: '320Kbps AAC',
 				bg: 'bg-sky-500/20',
 				border: 'border-sky-400/30',
 				color: 'text-sky-300',
-				tooltip: `高品质常规 AAC · 320K 档位 (${measuredKbps ? `当前动态流码率: ${measuredKbps}Kbps` : '标称 320Kbps'} / ID: 30280)`,
+				tooltip: `高品质常规 AAC · 320K 档位 (${measuredKbps ? `实时流物理带宽: ${measuredKbps}Kbps` : '标称 320Kbps'} / B站音频ID: 30280)`,
 			}
 		}
 		case 30232: {

@@ -298,23 +298,17 @@ export class BilibiliApi {
 		BilibiliApiError
 	> {
 		const { bvid, cid, audioQuality, enableDolby, enableHiRes, preferDolbyFirst } = params
-		// 当请求 Hi-Res 无损音质 (FLAC) 或杜比全景声时，需传入 fnval=4048 以便 B 站下发 dash.flac / dash.dolby
-		// 基础常规 AAC 模式下使用 16 (DASH)，保证极速响应
-		let fnvalNum = 16
-		if (enableDolby || enableHiRes) {
-			fnvalNum = 4048
-		}
-		const fnval = String(fnvalNum)
+		// 请求播放流参数：
+		// fnval=4048: 开启 DASH=16 + 4K=128 + 杜比全景声=1024 + Hi-Res无损=2048 等全特性位掩码支持
+		// qn=120, fourk=1: 告知 B 站服务端返回最完整的高清音视频轨描述，确保 30280 / 杜比 / Hi-Res 无遗漏完整下发
 		const queryPayload: Record<string, string> = {
 			bvid,
 			cid: String(cid),
-			fnval,
+			fnval: '4048',
 			fnver: '0',
-			qlt: String(audioQuality),
+			fourk: '1',
+			qn: '120',
 			voice_balance: '1',
-		}
-		if (enableHiRes || enableDolby) {
-			queryPayload.fourk = '1'
 		}
 		const wbiParams = getWbiEncodedParams(queryPayload)
 
