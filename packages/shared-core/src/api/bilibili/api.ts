@@ -719,9 +719,14 @@ export class BilibiliApi {
 					page_num: pageNumber.toString(),
 					page_size: pageSize.toString(),
 				},
+				headers: {
+					'User-Agent':
+						'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+					Referer: 'https://space.bilibili.com/' + mid,
+				},
 				signal,
 			})
-			.map((res) => res.items_lists)
+			.map((res) => res?.items_lists || { page: { page_num: 1, page_size: pageSize, total: 0 }, seasons_list: [], series_list: [] })
 	}
 
 	getComments({

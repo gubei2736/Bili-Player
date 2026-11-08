@@ -278,12 +278,15 @@ export const SearchView: React.FC<SearchViewProps> = ({
 		setLoadingCollections(true)
 		setCollectionsError(null)
 
-		const res = await bilibiliApi.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 50 })
+		let res = await bilibiliApi.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 50 })
+		if (!res.isOk()) {
+			res = await bilibiliApi.getUserSeasonsSeriesList({ mid, pageNumber: 1, pageSize: 50 })
+		}
 		setLoadingCollections(false)
 
 		if (res.isOk()) {
-			setSeasons(res.value.seasons_list || [])
-			setSeries(res.value.series_list || [])
+			setSeasons(res.value?.seasons_list || [])
+			setSeries(res.value?.series_list || [])
 		} else {
 			setCollectionsError(res.error.message || '获取 UP 主合集列表失败')
 		}

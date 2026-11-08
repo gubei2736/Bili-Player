@@ -130,12 +130,14 @@ export class BilibiliApiClient {
 	get<T>({
 		endpoint,
 		params,
+		headers,
 		fullUrl,
 		skipCookie,
 		signal,
 	}: {
 		endpoint: string
 		params?: Record<string, string | undefined> | string
+		headers?: Record<string, string>
 		fullUrl?: string
 		skipCookie?: boolean
 		signal?: AbortSignal
@@ -154,7 +156,7 @@ export class BilibiliApiClient {
 		}
 		return this.request<T>({
 			endpoint: url,
-			options: { method: 'GET', signal },
+			options: { method: 'GET', headers, signal },
 			fullUrl,
 			skipCookie,
 		})
